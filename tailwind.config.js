@@ -1,0 +1,41 @@
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        bg: {
+          base: "#0b0d12",
+          panel: "#12151c",
+          card: "#181c25",
+          border: "#222734",
+        },
+        accent: {
+          DEFAULT: "#7c5cff",
+          hover: "#9079ff",
+          soft: "#2a224a",
+        },
+        text: {
+          base: "#e6e8ee",
+          muted: "#8b91a3",
+        },
+      },
+      boxShadow: {
+        card: "0 8px 24px rgba(0,0,0,0.35)",
+      },
+      fontFamily: {
+        sans: [
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "Noto Sans JP",
+          "Hiragino Sans",
+          "Yu Gothic",
+          "sans-serif",
+        ],
+      },
+    },
+  },
+  plugins: [],
+};

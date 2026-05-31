@@ -1,0 +1,40 @@
+# ── Node / build artifacts ────────────────────────────
+node_modules/
+server/node_modules/
+dist/
+server/dist/
+*.tsbuildinfo
+
+# ── Secrets（絶対に commit しない） ──────────────────
+.env
+.env.local
+.env.*.local
+server/.env
+server/.env.local
+server/.env.*.local
+
+# ── ログ ─────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── IDE / Editor ─────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Claude / ローカル開発支援 ────────────────────────
+.claude/
+
+# ── 個人用起動スクリプト（必要なら remove） ───────
+# 起動.bat
+# 自動起動_スタートアップ用.vbs

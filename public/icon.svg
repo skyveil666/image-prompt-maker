@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%"   stop-color="#6d28d9"/>
+      <stop offset="50%"  stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="clip">
+      <rect width="64" height="64" rx="14"/>
+    </clipPath>
+  </defs>
+
+  <!-- Base gradient -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+
+  <!-- Top-half shine -->
+  <rect width="64" height="36" fill="url(#shine)" clip-path="url(#clip)"/>
+
+  <!-- Viewfinder corner marks — top-left -->
+  <path d="M9 20 L9 9 L20 9" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.55"/>
+  <!-- Viewfinder corner marks — top-right -->
+  <path d="M55 20 L55 9 L44 9" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.55"/>
+
+  <!-- IPM text -->
+  <text
+    x="32" y="41"
+    font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="19"
+    fill="white"
+    text-anchor="middle"
+    letter-spacing="2"
+  >IPM</text>
+
+  <!-- Prompt lines (text-output metaphor) -->
+  <line x1="13" y1="50" x2="51" y2="50" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.28"/>
+  <line x1="18" y1="55" x2="46" y2="55" stroke="white" stroke-width="1.8" stroke-linecap="round" opacity="0.18"/>
+</svg>

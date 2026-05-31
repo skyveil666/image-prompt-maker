@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── テキスト可読性トークン ───────────────────────────────────────── */
+:root {
+  --text-primary:         rgba(255, 255, 255, 0.96);
+  --text-secondary:       rgba(255, 255, 255, 0.86);
+  --text-muted-readable:  rgba(255, 255, 255, 0.72);
+  --text-placeholder:     rgba(255, 255, 255, 0.56);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-feature-settings: "palt";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar polish (dark) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a3040;
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3a425a;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* progress bar の流れる光 */
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+
+/* 生成完了：バッジ点滅（scale + glow） */
+@keyframes completionPulse {
+  0%   { transform: scale(1);    filter: drop-shadow(0 0 0px  rgba(52,211,153,0)); }
+  35%  { transform: scale(1.10); filter: drop-shadow(0 0 8px  rgba(52,211,153,0.95)); }
+  70%  { transform: scale(1.04); filter: drop-shadow(0 0 4px  rgba(52,211,153,0.50)); }
+  100% { transform: scale(1);    filter: drop-shadow(0 0 0px  rgba(52,211,153,0)); }
+}
+
+/* プリセット押下時：スコープボタン点灯フラッシュ */
+@keyframes scope-flash {
+  0%   { box-shadow: 0 0 0 0    rgba(124,92,255,0.8); transform: scale(1.08); }
+  40%  { box-shadow: 0 0 10px 3px rgba(124,92,255,0.35); transform: scale(1.04); }
+  100% { box-shadow: 0 0 0 0    rgba(124,92,255,0);   transform: scale(1); }
+}
+.scope-flash {
+  animation: scope-flash 0.55s cubic-bezier(0.22,1,0.36,1);
+}
+
+/* エクスプローラー：細めスクロールバー */
+.mx-thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+.mx-thin-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.mx-thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.mx-thin-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.13);
+  border-radius: 9999px;
+}
+.mx-thin-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(124,92,255,0.5);
+}
+
+/* 詳細設定アコーディオン：開いたときの軽いフェード＆スライド */
+@keyframes dc-accordion-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.dc-accordion-body {
+  animation: dc-accordion-in 140ms ease-out;
+}
+
+/* 生成完了：プログレスバー一瞬フラッシュ */
+@keyframes barFlash {
+  0%   { box-shadow: 0 0 14px rgba(52,211,153,0.55); filter: brightness(1); }
+  25%  { box-shadow: 0 0 36px rgba(52,211,153,1);    filter: brightness(1.6); }
+  55%  { box-shadow: 0 0 22px rgba(52,211,153,0.75); filter: brightness(1.2); }
+  100% { box-shadow: 0 0 14px rgba(52,211,153,0.55); filter: brightness(1); }
+}
+
+@layer components {
+  .card {
+    @apply bg-bg-card border border-bg-border rounded-2xl p-5 shadow-card;
+  }
+  .pill {
+    @apply px-3 py-1.5 rounded-full text-sm border border-bg-border bg-bg-panel text-text-muted hover:text-text-base hover:border-accent/60 transition;
+  }
+  .pill-active {
+    @apply px-3 py-1.5 rounded-full text-sm border border-accent bg-accent/15 text-text-base shadow-[0_0_0_1px_rgba(124,92,255,0.4)];
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-bg-border bg-bg-panel text-text-base hover:border-accent/60 transition;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-accent text-white font-semibold hover:bg-accent-hover transition disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .section-title {
+    @apply text-[15px] uppercase tracking-[0.16em] text-text-muted mb-3 font-medium;
+  }
+  .code-block {
+    @apply bg-[#0c0f15] border border-bg-border rounded-xl p-4 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-mono;
+  }
+}
