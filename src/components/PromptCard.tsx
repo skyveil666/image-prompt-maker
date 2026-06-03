@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptHistoryItem } from "../types";
 import { makeThumbnail } from "../lib/imageThumb";
 import { FavoriteButton } from "./FavoriteButton";
+import {
+  getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES,
+  getRatingAt, getMemoAt, buildRatingPatch, buildMemoPatch, RATING_LABELS,
+  getAxisRatingAt, buildAxisRatingPatch, AXIS_RATING_META, type RatingAxisKey,
+} from "../lib/history";
 
 interface Props {
   item: PromptHistoryItem;
@@ -72,21 +77,65 @@ const LONG_THRESHOLD_CHARS  = 480;
 // ─── GeneratedResultSlot ──────────────────────────────────────────────────────
 
 interface SlotProps {
-  resultImageUrl: string | null;
+  /** 登録済みの生成結果画像（最大3枚） */
+  resultImages: string[];
+  /** 画像ごとの評価（同インデックス、null=未評価） */
+  resultRatings: (number | null)[];
+  /** 画像ごとのメモ（同インデックス） */
+  resultMemos: (string | null)[];
   sourceImageUrl: string | null;
-  onImage: (dataUrl: string) => void;
-  onRemove: () => void;
+  /** 末尾に画像を追加（呼び出し側で MAX_RESULT_IMAGES 制限済み） */
+  onAppend: (dataUrl: string) => void;
+  /** 指定インデックスの画像を差し替え */
+  onReplaceAt: (index: number, dataUrl: string) => void;
+  /** 指定インデックスの画像を削除 */
+  onRemoveAt: (index: number) => void;
+  /** 全削除 */
+  onRemoveAll: () => void;
+  /** 評価を設定／クリア（null=クリア） */
+  onSetRating: (index: number, rating: number | null) => void;
+  /** メモを設定 */
+  onSetMemo: (index: number, memo: string) => void;
+  /** 軸別評価マップ（背景/衣装/ポーズ） */
+  axisRatings: Record<RatingAxisKey, (number | null)[]>;
+  /** 軸別評価の設定（null=解除） */
+  onSetAxisRating: (axis: RatingAxisKey, index: number, value: number | null) => void;
 }
 
-function GeneratedResultSlot({ resultImageUrl, sourceImageUrl, onImage, onRemove }: SlotProps) {
+const SLOT_MAX = 3;
+
+// 評価値 → 枠の Tailwind クラス（緑=良い / 青=普通 / 黄=微妙 / 赤=失敗）
+function ratingFrameClass(rating: number | null): string {
+  switch (rating) {
+    case 5: return "border-emerald-400/85 shadow-[0_0_10px_-2px_rgba(52,211,153,0.55)]";
+    case 3: return "border-sky-400/80 shadow-[0_0_8px_-2px_rgba(56,189,248,0.45)]";
+    case 2: return "border-amber-400/80 shadow-[0_0_8px_-2px_rgba(251,191,36,0.45)]";
+    case 1: return "border-rose-400/85 shadow-[0_0_10px_-2px_rgba(244,63,94,0.55)]";
+    default: return "border-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.2)]";
+  }
+}
+
+function GeneratedResultSlot({
+  resultImages, resultRatings, resultMemos,
+  sourceImageUrl,
+  onAppend, onReplaceAt, onRemoveAt, onRemoveAll,
+  onSetRating, onSetMemo,
+  axisRatings, onSetAxisRating,
+}: SlotProps) {
+  const [memoOpenIdx, setMemoOpenIdx] = useState<number | null>(null);
   const slotRef      = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  /** 差し替え対象（null = 末尾追加） */
+  const [replaceTarget, setReplaceTarget] = useState<number | null>(null);
 
-  // stable ref — prevents stale closure in paste listener
-  const onImageRef = useRef(onImage);
-  useEffect(() => { onImageRef.current = onImage; }, [onImage]);
+  // stable refs — prevent stale closure in paste listener
+  const appendRef    = useRef(onAppend);
+  const replaceRef   = useRef(onReplaceAt);
+  useEffect(() => { appendRef.current = onAppend; }, [onAppend]);
+  useEffect(() => { replaceRef.current = onReplaceAt; }, [onReplaceAt]);
 
+  /** ファイル → サムネ → 追加 or 差し替え */
   const processFile = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) return;
     const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -95,13 +144,19 @@ function GeneratedResultSlot({ resultImageUrl, sourceImageUrl, onImage, onRemove
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+    let final = dataUrl;
     try {
-      const thumb = await makeThumbnail(dataUrl, 600, 0.83);
-      onImageRef.current(thumb);
-    } catch {
-      onImageRef.current(dataUrl);
+      final = await makeThumbnail(dataUrl, 600, 0.83);
+    } catch { /* 元 dataUrl で続行 */ }
+    if (replaceTarget !== null) {
+      replaceRef.current(replaceTarget, final);
+      setReplaceTarget(null);
+    } else {
+      appendRef.current(final);
     }
-  }, []);
+  }, [replaceTarget]);
+
+  const canAdd = resultImages.length < SLOT_MAX;
 
   // Clipboard paste — only fires when this slot (tabIndex=0) has focus
   useEffect(() => {
@@ -122,26 +177,50 @@ function GeneratedResultSlot({ resultImageUrl, sourceImageUrl, onImage, onRemove
     return () => document.removeEventListener("paste", handler);
   }, [processFile]);
 
-  const handleDragOver  = (e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); };
+  const handleDragOver  = (e: React.DragEvent) => { e.preventDefault(); if (canAdd) setIsDragOver(true); };
   const handleDragLeave = () => setIsDragOver(false);
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
+    if (!canAdd && replaceTarget === null) return;
     const file = e.dataTransfer.files[0];
     if (file) void processFile(file);
   };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) void processFile(file);
+    if (file) {
+      void processFile(file);
+    } else {
+      // ファイル未選択（=キャンセル）の場合は replaceTarget をクリアして次回 paste/D&D を append 扱いに戻す
+      setReplaceTarget(null);
+    }
     e.target.value = "";
   };
-  const openPicker = () => fileInputRef.current?.click();
+  // input の cancel イベントは React の型に無いので addEventListener で個別購読
+  // （Chrome 113+ / Firefox 91+ でサポート、それ以外は何もしないだけで実害なし）
+  useEffect(() => {
+    const el = fileInputRef.current;
+    if (!el) return;
+    const onCancel = () => setReplaceTarget(null);
+    el.addEventListener("cancel", onCancel);
+    return () => el.removeEventListener("cancel", onCancel);
+  }, []);
 
-  // ── Filled state ──────────────────────────────────────────────────────
-  if (resultImageUrl) {
+  const openAppendPicker = () => {
+    if (!canAdd) return;
+    setReplaceTarget(null);
+    fileInputRef.current?.click();
+  };
+  const openReplacePicker = (idx: number) => {
+    setReplaceTarget(idx);
+    fileInputRef.current?.click();
+  };
+
+  // ── Filled state（1〜3枚） ────────────────────────────────────────────
+  if (resultImages.length > 0) {
     return (
       <div className="px-4 py-2.5 border-b border-bg-border/50 bg-black/15">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* 元画像サムネイル */}
           {sourceImageUrl ? (
             <img
@@ -159,33 +238,200 @@ function GeneratedResultSlot({ resultImageUrl, sourceImageUrl, onImage, onRemove
             <span className="text-[12px] text-text-muted/75 leading-none">→</span>
             <span className="text-[11px] text-emerald-400/80 leading-none font-semibold">生成</span>
           </div>
-          {/* 生成結果画像 */}
-          <img
-            src={resultImageUrl}
-            alt="生成結果"
-            className="w-14 h-14 rounded-lg object-cover border border-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.2)] flex-shrink-0"
-          />
-          {/* ラベル＋操作ボタン */}
+          {/* 生成結果画像（横並び、最大3枚） — 評価バーは右列に移動 */}
+          <div className="flex items-center gap-1.5 flex-shrink-0"
+               ref={slotRef} tabIndex={0}
+               onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
+          >
+            {resultImages.map((url, i) => {
+              const rating = resultRatings[i] ?? null;
+              return (
+                <div key={i} className="relative group">
+                  <img
+                    src={url}
+                    alt={`生成結果 ${i + 1}`}
+                    title="クリックで差し替え"
+                    onClick={() => openReplacePicker(i)}
+                    className={[
+                      "w-16 h-16 rounded-lg object-cover border-2 cursor-pointer hover:border-accent/70 transition",
+                      ratingFrameClass(rating),
+                    ].join(" ")}
+                  />
+                  {/* 個別×削除 */}
+                  <button
+                    type="button"
+                    onClick={() => onRemoveAt(i)}
+                    title="この画像を削除"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500/85 hover:bg-rose-500 text-white text-[11px] font-bold leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow"
+                  >
+                    ×
+                  </button>
+                  <span className="absolute -bottom-1 -left-1 px-1 rounded bg-black/65 text-emerald-200/95 text-[10px] leading-none font-bold pointer-events-none">
+                    {i + 1}
+                    {rating !== null && <span className="ml-0.5">{RATING_LABELS[rating]?.emoji}</span>}
+                  </span>
+                </div>
+              );
+            })}
+            {canAdd && (
+              <button
+                type="button"
+                onClick={openAppendPicker}
+                title={`生成結果を追加（${resultImages.length}/${SLOT_MAX}）`}
+                className={[
+                  "w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center transition",
+                  isDragOver
+                    ? "border-accent bg-accent/10 text-white"
+                    : "border-bg-border/60 text-text-muted/60 hover:border-accent/50 hover:text-accent",
+                ].join(" ")}
+              >
+                <span className="text-[22px] leading-none">＋</span>
+              </button>
+            )}
+          </div>
+          {/* 右列：ラベル＋操作＋画像ごとの評価バー（広めに使う） */}
           <div className="flex-1 min-w-0 flex flex-col gap-1.5">
-            <span className="text-[13px] text-emerald-300/90 font-medium leading-none">
-              ✅ 生成結果登録済み
-            </span>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={openPicker}
-                className="text-[12px] px-2 py-1 rounded-lg border border-bg-border bg-bg-panel/60 text-text-muted hover:text-text-base hover:border-accent/40 transition"
-              >
-                🔄 変更
-              </button>
-              <button
-                type="button"
-                onClick={onRemove}
-                className="text-[12px] px-2 py-1 rounded-lg border border-rose-400/30 bg-transparent text-rose-300/60 hover:text-rose-200 hover:border-rose-400/50 hover:bg-rose-400/8 transition"
-              >
-                ✕ 削除
-              </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[13px] text-emerald-300/90 font-medium leading-none">
+                ✅ 生成結果 <span className="text-[11px] text-emerald-300/60">（{resultImages.length}/{SLOT_MAX}）</span>
+              </span>
+              <span className="ml-auto flex items-center gap-1.5">
+                {canAdd && (
+                  <button
+                    type="button"
+                    onClick={openAppendPicker}
+                    className="text-[11px] px-2 py-0.5 rounded border border-emerald-400/40 bg-emerald-400/8 text-emerald-200 hover:bg-emerald-400/16 hover:border-emerald-400/65 transition leading-none"
+                  >
+                    ＋ 追加
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onRemoveAll}
+                  className="text-[11px] px-2 py-0.5 rounded border border-rose-400/30 bg-transparent text-rose-300/60 hover:text-rose-200 hover:border-rose-400/50 hover:bg-rose-400/8 transition leading-none"
+                >
+                  ✕ 全削除
+                </button>
+              </span>
             </div>
+
+            {/* 画像ごとの評価バー（縦に並べる：右の余白を活用） */}
+            <div className="space-y-1">
+              {resultImages.map((_, i) => {
+                const rating = resultRatings[i] ?? null;
+                const memo = resultMemos[i] ?? "";
+                const isMemoOpen = memoOpenIdx === i;
+                // 番号バッジ（サムネのと同色）
+                const indexBadgeCls =
+                  rating === 5 ? "border-emerald-400/65 bg-emerald-500/15 text-emerald-100"
+                : rating === 3 ? "border-sky-400/65     bg-sky-500/15     text-sky-100"
+                : rating === 2 ? "border-amber-400/65   bg-amber-500/15   text-amber-100"
+                : rating === 1 ? "border-rose-400/65    bg-rose-500/15    text-rose-100"
+                : "border-white/15 bg-white/4 text-text-muted/60";
+                return (
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={[
+                        "inline-flex items-center justify-center w-6 h-6 rounded border text-[11px] font-bold leading-none shrink-0",
+                        indexBadgeCls,
+                      ].join(" ")}>
+                        {i + 1}
+                      </span>
+                      {([5, 3, 2, 1] as const).map((v) => {
+                        const m = RATING_LABELS[v];
+                        const active = rating === v;
+                        const activeCls =
+                          v === 5 ? "border-emerald-400/85 bg-emerald-500/25 text-emerald-100 shadow-[0_0_6px_-1px_rgba(52,211,153,0.4)]"
+                        : v === 3 ? "border-sky-400/80     bg-sky-500/22     text-sky-100     shadow-[0_0_6px_-1px_rgba(56,189,248,0.35)]"
+                        : v === 2 ? "border-amber-400/80   bg-amber-500/22   text-amber-100   shadow-[0_0_6px_-1px_rgba(251,191,36,0.35)]"
+                        :            "border-rose-400/85    bg-rose-500/22    text-rose-100    shadow-[0_0_6px_-1px_rgba(244,63,94,0.4)]";
+                        const idleCls = "border-bg-border/55 bg-bg-base/40 text-text-muted/75 hover:text-text-base hover:border-white/35";
+                        return (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => onSetRating(i, active ? null : v)}
+                            title={`${m.emoji} ${m.jp}${active ? "（クリックで解除）" : ""}`}
+                            className={[
+                              "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-semibold leading-none transition select-none",
+                              active ? activeCls : idleCls,
+                            ].join(" ")}
+                          >
+                            <span className="text-[12px]">{m.emoji}</span>
+                            <span>{m.jp}</span>
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={() => setMemoOpenIdx(isMemoOpen ? null : i)}
+                        title={memo ? `メモ：${memo}` : "メモを追加"}
+                        className={[
+                          "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-semibold leading-none transition",
+                          memo
+                            ? "border-violet-400/65 bg-violet-500/18 text-violet-100"
+                            : "border-bg-border/55 bg-bg-base/40 text-text-muted/75 hover:text-text-base hover:border-violet-400/45",
+                        ].join(" ")}
+                      >
+                        <span>📝</span>
+                        <span>{memo ? "メモ" : "メモ"}</span>
+                      </button>
+                    </div>
+                    {/* 軸別 👍👎 行（背景/衣装/ポーズ）— 30件以上で内部分析が走る */}
+                    <div className="flex items-center gap-2 pl-7 flex-wrap">
+                      {(["bg", "outfit", "pose"] as RatingAxisKey[]).map((axis) => {
+                        const meta = AXIS_RATING_META[axis];
+                        const v = axisRatings[axis][i] ?? null;
+                        const Btn = (val: 5 | 1, emoji: string, lbl: string, onCls: string) => {
+                          const on = v === val;
+                          return (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => onSetAxisRating(axis, i, on ? null : val)}
+                              title={`${meta.jp}：${lbl}${on ? "（クリックで解除）" : ""}`}
+                              className={[
+                                "inline-flex items-center justify-center w-6 h-6 rounded border text-[12px] leading-none transition select-none",
+                                on
+                                  ? onCls
+                                  : "border-bg-border/45 bg-bg-base/30 text-text-muted/60 hover:text-text-base hover:border-white/30",
+                              ].join(" ")}
+                            >
+                              {emoji}
+                            </button>
+                          );
+                        };
+                        return (
+                          <span key={axis} className="inline-flex items-center gap-1">
+                            <span className="text-[10px] text-text-muted/65 leading-none w-8 shrink-0">
+                              {meta.emoji} {meta.jp}
+                            </span>
+                            {Btn(5, "👍", "良い", "border-emerald-400/75 bg-emerald-500/22 text-emerald-100")}
+                            {Btn(1, "👎", "悪い", "border-rose-400/75 bg-rose-500/22 text-rose-100")}
+                          </span>
+                        );
+                      })}
+                    </div>
+                    {isMemoOpen && (
+                      <input
+                        type="text"
+                        value={memo}
+                        onChange={(e) => onSetMemo(i, e.target.value)}
+                        onBlur={() => setMemoOpenIdx(null)}
+                        placeholder="メモ（例：背景が良い / 顔は良いが衣装は微妙）"
+                        autoFocus
+                        maxLength={200}
+                        className="w-full px-2 py-1 rounded border border-violet-400/45 bg-bg-base/90 text-[12px] text-text-base outline-none focus:border-violet-400/80"
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-[10px] text-text-muted/45 leading-snug">
+              画像クリックで差し替え・×で個別削除・最大{SLOT_MAX}枚 ／ 評価は次回プロンプト生成に反映
+            </p>
           </div>
         </div>
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
@@ -199,8 +445,8 @@ function GeneratedResultSlot({ resultImageUrl, sourceImageUrl, onImage, onRemove
       ref={slotRef}
       tabIndex={0}
       role="button"
-      aria-label="生成結果画像を登録（D&D / Ctrl+V / クリック）"
-      onClick={openPicker}
+      aria-label="生成結果画像を登録（D&D / Ctrl+V / クリック・最大3枚）"
+      onClick={openAppendPicker}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -218,7 +464,7 @@ function GeneratedResultSlot({ resultImageUrl, sourceImageUrl, onImage, onRemove
       <span>
         {isDragOver
           ? "ドロップして登録"
-          : "生成結果画像をここに貼り付け（D&D / Ctrl+V / クリック）"}
+          : `生成結果画像をここに貼り付け（D&D / Ctrl+V / クリック・最大${SLOT_MAX}枚）`}
       </span>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
     </div>
@@ -251,13 +497,72 @@ export function PromptCard({ item, onUpdate, onArrange }: Props) {
     item.promptText.split(/\n/).length > LONG_THRESHOLD_LINES ||
     item.promptText.length > LONG_THRESHOLD_CHARS;
 
-  const handleResultImage = useCallback((dataUrl: string) => {
-    onUpdate(item.id, { resultImageData: dataUrl, generatedResultAddedAt: Date.now() });
+  const currentImages = getResultImages(item);
+
+  /** 末尾に追加（上限超え分は無視） */
+  const handleResultAppend = useCallback((dataUrl: string) => {
+    const next = [...currentImages, dataUrl].slice(0, MAX_RESULT_IMAGES);
+    onUpdate(item.id, {
+      ...buildResultImagesPatch(next),
+      generatedResultAddedAt: Date.now(),
+    });
+  }, [item.id, onUpdate, currentImages]);
+
+  /** 指定インデックスの画像を差し替え */
+  const handleResultReplaceAt = useCallback((index: number, dataUrl: string) => {
+    const next = [...currentImages];
+    if (index < 0 || index >= next.length) return;
+    next[index] = dataUrl;
+    onUpdate(item.id, {
+      ...buildResultImagesPatch(next),
+      generatedResultAddedAt: Date.now(),
+    });
+  }, [item.id, onUpdate, currentImages]);
+
+  /** 指定インデックスの画像を削除（同時に評価・メモも同じ位置を削除） */
+  const handleResultRemoveAt = useCallback((index: number) => {
+    const nextImages = currentImages.filter((_, i) => i !== index);
+    const ratingsSrc = currentImages.map((_, i) => getRatingAt(item, i));
+    const memosSrc   = currentImages.map((_, i) => getMemoAt(item, i));
+    onUpdate(item.id, {
+      ...buildResultImagesPatch(nextImages),
+      resultRatings: ratingsSrc.filter((_, i) => i !== index),
+      resultMemos:   memosSrc.filter((_, i) => i !== index),
+    });
+  }, [item, onUpdate, currentImages]);
+
+  /** すべての画像を削除（評価・メモも一緒にクリア） */
+  const handleResultRemoveAll = useCallback(() => {
+    onUpdate(item.id, {
+      ...buildResultImagesPatch([]),
+      resultRatings: [],
+      resultMemos: [],
+    });
   }, [item.id, onUpdate]);
 
-  const handleResultRemove = useCallback(() => {
-    onUpdate(item.id, { resultImageData: null });
-  }, [item.id, onUpdate]);
+  /** 画像ごとの評価を設定 */
+  const handleSetRating = useCallback((index: number, value: number | null) => {
+    onUpdate(item.id, buildRatingPatch(item, index, value));
+  }, [item, onUpdate]);
+
+  /** 画像ごとのメモを設定 */
+  const handleSetMemo = useCallback((index: number, memo: string) => {
+    onUpdate(item.id, buildMemoPatch(item, index, memo));
+  }, [item, onUpdate]);
+
+  /** 軸別評価（背景/衣装/ポーズ）を設定 */
+  const handleSetAxisRating = useCallback((axis: RatingAxisKey, index: number, value: number | null) => {
+    onUpdate(item.id, buildAxisRatingPatch(item, axis, index, value));
+  }, [item, onUpdate]);
+
+  // 評価・メモ・軸別評価を画像枚数と揃えて取得
+  const currentRatings: (number | null)[] = currentImages.map((_, i) => getRatingAt(item, i));
+  const currentMemos: (string | null)[]   = currentImages.map((_, i) => getMemoAt(item, i));
+  const axisRatings: Record<RatingAxisKey, (number | null)[]> = {
+    bg:     currentImages.map((_, i) => getAxisRatingAt(item, "bg", i)),
+    outfit: currentImages.map((_, i) => getAxisRatingAt(item, "outfit", i)),
+    pose:   currentImages.map((_, i) => getAxisRatingAt(item, "pose", i)),
+  };
 
   return (
     <article
@@ -350,12 +655,20 @@ export function PromptCard({ item, onUpdate, onArrange }: Props) {
         </div>
       </header>
 
-      {/* ── 生成結果スロット ────────────────────────────────────────────────── */}
+      {/* ── 生成結果スロット（最大3枚＋全体評価＋軸別評価） ─────────────── */}
       <GeneratedResultSlot
-        resultImageUrl={item.resultImageData}
+        resultImages={currentImages}
+        resultRatings={currentRatings}
+        resultMemos={currentMemos}
         sourceImageUrl={item.sourceImageThumbnail}
-        onImage={handleResultImage}
-        onRemove={handleResultRemove}
+        onAppend={handleResultAppend}
+        onReplaceAt={handleResultReplaceAt}
+        onRemoveAt={handleResultRemoveAt}
+        onRemoveAll={handleResultRemoveAll}
+        onSetRating={handleSetRating}
+        onSetMemo={handleSetMemo}
+        axisRatings={axisRatings}
+        onSetAxisRating={handleSetAxisRating}
       />
 
       {/* ── 本文 ───────────────────────────────────────────────────────────── */}

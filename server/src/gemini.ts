@@ -16,6 +16,150 @@ export const MODEL_NAME = model;
 
 const ai = new GoogleGenAI({ apiKey });
 
+// ── 好みプロファイル分析（structured JSON 出力） ────────────────────────
+
+export interface AnalyzePreferenceSample {
+  prompt: string;
+  overall: number;             // 5/3/2/1
+  bg:     number | null;        // 5/1/null
+  outfit: number | null;
+  pose:   number | null;
+  createdAt: number;
+}
+
+export interface AnalyzePreferenceResult {
+  likes:    { bg: string; outfit: string; pose: string };
+  dislikes: { bg: string; outfit: string; pose: string };
+  preferKeywords: string[];
+  avoidKeywords:  string[];
+  summary: string;
+}
+
+/**
+ * Gemini Flash に「好み傾向の分析」を依頼し、構造化 JSON で結果を取得。
+ * 失敗時は例外を投げる（HTTP 500 になる）。
+ */
+export async function analyzePreferences(
+  samples: AnalyzePreferenceSample[],
+): Promise<{ result: AnalyzePreferenceResult; model: string }> {
+  if (samples.length === 0) {
+    throw new Error("samples is empty");
+  }
+
+  // 評価ラベル
+  const ratingJp = (n: number | null) =>
+    n === 5 ? "良い(👍)" : n === 3 ? "普通(😐)" : n === 2 ? "微妙(👎)" : n === 1 ? "失敗(💀)" : "未評価";
+
+  // プロンプト本文を構築（短く・JSON サンプル付き）
+  const sampleLines = samples.slice(0, 60).map((s, i) => {
+    return [
+      `--- サンプル ${i + 1} ---`,
+      `日時: ${new Date(s.createdAt).toISOString().slice(0, 10)}`,
+      `全体評価: ${ratingJp(s.overall)}`,
+      `背景評価: ${ratingJp(s.bg)} / 衣装評価: ${ratingJp(s.outfit)} / ポーズ評価: ${ratingJp(s.pose)}`,
+      `プロンプト本文:`,
+      (s.prompt ?? "").slice(0, 800),
+    ].join("\n");
+  }).join("\n\n");
+
+  const system = [
+    "あなたは画像生成プロンプトの好み傾向分析の専門家です。",
+    "ユーザーが過去に生成したプロンプト本文と、自身で付けた評価（👍良い/😐普通/👎微妙/💀失敗）から、",
+    "ユーザーの好みの傾向を抽出してください。",
+    "",
+    "重要：",
+    "  - 出力は厳密に JSON のみ。コードブロック・前置き・後置き・改行装飾は不要。",
+    "  - 各フィールドは指定の型・要素数を守る。",
+    "  - 日本語の自然な短文で記述。",
+  ].join("\n");
+
+  const userPrompt = [
+    `【分析対象】合計 ${samples.length} 件の評価データ：`,
+    "",
+    sampleLines,
+    "",
+    "【出力 JSON 仕様】",
+    "{",
+    '  "likes":    { "bg": "...", "outfit": "...", "pose": "..." },',
+    '  "dislikes": { "bg": "...", "outfit": "...", "pose": "..." },',
+    '  "preferKeywords": ["...", "..."],   // 次回プロンプトで優先したい表現（最大5、日本語）',
+    '  "avoidKeywords":  ["...", "..."],   // 次回プロンプトで避けるべき表現（最大5、日本語）',
+    '  "summary": "ユーザー好み傾向の要約（2-3文）"',
+    "}",
+    "",
+    "likes/dislikes の各フィールドは、その軸でユーザーが好む/嫌う傾向を1-2文の自然な日本語で。",
+    "明確な傾向が読み取れない場合は「明確な傾向なし」と書く。サンプルが少なくても無理に推測しない。",
+    "",
+    "JSON のみ返す：",
+  ].join("\n");
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [
+      { role: "user", parts: [{ text: userPrompt }] },
+    ],
+    config: {
+      systemInstruction: system,
+      temperature: 0.4,
+      responseMimeType: "application/json",
+    },
+  });
+
+  const text = response.text;
+  if (!text) {
+    const candidate = response.candidates?.[0];
+    const finishReason = candidate?.finishReason as string | undefined;
+    if (finishReason === "SAFETY" || finishReason === "PROHIBITED_CONTENT") {
+      throw new Error(`分析がブロックされました（${finishReason}）`);
+    }
+    throw new Error(`Gemini が空の応答を返しました（finishReason: ${finishReason ?? "unknown"}）`);
+  }
+
+  // JSON パース
+  let parsed: AnalyzePreferenceResult;
+  try {
+    const obj = JSON.parse(text);
+    parsed = sanitizeAnalysisResult(obj);
+  } catch (err) {
+    throw new Error(`Gemini の応答が JSON として解析できません: ${(err as Error).message}`);
+  }
+
+  return { result: parsed, model };
+}
+
+/** Gemini の応答が型に合致するかチェック＋デフォルト埋め */
+function sanitizeAnalysisResult(obj: unknown): AnalyzePreferenceResult {
+  if (!obj || typeof obj !== "object") {
+    throw new Error("レスポンスがオブジェクトではありません");
+  }
+  const o = obj as Record<string, unknown>;
+  const strField = (v: unknown, max = 200): string =>
+    typeof v === "string" ? v.slice(0, max).trim() : "明確な傾向なし";
+  const arrField = (v: unknown, max = 5): string[] => {
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter((x): x is string => typeof x === "string")
+      .slice(0, max)
+      .map((s) => s.slice(0, 60).trim())
+      .filter((s) => s.length > 0);
+  };
+  const triple = (v: unknown): { bg: string; outfit: string; pose: string } => {
+    const o2 = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+    return {
+      bg:     strField(o2.bg),
+      outfit: strField(o2.outfit),
+      pose:   strField(o2.pose),
+    };
+  };
+  return {
+    likes:    triple(o.likes),
+    dislikes: triple(o.dislikes),
+    preferKeywords: arrField(o.preferKeywords),
+    avoidKeywords:  arrField(o.avoidKeywords),
+    summary: strField(o.summary, 400),
+  };
+}
+
 function parseDataUrl(url: string): { mimeType: string; data: string } | null {
   const m = url.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
   if (!m) return null;
@@ -112,9 +256,10 @@ export async function generate(req: GenerateRequest): Promise<GeneratedProposal[
     const finishReason = candidate?.finishReason as string | undefined;
 
     if (finishReason === "SAFETY" || finishReason === "PROHIBITED_CONTENT") {
+      // エラーメッセージに PROHIBITED_CONTENT を含める（クライアント側の検知に使用）
       throw new Error(
-        `安全フィルターにより生成がブロックされました（${finishReason}）。` +
-        "画像の内容・追加指示・NG指定を変更してもう一度お試しください。"
+        `プロンプトがブロックされました（PROHIBITED_CONTENT）。` +
+        "入力画像・追加指示・NG指定を変更してお試しください。"
       );
     }
     if (finishReason === "RECITATION") {

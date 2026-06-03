@@ -1,22 +1,30 @@
 /**
  * Minimal promisified IndexedDB wrapper.
  *
- * DB layout (v3):
+ * DB layout (v4):
  *  - `history`          : 生成案 1 件＝1 レコード（id, dateKey, createdAt, batchId 等）
  *  - `recentImages`     : 直近で使った画像（id=ハッシュ, thumbnailDataUrl, imageDataUrl, addedAt 等）
  *  - `selectionHistory` : 選択範囲プロンプト履歴（id, createdAt, maskDataUrl, generatedPrompt 等）
+ *  - `imageFeatures`    : 画像特徴DB（id=履歴アイテムID, hash=dHash16進, dominantColors, analyzedAt 等）
  *
  * 既存ユーザーは onupgradeneeded 内で oldVersion を見て段階マイグレーション。
  */
 
 const DB_NAME = "image-prompt-maker";
-const DB_VERSION = 3;
+const DB_VERSION = 5;
 
 export const STORE_HISTORY   = "history";
 export const STORE_RECENT    = "recentImages";
 export const STORE_SELECTION = "selectionHistory";
+export const STORE_IMAGE_FEATURES = "imageFeatures";
+export const STORE_OPERATION_LOG = "operationLog";
 
-type StoreName = typeof STORE_HISTORY | typeof STORE_RECENT | typeof STORE_SELECTION;
+type StoreName =
+  | typeof STORE_HISTORY
+  | typeof STORE_RECENT
+  | typeof STORE_SELECTION
+  | typeof STORE_IMAGE_FEATURES
+  | typeof STORE_OPERATION_LOG;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -40,6 +48,17 @@ function openDB(): Promise<IDBDatabase> {
       if (oldVersion < 3) {
         const s = db.createObjectStore(STORE_SELECTION, { keyPath: "id" });
         s.createIndex("createdAt", "createdAt", { unique: false });
+      }
+      if (oldVersion < 4) {
+        const s = db.createObjectStore(STORE_IMAGE_FEATURES, { keyPath: "id" });
+        s.createIndex("hash", "hash", { unique: false });
+        s.createIndex("analyzedAt", "analyzedAt", { unique: false });
+      }
+      if (oldVersion < 5) {
+        // skyveil好み学習エージェント：操作ログ（押したボタン・変更対象・プリセット等）
+        const s = db.createObjectStore(STORE_OPERATION_LOG, { keyPath: "id" });
+        s.createIndex("ts", "ts", { unique: false });
+        s.createIndex("type", "type", { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);

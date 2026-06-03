@@ -39,6 +39,10 @@ export interface PersistedSettings {
   strength:           number;
   glossLevel:         number;
   dimensionLevel:     number;
+  /** 質感・リアル度 1-5（1=完全2D ↔ 5=写真リアル）。既定 3 = 2.5D */
+  realismLevel:       number;
+  /** 質感タイプ（"anime_bg" 等、null = 指定なし） */
+  realismType:        string | null;
   textureOriginal:    boolean;
   textureDisabled:    boolean;
   promptTarget:       PromptTarget | null;
@@ -86,6 +90,8 @@ export const SETTINGS_DEFAULTS: PersistedSettings = {
   strength:           2,
   glossLevel:         3,
   dimensionLevel:     3,
+  realismLevel:       3,
+  realismType:        null,
   textureOriginal:    false,
   textureDisabled:    false,
   promptTarget:       "chatgpt_safe",

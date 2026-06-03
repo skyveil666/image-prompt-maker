@@ -2,12 +2,15 @@ import { useState } from "react";
 import type { PromptHistoryItem, Scope } from "../types";
 import { FavoriteButton } from "./FavoriteButton";
 import { WithImagePreview } from "./ImagePreviewTooltip";
+import { getResultImages } from "../lib/history";
 
 interface Props {
   item: PromptHistoryItem;
   onUpdate: (id: string, patch: Partial<PromptHistoryItem>) => void;
   onDelete: (id: string) => void;
   onArrange?: (item: PromptHistoryItem) => void;
+  /** 同じ構成で再生成：全設定をメイン画面に復元する */
+  onRestore?: (item: PromptHistoryItem) => void;
   /** アレンジ元としてハイライト表示する */
   highlight?: boolean;
   /** このカードのアレンジが生成中 */
@@ -39,7 +42,7 @@ function formatDateTime(ts: number): string {
   );
 }
 
-export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, highlight, busy }: Props) {
+export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore, highlight, busy }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
 
@@ -62,7 +65,7 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, highlight,
         "relative rounded-xl border overflow-hidden transition",
         highlight
           ? "border-violet-400 bg-violet-500/8 shadow-[0_0_0_1px_rgba(192,132,252,0.55),0_0_20px_rgba(192,132,252,0.35)]"
-          : "border-bg-border bg-bg-card hover:border-accent/40",
+          : "border-bg-border bg-bg-card hover:border-accent/60 hover:shadow-[0_0_14px_-2px_rgba(124,92,255,0.45)]",
       ].join(" ")}
     >
       {/* アレンジ元バッジ */}
@@ -72,8 +75,8 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, highlight,
         </span>
       )}
       <div className="p-3 flex gap-3">
-        {/* サムネイル：生成結果がある場合はチェーン表示 */}
-        {item.resultImageData ? (
+        {/* サムネイル：生成結果がある場合はチェーン表示（複数枚なら横並び） */}
+        {(() => { const results = getResultImages(item); return results.length > 0; })() ? (
           <div className="flex items-center gap-1 flex-shrink-0">
             {item.sourceImageThumbnail ? (
               <WithImagePreview
@@ -93,17 +96,30 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, highlight,
               </div>
             )}
             <span className="text-[10px] text-text-muted/40 leading-none flex-shrink-0">→</span>
-            <WithImagePreview
-              src={item.resultImageData}
-              label="生成結果"
-              sublabel={`案${item.proposalIndex}`}
-            >
-              <img
-                src={item.resultImageData}
-                alt="生成結果"
-                className="w-10 h-10 rounded-lg object-cover border border-emerald-400/50 cursor-zoom-in"
-              />
-            </WithImagePreview>
+            {/* 生成結果（最大3枚を縦に細く並べる：1枚なら大きく・複数なら積み重ね） */}
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              {getResultImages(item).map((url, i) => (
+                <WithImagePreview
+                  key={i}
+                  src={url}
+                  label={`生成結果 ${i + 1}`}
+                  sublabel={`案${item.proposalIndex}`}
+                >
+                  <div className="relative">
+                    <img
+                      src={url}
+                      alt={`生成結果 ${i + 1}`}
+                      className="w-10 h-10 rounded-lg object-cover border border-emerald-400/50 cursor-zoom-in"
+                    />
+                    {getResultImages(item).length > 1 && (
+                      <span className="absolute -bottom-0.5 -right-0.5 px-1 rounded bg-black/70 text-emerald-200/95 text-[8px] leading-none font-bold pointer-events-none">
+                        {i + 1}
+                      </span>
+                    )}
+                  </div>
+                </WithImagePreview>
+              ))}
+            </div>
           </div>
         ) : item.sourceImageThumbnail ? (
           <WithImagePreview
@@ -179,6 +195,16 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, highlight,
             title="このプロンプトをベースに、その場でアレンジ案を生成（右パネルに表示）"
           >
             {busy ? "⏳ アレンジ中…" : "✨ アレンジ"}
+          </button>
+        )}
+        {onRestore && (
+          <button
+            type="button"
+            className="rounded-lg px-2.5 py-1.5 text-xs font-semibold border border-sky-400/50 bg-sky-400/10 text-sky-200 hover:bg-sky-400/20 hover:border-sky-400/80 transition"
+            onClick={() => onRestore(item)}
+            title="元画像・変更対象・詳細設定など、当時の全設定をメイン画面に復元してすぐ再生成できます"
+          >
+            🔁 同じ構成で再生成
           </button>
         )}
         <button

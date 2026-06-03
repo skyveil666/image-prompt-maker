@@ -502,8 +502,20 @@ export interface GenerateRequest {
   strength?: number;
   /** 光沢感 1-5（1=マット 2=ややマット 3=標準 4=光沢 5=強光沢）。3はプロンプト非出力。 */
   glossLevel?: number;
-  /** 立体感 1-5（1=2D 2=やや2D 3=2.5D 4=やや3D 5=3D）。3はプロンプト非出力。 */
+  /** 立体感 1-5（1=2D 2=やや2D 3=2.5D 4=やや3D 5=3D）。3はプロンプト非出力。
+   * 互換のため残しているが、UIから露出はしない。代わりに realismLevel を使う。 */
   dimensionLevel?: number;
+  /**
+   * 質感・リアル度 1-5（1=完全2Dイラスト / 2=デジタルペイント / 3=2.5D / 4=リアル寄り / 5=写真リアル）。
+   * 「背景だけリアルすぎる問題」を防ぐため、人物と背景の質感統一を最優先する。
+   * 3は標準値のためプロンプト非出力。
+   */
+  realismLevel?: number;
+  /**
+   * 質感タイプ（"anime_bg" / "digital_paint" 等、null/未指定 = タイプ指定なし）。
+   * realismLevel と組み合わせて具体的な絵柄を指定する。
+   */
+  realismType?: string | null;
   /** 元画像維持：true のとき質感と立体感を「元画像と同じに維持」 */
   textureOriginal?: boolean;
   /** プロンプトに反映しない：true のとき質感ブロックを出力しない */
@@ -571,6 +583,72 @@ export interface GenerateRequest {
    * 髪・衣装・前景演出・ポーズ・カメラのいずれかが変更範囲ONの時のみ反映。
    */
   windLevel?: number;
+  /**
+   * 色ごとのポリシー（旧構造、互換のため残す。3=普通は送らない）。
+   * "restrict" = できるだけ控える / "block" = 一発禁止（候補から除外）。
+   * block の色は ngList にもキーワードが追加される。
+   * @deprecated 新規実装は colorWeights を使う。
+   */
+  colorControls?: { colorId: string; jp: string; policy: "restrict" | "block" }[];
+  /**
+   * 色×軸の重み制御（髪/服/背景それぞれ 0〜5、3=普通は送らない）。
+   * 0 = 完全禁止 / 1 = 強抑制 / 2 = 抑制 / 4 = 推奨 / 5 = 強推奨
+   * 同一色でも軸ごとに異なる重みを取れる（例：白系は髪は禁止だが背景は推奨）。
+   */
+  colorWeights?: {
+    colorId: string;
+    jp:      string;
+    axis:    "hair" | "outfit" | "background";
+    weight:  0 | 1 | 2 | 4 | 5;
+  }[];
+  /**
+   * 画像分析（生成結果画像）からの偏り情報。
+   * - overused: 出現率が高すぎる（ratio>=0.40）カテゴリ → プロンプトで回避指示
+   * - underused: まだ使われていないカテゴリ → 候補として提案
+   * - visualDupCount: 視覚的に酷似した画像クラスタの最大サイズ
+   */
+  imageBias?: {
+    overused?:  { axis: string; label: string; ratio: number }[];
+    underused?: { axis: string; label: string }[];
+    visualDupCount?: number;
+  };
+  /**
+   * 好みプロファイル（実 AI 分析結果）。
+   * Gemini Flash で分析した「好む傾向 / 嫌う傾向 / 優先・回避キーワード」。
+   */
+  preferenceProfile?: {
+    generatedAt: number;
+    model: string;
+    sampleSize: number;
+    likes:    { bg: string; outfit: string; pose: string };
+    dislikes: { bg: string; outfit: string; pose: string };
+    preferKeywords: string[];
+    avoidKeywords:  string[];
+    summary: string;
+  };
+  /**
+   * ユーザー画像評価（👍/😐/👎/💀）から導出した方向性ヒント。
+   * - recommended: 高評価が多いカテゴリ（score>=1, サンプル>=2）
+   * - avoid:       低評価が多いカテゴリ（score<=-1, サンプル>=2）
+   * クライアント側で「変更範囲ONの軸のみ」フィルタ済みのものを送る。
+   *
+   * preference: 軸別👍👎の集計レポート（30件以上で active=true）。
+   * 背景/衣装/ポーズの 3軸について、ユーザーの好む傾向／嫌う傾向を直接示す。
+   */
+  ratingBias?: {
+    recommended?: { axis: string; label: string; score: number }[];
+    avoid?:       { axis: string; label: string; score: number }[];
+    preference?: {
+      active: boolean;
+      axes: {
+        axis: "bg" | "outfit" | "pose";
+        good: number;
+        bad: number;
+        goodRatio: number;
+        badRatio: number;
+      }[];
+    };
+  };
 }
 
 export interface GeneratedProposal {

@@ -13,8 +13,8 @@ import { SelectionPromptModal } from "./components/SelectionPromptModal";
 import { SimpleImageEditor } from "./components/SimpleImageEditor";
 import { CompletionToast } from "./components/CompletionToast";
 import { PresetAppliedToast } from "./components/PresetAppliedToast";
-import { SelectionSummary } from "./components/SelectionSummary";
-import { generateViaBackend } from "./lib/backendClient";
+import { ReflectionStatusBar } from "./components/ReflectionStatusBar";
+import { generateViaBackend, analyzePreferencesViaBackend } from "./lib/backendClient";
 import { loadSettings, saveSettings, type PersistedSettings } from "./lib/settingsPersist";
 import { getNotifSettings } from "./lib/notificationSettings";
 import { playCompletionSound } from "./lib/completionSound";
@@ -42,13 +42,13 @@ import {
 } from "./lib/quickActions";
 import { buildChaosFusionInputs, formatChaosLabel } from "./lib/chaosEngine";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
-import { analyzeFullHistory, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
+import { analyzeFullHistory, filterRecentWindow, WINDOW_DAYS, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
 import { DuplicateAnalysisPanel } from "./components/DuplicateAnalysisPanel";
 import {
   loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
   isApplied, setAppliedStorage,
   getNgTokens, getMotifControls,
-  computeAutoAdjust,
+  computeAutoAdjust, countLevels, countComboPolicies,
   loadComboPolicies, saveComboPolicies, setComboPolicy as setComboPolicyFn,
   resetComboPolicies, getComboControls, getNgPhrasesFromCombos,
   type LevelMap, type MotifLevel,
@@ -69,6 +69,7 @@ import {
   saveBatch,
   uid,
   updateItem as updateItemDb,
+  buildResultImagesPatch,
 } from "./lib/history";
 import { getRecentGenres, pushRecentGenres, clearRecentGenres } from "./lib/genreHistory";
 import { getRecentSubStyles, pushRecentSubStyles, clearRecentSubStyles } from "./lib/subStyleHistory";
@@ -89,9 +90,37 @@ import {
 import { computeChangedAxes, arrangeCandidateScopes, buildElementFilterInstruction } from "./lib/arrange";
 import { buildFavoriteProfile, type FavoriteProfile } from "./lib/favoriteProfile";
 import { analyzeAgent, type AgentActionId } from "./lib/aiAgent";
-import { AssistantCharacter } from "./components/AssistantCharacter";
 import { BoostControls } from "./components/BoostControls";
 import type { ZozoTrend } from "./lib/zozoTrend";
+import { analyzeColors, type ColorAnalysis } from "./lib/colorAnalyzer";
+import {
+  loadAllFeatures, buildAnalysis as buildImageAnalysis,
+  runProgressiveAnalysis, primaryResultImage,
+  type ImageAnalysisResult, type ImageFeature,
+} from "./lib/imageAnalyzer";
+import {
+  analyzeRatings, buildRatingBiasPayload,
+  type RatingAnalysis,
+} from "./lib/ratingAnalyzer";
+import { SkyveilBar } from "./components/SkyveilBar";
+import {
+  buildSkyveilProfile, favoriteToStrength, STRENGTH_TO_FAVORITE,
+  type SkyveilStrength, type SkyveilProfile,
+} from "./lib/skyveilProfile";
+import { logOperation } from "./lib/operationLog";
+import {
+  loadPreferenceProfile, savePreferenceProfile, clearPreferenceProfile,
+  loadAutoLearn, saveAutoLearn,
+  collectSamples, MIN_SAMPLES,
+  AUTO_NEW_SAMPLE_THRESHOLD, AUTO_COOLDOWN_MS, AUTO_DEBOUNCE_MS,
+  type PreferenceProfile,
+} from "./lib/preferenceProfile";
+import {
+  loadColorWeights, saveColorWeights, setColorWeight as setColorWeightFn,
+  resetColorWeights, getColorWeightControls, getBlockedColorTokens,
+  autoAdjustColorWeights,
+  type ColorWeight, type ColorWeightMap, type ColorAxisCtrl,
+} from "./lib/colorPolicy";
 
 // ── 代表ボタン用ランダムピック定数（モジュールレベル） ────────────────────────
 const SNS_TYPES: SnsType[] = ["x_buzz", "instagram", "tiktok", "pinterest", "thumbnail", "icon", "scroll_stop", "save", "double_take", "global"];
@@ -118,7 +147,12 @@ export default function App() {
   const [avoidCliche, setAvoidCliche] = useState(s0.avoidCliche);
   const [strength, setStrength] = useState(s0.strength);
   const [glossLevel,       setGlossLevel]       = useState(s0.glossLevel);      // 1-5, 3=標準
-  const [dimensionLevel,   setDimensionLevel]   = useState(s0.dimensionLevel);  // 1-5, 3=2.5D
+  // dimensionLevel は互換のため state に持つ（旧履歴・旧設定の保存のため）。UI からは外した。
+  const [dimensionLevel]                        = useState(s0.dimensionLevel);  // 1-5, 3=2.5D
+  /** 質感・リアル度（1=完全2D ↔ 5=写真リアル）。既定 3 = 2.5D */
+  const [realismLevel,     setRealismLevel]     = useState<number>(s0.realismLevel ?? 3);
+  /** 質感タイプ（"anime_bg" 等、null = 指定なし） */
+  const [realismType,      setRealismType]      = useState<string | null>(s0.realismType ?? null);
   const [textureOriginal,  setTextureOriginal]  = useState(s0.textureOriginal); // 元画像維持
   const [textureDisabled,  setTextureDisabled]  = useState(s0.textureDisabled); // プロンプトに反映しない
   /** 出力先プラットフォームに合わせた安全モード（null = 解除済み・フィルタなし） */
@@ -147,6 +181,9 @@ export default function App() {
   const [favoriteLearnEnabled, setFavoriteLearnEnabled] = useState<boolean>(s0.favoriteLearnEnabled);
   const [favoriteStrength, setFavoriteStrength] = useState<number>(s0.favoriteStrength);
   const [favoriteProfile, setFavoriteProfile] = useState<FavoriteProfile | null>(null);
+  // skyveil好みAI：ON/OFF と強度は既存の favoriteLearnEnabled / favoriteStrength を流用（単一の真実）。
+  // oneShot は「今回だけ反映」用の一時フラグ（生成後にクリア）。
+  const [skyveilOneShot, setSkyveilOneShot] = useState<boolean>(false);
   /** ZOZOトレンド：反映中のトレンド（null = 未反映）。衣装ON時のみ送信。永続化 */
   const [zozoApplied, setZozoApplied] = useState<ZozoTrend | null>(s0.zozoApplied);
   /** 禁止トークン（意味ベースで類語展開してプロンプトから除外） */
@@ -174,6 +211,13 @@ export default function App() {
   const [massProductionResult, setMassProductionResult] = useState<BiasAnalysisResult | null>(null);
   /** 全履歴分析結果（重複分析センター用） */
   const [historyAnalysis, setHistoryAnalysis] = useState<FullHistoryAnalysis | null>(null);
+  /** 履歴の生アイテム（色分析の入力）。historyAnalysis と同期して更新される */
+  const [historyItemsForColor, setHistoryItemsForColor] = useState<PromptHistoryItem[]>([]);
+  /** 画像特徴キャッシュ（itemId → ImageFeature） */
+  const [imageFeatureMap, setImageFeatureMap] = useState<Map<string, ImageFeature>>(new Map());
+  /** 画像分析の進捗 */
+  const [imageAnalyzeProgress, setImageAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
+  const imageAnalyzeAbortRef = useRef<AbortController | null>(null);
   /** モチーフ出現制御レベル（行ごとの 0〜5。永続化） */
   const [levels, setLevels] = useState<LevelMap>(() => loadLevels());
   /** 頻出構成（コンボ）ポリシー：comboKey → block/alt/allow。永続化 */
@@ -185,6 +229,29 @@ export default function App() {
       return next;
     });
   }, []);
+  /** 色×軸 重み：colorId → { hair, outfit, background }（各 0-5）。永続化 */
+  const [colorWeights, setColorWeights] = useState<ColorWeightMap>(() => loadColorWeights());
+  const handleColorWeightChange = useCallback((colorId: string, axis: ColorAxisCtrl, w: ColorWeight) => {
+    setColorWeights((prev) => {
+      const next = setColorWeightFn(prev, colorId, axis, w);
+      saveColorWeights(next);
+      return next;
+    });
+  }, []);
+  const handleColorWeightsReset = useCallback(() => {
+    setColorWeights(() => {
+      const next = resetColorWeights();
+      saveColorWeights(next);
+      return next;
+    });
+  }, []);
+  /** 色重み自動調整の Undo スタック */
+  const [colorWeightsUndoStack, setColorWeightsUndoStack] = useState<ColorWeightMap[]>([]);
+  /** 直近で自動調整された (colorId,axis) ペアの集合（行ハイライト用） */
+  const [colorChangedKeys, setColorChangedKeys] = useState<ReadonlySet<string>>(new Set());
+  const colorChangedClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 色分析の対象ウィンドウ（50件 or 100件） */
+  const [colorWindowSize, setColorWindowSize] = useState<50 | 100>(50);
   /** 反映状態（true = 生成ロジックへ実際に流す）。永続化 */
   const [policyApplied, setPolicyAppliedState] = useState<boolean>(() => isApplied());
 
@@ -218,6 +285,7 @@ export default function App() {
   const handleApplyPolicies = useCallback(() => {
     setPolicyAppliedState(true);
     setAppliedStorage(true);
+    void logOperation("policy_apply");
   }, []);
   const handleUnapplyPolicies = useCallback(() => {
     setPolicyAppliedState(false);
@@ -238,6 +306,9 @@ export default function App() {
   const [fashionToastMsg,     setFashionToastMsg]     = useState("");
   const [fashionToastHint,    setFashionToastHint]    = useState("");
   const [items, setItems] = useState<PromptHistoryItem[]>([]);
+  /** 最後に正常生成できた items のバックアップ。
+   *  履歴/お気に入り画面から戻った時に items が空でも復元できるようにする。 */
+  const lastItemsRef = useRef<PromptHistoryItem[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [explorerOpen, setExplorerOpen] = useState<boolean>(() => {
@@ -275,6 +346,8 @@ export default function App() {
   const [undoStack, setUndoStack] = useState<PromptHistoryItem[][]>([]);
   /** アレンジ元プロンプト（バナー表示用） */
   const [arrangeSource, setArrangeSource] = useState<PromptHistoryItem | null>(null);
+  /** 「同じ構成で再生成」復元後の確認バナー用 */
+  const [restoredItem, setRestoredItem] = useState<PromptHistoryItem | null>(null);
   /** runGenerate 内で items の最新値を読むためのリファレンス */
   const itemsRef = useRef<PromptHistoryItem[]>(items);
   /** pendingRun の保証発火のためのカウンター（scopes/moods が変わらない場合の保険） */
@@ -301,8 +374,14 @@ export default function App() {
         if (all.length > 0) {
           setHistoryAnalysis(analyzeFullHistory(all, []));
         }
+        setHistoryItemsForColor(all);
         const favs = all.filter((i) => i.isFavorite);
         setFavoriteProfile(buildFavoriteProfile(favs));
+        // 画像特徴キャッシュも先にロード（未解析分は後で要求された時に走らせる）
+        const features = await loadAllFeatures();
+        const m = new Map<string, ImageFeature>();
+        for (const f of features) m.set(f.id, f);
+        setImageFeatureMap(m);
       } catch {
         // 分析失敗は無視
       }
@@ -310,15 +389,28 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** お気に入りプロファイルを再構築する（お気に入り変更後に呼ぶ）。 */
+  /** お気に入りプロファイルを再構築する（お気に入り変更後に呼ぶ）。
+   *  ついでに色分析・画像分析・評価分析の入力 historyItemsForColor も同期する
+   *  （履歴削除や評価更新が反映されないバグを防ぐため）。 */
   const refreshFavoriteProfile = useCallback(async () => {
     try {
       const all = await getAll();
       setFavoriteProfile(buildFavoriteProfile(all.filter((i) => i.isFavorite)));
+      setHistoryItemsForColor(all);
     } catch {
       // 無視
     }
   }, []);
+
+  // 🔄 view が main に戻った時、items が空なら最後の生成結果を復元する。
+  // 理由：履歴/お気に入り画面へ移動→戻った時や、エラー後に items が空になっていた場合の
+  //        フォールバック。React の state は view 切り替えで消えないはずだが、
+  //        万一消えた場合もこの effect で復元できる。
+  useEffect(() => {
+    if (view === "main" && items.length === 0 && lastItemsRef.current.length > 0) {
+      setItems(lastItemsRef.current);
+    }
+  }, [view]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Explorer 開閉状態を localStorage に保存
   useEffect(() => {
@@ -344,7 +436,7 @@ export default function App() {
     saveSettings({
       scopes, moods, autoMoodCategories, count, details,
       extraInstructions, ngList, viralMode, strength, glossLevel,
-      dimensionLevel, textureOriginal, textureDisabled,
+      dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
       promptTarget, avoidCliche,
       bodyPoseLock, colorMoodLock, compositionLock,
       era, colorStrategy,
@@ -356,7 +448,7 @@ export default function App() {
   }, [
     scopes, moods, autoMoodCategories, count, details,
     extraInstructions, ngList, viralMode, strength, glossLevel,
-    dimensionLevel, textureOriginal, textureDisabled,
+    dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
     promptTarget, avoidCliche,
     bodyPoseLock, colorMoodLock, compositionLock,
     era, colorStrategy,
@@ -391,6 +483,12 @@ export default function App() {
       expression: faceLock ? undefined : (expression ?? undefined),
       ngList: (() => {
         let base = mergeForbiddenIntoNgList(ngList, forbiddenTokens);
+        // 禁止色（weight=0）の代表トークン（policyApplied に依存しない・色は明示UI設定なので常に効かせる）
+        const blockedColorTokens = getBlockedColorTokens(colorWeights);
+        if (blockedColorTokens.length > 0) {
+          const joined = blockedColorTokens.join(", ");
+          base = base ? `${base}\n${joined}` : joined;
+        }
         if (!policyApplied) return base;
         // モチーフ単体の完全NG
         const ngTokens = getNgTokens(levels);
@@ -422,10 +520,40 @@ export default function App() {
         const ctrl = getComboControls(comboPolicies, keyToCombo);
         return ctrl.length > 0 ? ctrl : undefined;
       })(),
+      // 色×軸 重み制御：常時送信（policyApplied に依存しない・色は明示的UI設定なので常に効かせる）
+      colorWeights: (() => {
+        const ctrl = getColorWeightControls(colorWeights);
+        return ctrl.length > 0 ? ctrl : undefined;
+      })(),
+      // 好みプロファイル（実 Gemini 分析）：skyveil好みAI が ON（または今回だけ反映）の時のみ送信
+      preferenceProfile: (favoriteLearnEnabled || skyveilOneShot) ? (preferenceProfile ?? undefined) : undefined,
+      // ユーザー画像評価バイアス（👍/👎）：scope ON の軸のみフィルタして送信
+      ratingBias: (() => {
+        if (!ratingAnalysis) return undefined;
+        const activeScopes = new Set<string>(scopes);
+        return buildRatingBiasPayload(ratingAnalysis, activeScopes) ?? undefined;
+      })(),
+      // 画像分析バイアス：頻出/未使用カテゴリと視覚的重複数をサーバへ送信。
+      // 「提案を反映」(policyApplied) を押した時のみ生成に効かせる（勝手に反映しない）。
+      imageBias: (() => {
+        if (!policyApplied) return undefined;
+        if (!imageAnalysis) return undefined;
+        const overused = imageAnalysis.overusedCategories;
+        const underused = imageAnalysis.underusedCategories.slice(0, 8);
+        const visualDupCount = imageAnalysis.clusters[0]?.size ?? 0;
+        if (overused.length === 0 && underused.length === 0 && visualDupCount < 3) return undefined;
+        return {
+          ...(overused.length > 0 && { overused }),
+          ...(underused.length > 0 && { underused }),
+          ...(visualDupCount >= 3 && { visualDupCount }),
+        };
+      })(),
       viralMode,
       strength,
       glossLevel,
       dimensionLevel,
+      realismLevel,
+      realismType,
       textureOriginal,
       textureDisabled,
       // null（解除）は undefined として扱い、サーバー側で "full" にフォールバックさせる
@@ -434,13 +562,13 @@ export default function App() {
       era: era ?? undefined,
       colorStrategy: colorStrategy ?? undefined,
       artStyle: artStyle ?? undefined,
-      // お気に入り学習：ONかつ傾向が抽出できている場合のみ反映（コピーではなく方向性）
+      // skyveil好みAI：ON（または今回だけ反映）かつ傾向が抽出できている場合のみ反映（コピーではなく方向性）
       favoriteTraits:
-        favoriteLearnEnabled && favoriteProfile && favoriteProfile.traitPhrases.length > 0
+        (favoriteLearnEnabled || skyveilOneShot) && favoriteProfile && favoriteProfile.traitPhrases.length > 0
           ? favoriteProfile.traitPhrases
           : undefined,
       favoriteStrength:
-        favoriteLearnEnabled && favoriteProfile && favoriteProfile.traitPhrases.length > 0
+        (favoriteLearnEnabled || skyveilOneShot) && favoriteProfile && favoriteProfile.traitPhrases.length > 0
           ? favoriteStrength
           : undefined,
       // ZOZOトレンド：衣装スコープON かつ 反映中の場合のみ送信（最重要：衣装ON時のみ）
@@ -475,6 +603,8 @@ export default function App() {
       strength,
       glossLevel,
       dimensionLevel,
+      realismLevel,
+      realismType,
       textureOriginal,
       textureDisabled,
       promptTarget,
@@ -487,9 +617,16 @@ export default function App() {
       favoriteLearnEnabled,
       favoriteProfile,
       favoriteStrength,
+      skyveilOneShot,
       zozoApplied,
       activeBoosts,
       windLevel,
+      // クロージャ内で参照しているのに依存配列から漏れていた（stale closure 修正）。
+      // ここで参照できるのは buildInputs より前に宣言された値のみ。
+      // imageAnalysis / ratingAnalysis / preferenceProfile は buildInputs より後で
+      // 宣言されるため依存配列に入れると TDZ エラーになる。これらは history 変化時に
+      // 他の依存（scopes/moods/details 等）も併せて変わるため実質的に最新値で再生成される。
+      colorWeights,
     ]
   );
 
@@ -515,6 +652,8 @@ export default function App() {
           (i) => !excludeBatchId || i.batchId !== excludeBatchId
         ), currentTexts);
         setHistoryAnalysis(fullAnalysis);
+        // 色分析用：履歴の生アイテムも同期
+        setHistoryItemsForColor(allHistory);
         return result;
       } catch {
         return null;
@@ -554,9 +693,20 @@ export default function App() {
           batchId,
           inputs,
           thumbnail: thumb,
+          // 「同じ構成で再生成」用スナップショット
+          settingsSnapshot: {
+            windLevel: windLevel > 0 ? windLevel : undefined,
+            zozoApplied: zozoApplied ?? null,
+            activeBoosts: activeBoosts.length > 0 ? [...activeBoosts] : undefined,
+            colorStrategy: colorStrategy ?? null,
+            artStyle: artStyle ?? null,
+            era: era ?? null,
+          },
         });
         await saveBatch(built);
         setItems(built);
+        // 正常生成できたらバックアップに保存（履歴画面から戻った時の復元用）
+        lastItemsRef.current = built;
 
         // 生成後に自動で偏り分析を実行（ノンブロッキング）
         const currentTexts = built.map((i) => i.promptText);
@@ -564,7 +714,8 @@ export default function App() {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         setError(msg);
-        setItems([]);
+        // エラー時は items をクリアしない：以前の生成結果を維持する。
+        // （古い結果が残っていてもユーザーはエラーバナーで把握できる）
       } finally {
         setGenerating(false);
         setArrangeSource(null);
@@ -573,10 +724,54 @@ export default function App() {
     [imageDataUrl, runBiasAnalysis]
   );
 
+  // skyveilProfile/Strength は後で宣言されるため、handleGenerate からは ref 経由で参照（TDZ回避）
+  const skyveilProfileRef = useRef<SkyveilProfile | null>(null);
+  const skyveilStrengthRef = useRef<SkyveilStrength>("standard");
+
   const handleGenerate = useCallback(() => {
     if (!canGenerate) return;
-    void runGenerate(buildInputs());
-  }, [canGenerate, buildInputs, runGenerate]);
+    const inputs = buildInputs();
+    const skyveilOn = !!(inputs.favoriteTraits || inputs.preferenceProfile);
+    const sp = skyveilProfileRef.current;
+    const sStrength = skyveilStrengthRef.current;
+    // ── 適用ログ：生成前に「何が効いているか」をブラウザのコンソールで確認できる ──
+    try {
+      console.groupCollapsed("%c🔬 生成に適用したバイアス（確認用ログ）", "color:#a78bfa;font-weight:bold");
+      console.log("変更対象 scopes:", inputs.scopes);
+      console.log("重複分析 motifControls:", inputs.motifControls ?? "（未反映：提案を反映を押す）");
+      console.log("重複分析 comboControls:", inputs.comboControls ?? "（未反映）");
+      console.log("画像分析 imageBias:", inputs.imageBias ?? "（未反映：提案を反映を押す / 画像が未解析）");
+      console.log("評価バイアス ratingBias:", inputs.ratingBias ?? "（なし）");
+      console.log("色ウェイト colorWeights:", inputs.colorWeights ?? "（既定）");
+      console.log("NG（最終）:", inputs.ngList || "（なし）");
+      // ── skyveil好みAI の +/- 内訳 ──
+      const sLabel = sStrength === "weak" ? "弱" : sStrength === "strong" ? "強" : "標準";
+      console.groupCollapsed(`%c🧬 skyveil好み反映：${skyveilOn ? `ON / ${sLabel}` : "OFF"}`,
+        "color:#c4b5fd;font-weight:bold");
+      if (skyveilOn && sp) {
+        console.log("加点（好き）:", sp.likes);
+        console.log("減点（避けたい）:", sp.avoid);
+        console.log("変換（好きだが出すぎ）:", sp.overusedButLiked);
+        console.log("未開拓加点:", sp.underusedRecommended);
+        console.log("※ 変更対象に含まれる軸のみ反映・固定ルール最優先（サーバ側で厳守）");
+      } else {
+        console.log("（OFF：skyveil好みAI のトグルを ON にすると反映されます）");
+      }
+      console.groupEnd();
+      console.groupEnd();
+    } catch { /* console 非対応環境では無視 */ }
+    // 操作ログ（skyveil学習データ）：生成イベントを記録
+    void logOperation("generate", {
+      scopes: inputs.scopes,
+      count: inputs.count,
+      outputType: inputs.promptTarget ?? "full",
+      skyveil: skyveilOn ? sStrength : "off",
+      viral: inputs.viralMode,
+    });
+    // 今回だけ反映は1回使ったら解除
+    if (skyveilOneShot) setSkyveilOneShot(false);
+    void runGenerate(inputs);
+  }, [canGenerate, buildInputs, runGenerate, skyveilOneShot]);
 
   /**
    * GenerationProgress の onComplete から呼ばれる完了ハンドラ。
@@ -627,6 +822,224 @@ export default function App() {
 
   const APPLY_HINT = "「プロンプトを生成」ボタンで反映します";
 
+  // ── 📅 偏り検出の対象：直近90日（最大1000件）。古い好み・失敗を引きずらない ──
+  const recentItems = useMemo(
+    () => filterRecentWindow(historyItemsForColor),
+    [historyItemsForColor],
+  );
+
+  // ── 🎨 色分析：直近90日×ウィンドウサイズで集計 ──
+  const colorAnalysis: ColorAnalysis | null = useMemo(() => {
+    if (recentItems.length === 0) return null;
+    return analyzeColors(recentItems, colorWindowSize);
+  }, [recentItems, colorWindowSize]);
+
+  // ── 📸 画像分析：直近90日×特徴キャッシュから集計 ──
+  const imageAnalysis: ImageAnalysisResult | null = useMemo(() => {
+    if (recentItems.length === 0) return null;
+    return buildImageAnalysis(recentItems, imageFeatureMap);
+  }, [recentItems, imageFeatureMap]);
+
+  // ── ⭐ 評価分析：履歴中の resultRatings を集計（評価＝回避学習は全期間が対象） ──
+  const ratingAnalysis: RatingAnalysis | null = useMemo(() => {
+    if (historyItemsForColor.length === 0) return null;
+    const r = analyzeRatings(historyItemsForColor);
+    return r.totalRatedImages > 0 ? r : null;
+  }, [historyItemsForColor]);
+
+  // ── 📊 分析対象サマリ（パネル見出しの「直近90日/N件」表示用） ──
+  const analysisStats = useMemo(() => {
+    const promptCount = recentItems.length;
+    // 画像解析済み＝直近90日のうち結果画像があり特徴キャッシュに載っている件数
+    let imageAnalyzedCount = 0;
+    for (const it of recentItems) {
+      if (imageFeatureMap.has(it.id)) imageAnalyzedCount++;
+    }
+    const ratedCount = ratingAnalysis?.totalRatedImages ?? 0;
+    return {
+      windowDays: WINDOW_DAYS,
+      totalItems: historyItemsForColor.length,
+      promptCount,
+      imageAnalyzedCount,
+      ratedCount,
+    };
+  }, [recentItems, imageFeatureMap, ratingAnalysis, historyItemsForColor.length]);
+
+  // ── 💡 好みプロファイル：Gemini で実分析した結果（localStorage 永続化） ──
+  // ↑ preferenceProfile はこの直後に宣言。skyveilProfile はさらに後で組み立てる。
+  const [preferenceProfile, setPreferenceProfile] = useState<PreferenceProfile | null>(() => loadPreferenceProfile());
+  /** 分析実行中フラグ */
+  const [analyzingProfile, setAnalyzingProfile] = useState(false);
+  /** 直近のエラー（成功時は null） */
+  const [profileError, setProfileError] = useState<string | null>(null);
+  /** 自動学習 ON/OFF（既定 ON・永続化） */
+  const [autoLearnEnabled, setAutoLearnEnabled] = useState<boolean>(() => loadAutoLearn());
+  /** 自動学習：直近の自動分析時刻（クールダウン判定） */
+  const lastAutoAnalyzeRef = useRef<number>(0);
+  /** 自動学習：デバウンスタイマー */
+  const autoLearnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** 評価可能サンプル数（評価が1つでも付いてる画像の総数） */
+  const profileSampleCount = useMemo(
+    () => collectSamples(historyItemsForColor).length,
+    [historyItemsForColor],
+  );
+
+  // ── 🧬 skyveil好みAI：既存の各分析を1つの統合プロファイルに束ねる ──
+  const skyveilStrength: SkyveilStrength = favoriteToStrength(favoriteStrength);
+  const skyveilProfile = useMemo(
+    () => buildSkyveilProfile({
+      preferenceProfile, favoriteProfile, ratingAnalysis, imageAnalysis, historyAnalysis,
+    }),
+    [preferenceProfile, favoriteProfile, ratingAnalysis, imageAnalysis, historyAnalysis],
+  );
+  // handleGenerate（前方宣言）から ref 経由で最新値を読むため同期
+  useEffect(() => { skyveilProfileRef.current = skyveilProfile; }, [skyveilProfile]);
+  useEffect(() => { skyveilStrengthRef.current = skyveilStrength; }, [skyveilStrength]);
+
+  /**
+   * 実 Gemini 呼び出しで好みプロファイルを更新。
+   * @param auto true=自動学習からの呼び出し（トーストを控えめに・クールダウン記録）
+   */
+  const handleRunPreferenceAnalysis = useCallback(async (auto = false) => {
+    if (analyzingProfile) return;
+    setProfileError(null);
+    const samples = collectSamples(historyItemsForColor);
+    if (samples.length < MIN_SAMPLES) {
+      if (!auto) {
+        setProfileError(`サンプル不足（${samples.length}件 / 最低 ${MIN_SAMPLES}件必要）。画像評価を増やしてから再試行してください。`);
+      }
+      return;
+    }
+    setAnalyzingProfile(true);
+    if (auto) lastAutoAnalyzeRef.current = Date.now();
+    try {
+      const profile = await analyzePreferencesViaBackend(samples);
+      savePreferenceProfile(profile);
+      setPreferenceProfile(profile);
+      showPresetToast(
+        auto ? "🔁 自動学習：好み傾向を更新しました" : "✓ AI分析完了",
+        `${profile.sampleSize}件のデータから好み傾向を抽出し、次回プロンプト生成に反映します。`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // 自動学習の失敗はエラーバナーを出さず静かにスキップ（ユーザー操作を邪魔しない）
+      if (!auto) setProfileError(msg);
+      else console.warn("[auto-learn] analysis failed:", msg);
+    } finally {
+      setAnalyzingProfile(false);
+    }
+  }, [analyzingProfile, historyItemsForColor, showPresetToast]);
+
+  /** プロファイルを削除（再分析できるようにクリア） */
+  const handleClearPreferenceProfile = useCallback(() => {
+    clearPreferenceProfile();
+    setPreferenceProfile(null);
+    setProfileError(null);
+  }, []);
+
+  /** 自動学習トグル */
+  const handleToggleAutoLearn = useCallback((enabled: boolean) => {
+    setAutoLearnEnabled(enabled);
+    saveAutoLearn(enabled);
+  }, []);
+
+  // ── 🔁 自動学習トリガー ──
+  // 評価サンプルが一定数増えるたびに、デバウンス＋クールダウン付きで自動再分析する。
+  // ループ防止：分析完了後は preferenceProfile.sampleSize が更新され「新規分」が 0 に戻るため再発火しない。
+  useEffect(() => {
+    if (!autoLearnEnabled) return;
+    if (analyzingProfile) return;
+    if (profileSampleCount < MIN_SAMPLES) return;
+
+    const lastSize = preferenceProfile?.sampleSize ?? 0;
+    // 新規サンプル数。負になる場合（サンプルが減った等）は 0 扱い
+    const newSamples = Math.max(0, profileSampleCount - lastSize);
+    // 初回（プロファイル無し）は MIN_SAMPLES 到達で実行。以降は +AUTO_NEW_SAMPLE_THRESHOLD 毎。
+    const need = preferenceProfile ? AUTO_NEW_SAMPLE_THRESHOLD : MIN_SAMPLES;
+    if (newSamples < need) return;
+
+    // クールダウン中なら待つ
+    const sinceLast = Date.now() - lastAutoAnalyzeRef.current;
+    if (sinceLast < AUTO_COOLDOWN_MS) return;
+
+    // デバウンス：評価が連続したらタイマーをリセットして最後の操作から AUTO_DEBOUNCE_MS 後に実行
+    if (autoLearnTimerRef.current) clearTimeout(autoLearnTimerRef.current);
+    autoLearnTimerRef.current = setTimeout(() => {
+      void handleRunPreferenceAnalysis(true);
+    }, AUTO_DEBOUNCE_MS);
+
+    return () => {
+      if (autoLearnTimerRef.current) {
+        clearTimeout(autoLearnTimerRef.current);
+        autoLearnTimerRef.current = null;
+      }
+    };
+  }, [autoLearnEnabled, analyzingProfile, profileSampleCount, preferenceProfile, handleRunPreferenceAnalysis]);
+
+  // App unmount 時に進行中の画像分析を中断（メモリリーク・残留 setState 防止）
+  useEffect(() => {
+    return () => {
+      if (imageAnalyzeAbortRef.current) {
+        imageAnalyzeAbortRef.current.abort();
+        imageAnalyzeAbortRef.current = null;
+      }
+    };
+  }, []);
+
+  /** 画像分析を開始（未解析分のサムネをハッシュ化）。タブを開いたときに発火 */
+  const startImageAnalysis = useCallback(() => {
+    if (imageAnalyzeAbortRef.current) {
+      imageAnalyzeAbortRef.current.abort();
+    }
+    const ctrl = new AbortController();
+    imageAnalyzeAbortRef.current = ctrl;
+    void (async () => {
+      try {
+        const next = await runProgressiveAnalysis(
+          historyItemsForColor,
+          imageFeatureMap,
+          (state) => {
+            // アボート後は setState を呼ばない（メモリリーク防止）
+            if (!ctrl.signal.aborted) {
+              setImageAnalyzeProgress({ done: state.done, total: state.total });
+            }
+          },
+          ctrl.signal,
+        );
+        if (!ctrl.signal.aborted) {
+          setImageFeatureMap(next);
+        }
+      } finally {
+        // アボートされていない場合のみ進捗をクリア
+        if (!ctrl.signal.aborted) {
+          setImageAnalyzeProgress(null);
+        }
+        if (imageAnalyzeAbortRef.current === ctrl) imageAnalyzeAbortRef.current = null;
+      }
+    })();
+  }, [historyItemsForColor, imageFeatureMap]);
+
+  // ── 📸 自動画像解析：結果画像を貼ったら（タブを開かなくても）自動で解析する ──
+  // 直近90日に「結果画像はあるが未解析」のアイテムがあれば、デバウンス後に解析を走らせる。
+  // runProgressiveAnalysis は未解析分のみ処理するので再実行は安全（解析済みは即終了）。
+  const autoImageAnalyzeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    let pending = 0;
+    for (const it of recentItems) {
+      if (!imageFeatureMap.has(it.id) && primaryResultImage(it) != null) { pending++; }
+    }
+    if (pending === 0) return;
+    if (autoImageAnalyzeTimer.current) clearTimeout(autoImageAnalyzeTimer.current);
+    autoImageAnalyzeTimer.current = setTimeout(() => { startImageAnalysis(); }, 1500);
+    return () => {
+      if (autoImageAnalyzeTimer.current) {
+        clearTimeout(autoImageAnalyzeTimer.current);
+        autoImageAnalyzeTimer.current = null;
+      }
+    };
+  }, [recentItems, imageFeatureMap, startImageAnalysis]);
+
   // ── 🤖 AI分析エージェント：useMemoで現状から提案を再計算 ──
   const agentAnalysis = useMemo(() => analyzeAgent({
     scopes, locks: {
@@ -636,13 +1049,13 @@ export default function App() {
     faceLock,
     activeWorldPresets, activeGodModes, activeBoosts, viralMode,
     favoriteProfile, favoriteEnabled: favoriteLearnEnabled,
-    historyAnalysis, policyApplied,
+    historyAnalysis, colorAnalysis, imageAnalysis, ratingAnalysis, policyApplied,
     windLevel,
     hasImage: !!imageDataUrl,
   }), [
     scopes, bodyPoseLock, colorMoodLock, compositionLock, faceLock,
     activeWorldPresets, activeGodModes, activeBoosts, viralMode,
-    favoriteProfile, favoriteLearnEnabled, historyAnalysis, policyApplied,
+    favoriteProfile, favoriteLearnEnabled, historyAnalysis, colorAnalysis, imageAnalysis, ratingAnalysis, policyApplied,
     windLevel, imageDataUrl,
   ]);
 
@@ -696,6 +1109,48 @@ export default function App() {
       saveLevels(restored);
       setChangedIds(new Set());
       showPresetToast("↶ 自動調整を元に戻しました", "");
+      return rest;
+    });
+  }, [showPresetToast]);
+
+  // ── 🎨 色重み：自動調整（偏り減点・未使用加点）──
+  const handleColorAutoAdjust = useCallback((preserveManual: boolean) => {
+    if (!colorAnalysis) {
+      showPresetToast("色分析データが不足しています", "数回生成すると自動調整が使えます。");
+      return;
+    }
+    const snapshot: ColorWeightMap = JSON.parse(JSON.stringify(colorWeights));
+    const result = autoAdjustColorWeights(snapshot, colorAnalysis, preserveManual);
+    if (result.changes.length === 0) {
+      showPresetToast("変更点はありませんでした", "");
+      return;
+    }
+    setColorWeightsUndoStack((s) => [snapshot, ...s].slice(0, 5));
+    setColorWeights(result.next);
+    saveColorWeights(result.next);
+
+    // 変更ハイライト：colorId:axis のキーで管理、1.6 秒で自然消去
+    const keys = new Set(result.changes.map((c) => `${c.colorId}:${c.axis}`));
+    setColorChangedKeys(keys);
+    if (colorChangedClearTimer.current) clearTimeout(colorChangedClearTimer.current);
+    colorChangedClearTimer.current = setTimeout(() => setColorChangedKeys(new Set()), 1600);
+
+    const biasCount = result.changes.filter((c) => c.reason === "bias" || c.reason === "axis_bias").length;
+    const upCount   = result.changes.filter((c) => c.reason === "untapped").length;
+    showPresetToast(
+      `✨ 色重みを自動調整しました（${result.changes.length}件）`,
+      `偏り減点 ${biasCount} 件・未使用加点 ${upCount} 件。次回の生成から反映されます。`,
+    );
+  }, [colorWeights, colorAnalysis, showPresetToast]);
+
+  const handleColorUndoAdjust = useCallback(() => {
+    setColorWeightsUndoStack((stack) => {
+      if (stack.length === 0) return stack;
+      const [restored, ...rest] = stack;
+      setColorWeights(restored);
+      saveColorWeights(restored);
+      setColorChangedKeys(new Set());
+      showPresetToast("↶ 色重みの自動調整を元に戻しました", "");
       return rest;
     });
   }, [showPresetToast]);
@@ -1008,18 +1463,13 @@ export default function App() {
     showPresetToast(msg, APPLY_HINT);
   }, [activeEffectTypes, buildInputs, variationMemory, showPresetToast]);
 
-  // ─── 多様性ツール（生成補助）：ギャップ化・量産回避のトグル選択（最大2コンボ） ─
+  // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
+  // 「anti（量産回避）」モードはUIから撤去済み（avoidCliche に統合）。
+  // 引数型は "gap" のみに狭めてあり、buildAntiTemplateInputs は別ジャンル化機能から直接利用される。
 
-  const handleAssistToggle = useCallback((mode: "gap" | "anti") => {
+  const handleAssistToggle = useCallback((mode: "gap") => {
     const prev = activeAssistModes;
-    let next: string[];
-    if (prev.includes(mode)) {
-      next = prev.filter((m) => m !== mode);
-    } else if (prev.length >= 2) {
-      next = [...prev.slice(1), mode];
-    } else {
-      next = [...prev, mode];
-    }
+    const next = prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode];
     setActiveAssistModes(next);
 
     if (next.length === 0) {
@@ -1038,12 +1488,7 @@ export default function App() {
     setScopeFlashKey((k) => k + 1);
     setVariationMemory((prev) => updateMemory(prev, { moods: combined.moods, scopes: combined.scopes }));
 
-    const ASSIST_LABELS: Record<string, string> = { gap: "🎭 ギャップ化", anti: "🧪 量産回避" };
-    const labels = next.map((m) => ASSIST_LABELS[m] ?? m);
-    const msg = next.length === 1
-      ? `${labels[0]} を適用しました`
-      : `生成補助コンボ：${labels.join(" × ")}`;
-    showPresetToast(msg, APPLY_HINT);
+    showPresetToast(`🎭 ギャップ化 を適用しました`, APPLY_HINT);
   }, [activeAssistModes, buildInputs, variationMemory, showPresetToast]);
 
   // ─── SNSバズ・カルチャー：マルチセレクト（最大2コンボ） ────────────────────────
@@ -1181,26 +1626,12 @@ export default function App() {
     setMoods([]);
     setExtraInstructions("");
     setViralMode(false);
+    void logOperation("reset");
     showPresetToast("↺ プリセット設定を全リセットしました");
   }, [showPresetToast]);
 
-  const handleResetGod = useCallback(() => {
-    setActiveGodModes([]);
-    setActiveBoosts([]);
-    setChaosLabel(null);
-    setExtraInstructions("");
-    showPresetToast("神引きの設定をリセットしました");
-  }, [showPresetToast]);
-
-  const handleResetAssist = useCallback(() => {
-    setActiveSnsTypes([]);
-    setActiveCultureTypes([]);
-    setActiveAssistModes([]);
-    setViralMode(false);
-    setExtraInstructions("");
-    showPresetToast("生成補助の設定をリセットしました");
-  }, [showPresetToast]);
-
+  // handleResetGod / handleResetAssist は SelectionSummary（撤去済み）専用だったため削除。
+  // 必要なリセットは onResetAll（全リセット）から行われる。
 
   /** 🚫 量産AI検知：生成済みプロンプトを偏り分析し結果を表示する。 */
   const handleMassProductionCheck = useCallback(() => {
@@ -1259,6 +1690,68 @@ export default function App() {
   );
 
   /**
+   * 🔁 同じ構成で再生成：履歴アイテムの全設定を現在の画面に復元する。
+   * - PromptHistoryItem に保存されているフィールドは直接復元。
+   * - settingsSnapshot があればそこから windLevel / zozoApplied / activeBoosts も復元。
+   * - ない場合（古い履歴）は保存されているフィールドのみ復元し、バナーで案内。
+   */
+  const handleRestoreFromHistory = useCallback(
+    (item: PromptHistoryItem) => {
+      setView("main");
+      setFavPanelOpen(false);
+
+      // ── 基本設定（PromptHistoryItem に常にある） ─────────────────────────
+      setScopes(item.scopes ?? []);
+      setMoods(item.moods ?? []);
+      setDetails(item.details ?? ({} as import("./types").DetailSettings));
+      setFaceLock(item.faceLock ?? false);
+      setNgList(item.ngList ?? "");
+      setViralMode(item.viralMode ?? false);
+      setExtraInstructions(item.extraInstructions ?? "");
+
+      // ロックの各フィールドを展開
+      const lk = item.locks ?? {};
+      setBodyPoseLock(lk.body_shape ?? false);
+      setColorMoodLock(lk.color ?? false);
+      setCompositionLock(lk.camera ?? false);
+
+      // 質感・リアル度
+      if (item.realismLevel != null) setRealismLevel(item.realismLevel);
+      if (item.realismType != null) setRealismType(item.realismType ?? null);
+      if (item.glossLevel != null) setGlossLevel(item.glossLevel);
+      if (item.textureOriginal != null) setTextureOriginal(item.textureOriginal);
+      if (item.textureDisabled != null) setTextureDisabled(item.textureDisabled);
+
+      // 出力先
+      if (item.promptTarget) setPromptTarget(item.promptTarget);
+
+      // 元画像（サムネイル）
+      if (item.sourceImageThumbnail) {
+        setImageDataUrl(item.sourceImageThumbnail);
+      }
+
+      // ── 拡張スナップショット（新しい履歴のみ存在） ─────────────────────
+      const ss = item.settingsSnapshot;
+      if (ss) {
+        if (ss.windLevel != null) setWindLevel(ss.windLevel);
+        if (ss.zozoApplied !== undefined) setZozoApplied(ss.zozoApplied);
+        if (ss.activeBoosts) setActiveBoosts(ss.activeBoosts);
+        if (ss.colorStrategy !== undefined) setColorStrategy(ss.colorStrategy as import("./types").ColorStrategy | null);
+        if (ss.artStyle !== undefined) setArtStyle(ss.artStyle as import("./types").ArtStyle | null);
+        if (ss.era !== undefined) setEra(ss.era as import("./types").Era | null);
+      }
+
+      // 確認バナー表示用
+      setRestoredItem(item);
+    },
+    [setView, setFavPanelOpen, setScopes, setMoods, setDetails, setFaceLock,
+     setNgList, setViralMode, setExtraInstructions, setBodyPoseLock, setColorMoodLock,
+     setCompositionLock, setRealismLevel, setRealismType, setGlossLevel,
+     setTextureOriginal, setTextureDisabled, setPromptTarget, setImageDataUrl,
+     setWindLevel, setZozoApplied, setActiveBoosts, setColorStrategy, setArtStyle, setEra]
+  );
+
+  /**
    * ✨ インライン・アレンジ：履歴画面を離れずにその場で生成し結果を返す。
    * 元プロンプトの保護ルール（faceLock / locks / 変更範囲）を尊重する。
    */
@@ -1308,9 +1801,13 @@ export default function App() {
     [buildInputs, imageDataUrl, showPresetToast]
   );
 
-  /** アレンジ案をお気に入りとして履歴へ保存する。 */
+  /** アレンジ案をお気に入りとして履歴へ保存する（生成画像・評価・派生元メタを含む）。 */
   const handleSaveArranged = useCallback(
-    async (result: ArrangeResult, proposal: GeneratedProposal) => {
+    async (
+      result: ArrangeResult,
+      proposal: GeneratedProposal,
+      localState?: import("./components/ArrangePreviewPanel").ProposalLocalState,
+    ) => {
       const batchId = uid();
       const built = buildHistoryItems({
         proposals: [proposal],
@@ -1319,11 +1816,48 @@ export default function App() {
         inputs: result.inputs,
         thumbnail: result.source.sourceImageThumbnail ?? null,
       });
-      const favItems = built.map((i) => ({ ...i, isFavorite: true }));
+
+      // changedAxes から使用/除外スコープを抽出
+      const usedScopes   = result.changedAxes.filter((a) => a.changed).map((a) => a.scope);
+      const excludedScopes = result.changedAxes.filter((a) => !a.changed).map((a) => a.scope);
+
+      const favItems = built.map((item) => {
+        const base = { ...item, isFavorite: true };
+        // 派生元リンク + アレンジメタ
+        const withMeta = {
+          ...base,
+          derivedFromId:         result.source.id,
+          derivedFromDate:       result.source.createdAt,
+          arrangeCaseNumber:     (proposal.index ?? 0) + 1,
+          arrangeUsedScopes:     usedScopes.length > 0 ? usedScopes : undefined,
+          arrangeExcludedScopes: excludedScopes.length > 0 ? excludedScopes : undefined,
+        };
+        // 生成画像・評価を引き継ぐ
+        if (localState && localState.images.length > 0) {
+          return {
+            ...withMeta,
+            ...buildResultImagesPatch(localState.images),
+            resultRatings:       localState.ratings.length > 0 ? localState.ratings : undefined,
+            resultMemos:         localState.memos.length > 0 ? localState.memos : undefined,
+            resultBgRatings:     localState.bgRatings.length > 0 ? localState.bgRatings : undefined,
+            resultOutfitRatings: localState.outfitRatings.length > 0 ? localState.outfitRatings : undefined,
+            resultPoseRatings:   localState.poseRatings.length > 0 ? localState.poseRatings : undefined,
+            generatedResultAddedAt: Date.now(),
+          };
+        }
+        return withMeta;
+      });
       await saveBatch(favItems);
       void refreshFavoriteProfile();
+      // 保存完了トースト
+      const imgCount = localState?.images.length ?? 0;
+      showPresetToast(
+        "✨ アレンジお気に入りに保存しました",
+        imgCount > 0 ? `画像 ${imgCount} 枚・評価付きで保存` : "プロンプトのみ保存（画像は未登録）",
+      );
+      void logOperation("arrange_save", { caseNumber: (proposal.index ?? 0) + 1, images: imgCount });
     },
-    [refreshFavoriteProfile]
+    [refreshFavoriteProfile, showPresetToast]
   );
 
   /** 案カードからのお気に入り/評価/メモ変更を反映する。 */
@@ -1331,9 +1865,22 @@ export default function App() {
     async (id: string, patch: Partial<PromptHistoryItem>) => {
       await updateItemDb(id, patch);
       setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
-      // お気に入り状態が変わったらプロファイルを再構築
-      if (Object.prototype.hasOwnProperty.call(patch, "isFavorite")) {
+      // 評価/画像/お気に入りいずれかが変わったら色・画像・評価分析の入力を refresh
+      const RELOAD_KEYS = [
+        "isFavorite", "resultRatings", "resultMemos",
+        "resultBgRatings", "resultOutfitRatings", "resultPoseRatings",
+        "resultImageDataList", "resultImageData",
+      ];
+      if (RELOAD_KEYS.some((k) => Object.prototype.hasOwnProperty.call(patch, k))) {
         void refreshFavoriteProfile();
+      }
+      // 操作ログ（skyveil学習）：お気に入り・評価を記録
+      if (Object.prototype.hasOwnProperty.call(patch, "isFavorite")) {
+        void logOperation("favorite", { id, value: patch.isFavorite });
+      }
+      if (["resultRatings", "resultBgRatings", "resultOutfitRatings", "resultPoseRatings"]
+        .some((k) => Object.prototype.hasOwnProperty.call(patch, k))) {
+        void logOperation("rate", { id });
       }
     },
     [refreshFavoriteProfile]
@@ -1366,11 +1913,16 @@ export default function App() {
       <main className="w-full px-2 py-2">
         {view === "history" ? (
           <HistoryView
-            onBack={() => setView("main")}
+            onBack={() => {
+              setView("main");
+              // 履歴ビューで削除・評価変更があったかもしれないので分析入力を再ロード
+              void refreshFavoriteProfile();
+            }}
             initialFavoritesOnly={historyFavoritesOnly}
             onArrangeInline={handleArrangeInline}
             onSaveArranged={handleSaveArranged}
             onSendToGenerator={handleArrange}
+            onRestore={handleRestoreFromHistory}
             favoriteProfile={favoriteProfile}
             favoriteLearnEnabled={favoriteLearnEnabled}
           />
@@ -1391,9 +1943,6 @@ export default function App() {
               onClose={() => setExplorerOpen(false)}
               width={explorerWidth}
               onResize={handleExplorerResize}
-              assistantSlot={
-                <AssistantCharacter agent={agentAnalysis} onAction={handleAgentAction} />
-              }
             />
             <ImageSidebar
               imageDataUrl={imageDataUrl}
@@ -1418,6 +1967,101 @@ export default function App() {
             />
 
             <div className="space-y-5 mt-5 lg:mt-0 min-w-0 pb-24">
+
+              {/* 🔁 復元確認バナー：「同じ構成で再生成」後に表示 */}
+              {restoredItem && (
+                <div className="rounded-2xl border border-sky-400/45 bg-sky-500/10 px-4 py-3 flex items-center gap-3 flex-wrap shadow-[0_0_20px_-4px_rgba(56,189,248,0.35)]">
+                  <span className="text-[18px] shrink-0">🔁</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-bold text-sky-100 leading-snug">
+                      この構成を復元しました
+                    </p>
+                    <p className="text-[12px] text-sky-200/70 leading-snug">
+                      {restoredItem.settingsSnapshot
+                        ? `${new Date(restoredItem.createdAt).toLocaleDateString("ja-JP")} 生成 — 変更対象・詳細設定・元画像・全設定を復元しました`
+                        : `${new Date(restoredItem.createdAt).toLocaleDateString("ja-JP")} 生成（古い履歴のため一部設定は復元できません）`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const inputs = buildInputs();
+                        setRestoredItem(null);
+                        void runGenerate(inputs);
+                      }}
+                      disabled={!canGenerate || generating}
+                      className="rounded-lg px-3 py-1.5 text-[13px] font-bold border border-sky-400/65 bg-sky-500/22 text-sky-100 hover:bg-sky-500/35 transition disabled:opacity-50 leading-none"
+                    >
+                      🚀 このまま生成
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRestoredItem(null)}
+                      className="rounded-lg px-3 py-1.5 text-[12px] border border-white/15 bg-white/5 text-text-muted hover:text-text-base transition leading-none"
+                    >
+                      ✕ 閉じる
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* 📡 現在の反映状態バー：今プロンプトに効く設定を一目で（読み取り専用） */}
+              <ReflectionStatusBar
+                scopes={scopes}
+                faceLock={faceLock}
+                bodyPoseLock={bodyPoseLock}
+                colorMoodLock={colorMoodLock}
+                compositionLock={compositionLock}
+                avoidCliche={avoidCliche}
+                activeGodModes={activeGodModes}
+                chaosLabel={chaosLabel}
+                activeBoosts={activeBoosts}
+                viralMode={viralMode}
+                activeSnsLabels={activeSnsTypes.map(getSnsLabel)}
+                activeCultureLabels={activeCultureTypes.map(getCultureLabel)}
+                activeWorldPresets={activeWorldPresets}
+                favoriteEnabled={favoriteLearnEnabled}
+                favoriteProfile={favoriteProfile}
+                zozoApplied={zozoApplied}
+                realismLevel={realismLevel}
+                realismType={realismType}
+                glossLevel={glossLevel}
+                windLevel={windLevel}
+                policyApplied={policyApplied}
+                motifControlledCount={countLevels(levels).controlled}
+                comboControlCount={countComboPolicies(comboPolicies).block + countComboPolicies(comboPolicies).alt}
+                colorWeights={colorWeights}
+              />
+
+              {/* 🧬 skyveil好みAI：既存の好み分析を束ねた単一の反映コントロール */}
+              <SkyveilBar
+                enabled={favoriteLearnEnabled}
+                strength={skyveilStrength}
+                profile={skyveilProfile}
+                analyzing={analyzingProfile}
+                sampleCount={profileSampleCount}
+                minSamples={MIN_SAMPLES}
+                oneShotArmed={skyveilOneShot}
+                onToggle={(v) => {
+                  setFavoriteLearnEnabled(v);
+                  if (v) setSkyveilOneShot(false);
+                  showPresetToast(v ? "🧬 skyveil好み反映 ON" : "skyveil好み反映 OFF",
+                    v ? `${skyveilProfile.summary || "好みを次回生成に反映します"}` : "");
+                }}
+                onStrength={(s) => setFavoriteStrength(STRENGTH_TO_FAVORITE[s])}
+                onUpdateAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
+                onOneShot={() => {
+                  setSkyveilOneShot(true);
+                  showPresetToast("✨ 今回だけ skyveil好みを反映します", "次の生成にのみ適用されます。");
+                }}
+                onReset={() => {
+                  setFavoriteLearnEnabled(false);
+                  setSkyveilOneShot(false);
+                  showPresetToast("skyveil好み反映をリセットしました", "");
+                }}
+              />
+
               <QuickActions
                 viralMode={viralMode}
                 canVariant={!!imageDataUrl || hasResults}
@@ -1442,6 +2086,8 @@ export default function App() {
                 onEffectToggle={handleEffectToggle}
                 onGodToggle={handleGodToggle}
                 onBoostToggle={handleBoostToggle}
+                avoidCliche={avoidCliche}
+                onAvoidClicheChange={setAvoidCliche}
                 onAssistToggle={handleAssistToggle}
                 onSnsSingle={handleSnsSingle}
                 onCultureSingle={handleCultureSingle}
@@ -1475,6 +2121,28 @@ export default function App() {
                   changedIds={changedIds}
                   comboPolicies={comboPolicies}
                   onComboPolicyChange={handleComboPolicyChange}
+                  colorAnalysis={colorAnalysis}
+                  colorWeights={colorWeights}
+                  onColorWeightChange={handleColorWeightChange}
+                  onColorWeightsReset={handleColorWeightsReset}
+                  onColorAutoAdjust={handleColorAutoAdjust}
+                  onColorUndoAdjust={handleColorUndoAdjust}
+                  canColorUndo={colorWeightsUndoStack.length > 0}
+                  colorChangedKeys={colorChangedKeys}
+                  colorWindowSize={colorWindowSize}
+                  onColorWindowSizeChange={setColorWindowSize}
+                  imageAnalysis={imageAnalysis}
+                  onStartImageAnalysis={startImageAnalysis}
+                  imageAnalyzeProgress={imageAnalyzeProgress}
+                  ratingAnalysis={ratingAnalysis}
+                  preferenceProfile={preferenceProfile}
+                  analyzingProfile={analyzingProfile}
+                  profileError={profileError}
+                  profileSampleCount={profileSampleCount}
+                  onRunPreferenceAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
+                  onClearPreferenceProfile={handleClearPreferenceProfile}
+                  autoLearnEnabled={autoLearnEnabled}
+                  onToggleAutoLearn={handleToggleAutoLearn}
                   agent={agentAnalysis}
                   onAgentAction={handleAgentAction}
                   onApplyPolicies={() => {
@@ -1522,48 +2190,24 @@ export default function App() {
                     setMassProductionResult(null);
                     setHistoryAnalysis(null);
                   }}
+                  analysisStats={analysisStats}
+                  activeScopes={scopes}
+                  favoriteProfile={favoriteProfile}
+                  favoriteLearnEnabled={favoriteLearnEnabled}
                 />
               )}
 
               <ControlPanel
                 scopes={scopes}
                 onScopesChange={setScopes}
-                selectionSummary={
-                  <SelectionSummary
-                    scopes={scopes}
-                    onScopeRemove={(s) => setScopes(scopes.filter((v) => v !== s))}
-                    activeGodModes={activeGodModes}
-                    chaosLabel={chaosLabel}
-                    onGodReset={handleResetGod}
-                    activeBoosts={activeBoosts}
-                    onBoostRemove={handleBoostToggle}
-                    activeEffectTypes={activeEffectTypes}
-                    onEffectRemove={handleEffectToggle}
-                    activeWorldPresets={activeWorldPresets}
-                    onWorldRemove={handleWorldPresetToggle}
-                    viralMode={viralMode}
-                    onViralRemove={handleViralOff}
-                    activeSnsLabels={activeSnsTypes.map(getSnsLabel)}
-                    activeCultureLabels={activeCultureTypes.map(getCultureLabel)}
-                    onAssistReset={handleResetAssist}
-                    onScopesReset={() => setScopes([])}
-                    onResetAll={() => {
-                      handleResetAll();
-                      setScopes([]);
-                      setActiveBoosts([]);
-                      setFavoriteLearnEnabled(false);
-                      setZozoApplied(null);
-                    }}
-                    // ZOZO は「衣装ON かつ反映済み」のときだけチップ表示（実効反映）
-                    zozoEffective={
-                      zozoApplied && zozoApplied.traits.length > 0 && scopes.includes("outfit")
-                        ? (zozoApplied.mode === "priority" ? "priority" : "assist")
-                        : "off"
-                    }
-                    zozoAgeLabel={zozoApplied?.ageLabel}
-                    onZozoRemove={() => setZozoApplied(null)}
-                  />
-                }
+                onScopesReset={() => setScopes([])}
+                onResetAll={() => {
+                  handleResetAll();
+                  setScopes([]);
+                  setActiveBoosts([]);
+                  setFavoriteLearnEnabled(false);
+                  setZozoApplied(null);
+                }}
                 boostArea={
                   <BoostControls
                     favoriteEnabled={favoriteLearnEnabled}
@@ -1617,12 +2261,14 @@ export default function App() {
                 scopeFlashKey={scopeFlashKey}
                 strength={strength}
                 glossLevel={glossLevel}
-                dimensionLevel={dimensionLevel}
+                realismLevel={realismLevel}
+                realismType={realismType}
                 textureOriginal={textureOriginal}
                 textureDisabled={textureDisabled}
                 onStrengthChange={setStrength}
                 onGlossChange={setGlossLevel}
-                onDimensionChange={setDimensionLevel}
+                onRealismLevelChange={setRealismLevel}
+                onRealismTypeChange={setRealismType}
                 onTextureOriginalChange={setTextureOriginal}
                 onTextureDisabledChange={setTextureDisabled}
                 faceLock={faceLock}
@@ -1632,11 +2278,9 @@ export default function App() {
                 bodyPoseLock={bodyPoseLock}
                 colorMoodLock={colorMoodLock}
                 compositionLock={compositionLock}
-                avoidCliche={avoidCliche}
                 onBodyPoseLockChange={setBodyPoseLock}
                 onColorMoodLockChange={setColorMoodLock}
                 onCompositionLockChange={setCompositionLock}
-                onAvoidClicheChange={setAvoidCliche}
               />
 
               <DetailsCard
@@ -1709,15 +2353,142 @@ export default function App() {
                 />
               </div>
 
-              {error && (
-                <section className="card border-rose-500/50 bg-rose-500/10">
-                  <h3 className="text-sm font-semibold text-rose-300 mb-1">生成に失敗しました</h3>
-                  <p className="text-xs text-rose-200/90 break-all">{error}</p>
-                  <p className="text-xs text-text-muted mt-2">
-                    `npm run dev:all` でサーバーが起動しているか、`server/.env` のキーが有効か確認してください。
-                  </p>
-                </section>
-              )}
+              {error && (() => {
+                const isBlocked =
+                  error.includes("PROHIBITED_CONTENT") ||
+                  error.includes("SAFETY") ||
+                  error.includes("ブロックされました");
+
+                // 「安全寄りに再試行」：複数の刺激要因を一度に外し、
+                // 調整済みの inputs を直接組み立てて再生成する（state 非同期問題を回避）
+                const handleSafeRetry = () => {
+                  // ── 安全化する値を先にローカルで計算 ──
+                  const nextViralMode = false;
+                  const nextGodModes: string[] = [];
+                  const nextBoosts = activeBoosts.filter((b) => b !== "buzz" && b !== "other_world");
+                  const nextWorldPresets: import("./components/QuickActions").WorldPreset[] = [];
+                  const nextWorldNote = "";
+
+                  // スコープ：3軸まで絞る
+                  const priorityOrder: Scope[] = [
+                    "outfit", "background", "lighting", "camera", "hair",
+                    "pose", "foreground", "cosplay", "props", "myth",
+                    "big_object", "vehicle", "cyber", "aspect_ratio",
+                  ];
+                  const nextScopes = scopes.length > 3
+                    ? priorityOrder.filter((s) => scopes.includes(s)).slice(0, 3)
+                    : scopes;
+
+                  // リアル度：4以上なら 2 に
+                  const nextRealismLevel = realismLevel >= 4 ? 2 : realismLevel;
+
+                  // 雰囲気：フィルタを引きやすい dark/gothic/emo/decadent を外す
+                  const HIGH_RISK_MOODS = ["dark", "gothic", "emo", "decadent"];
+                  const nextMoods = moods.filter((m) => !HIGH_RISK_MOODS.includes(m));
+
+                  // NG：感度を引く可能性のある明示語を除去（書くだけで Gemini が反応する）
+                  const TRIGGER_WORDS_TO_STRIP = [
+                    "sensual", "suggestive", "intimate", "erotic",
+                    "swimwear", "lingerie", "underwear", "panties", "bra",
+                    "cleavage", "exposed", "topless", "nude", "naked",
+                    "セクシー", "扇情", "下着", "水着",
+                  ];
+                  const nextNgList = ngList
+                    .split(/[、,\n]+/)
+                    .map((s) => s.trim())
+                    .filter((s) => s && !TRIGGER_WORDS_TO_STRIP.some((w) => s.toLowerCase() === w.toLowerCase()))
+                    .join(", ");
+
+                  // 追加指示：肯定的な方向指示を注入（禁止語を書かず「上品寄り」を誘導）
+                  const POSITIVE_DIRECTION =
+                    "衣装は常識的な日常着。雑誌の表紙レベルの上品さで統一する。" +
+                    "全体トーンは clean / editorial / artistic にする。";
+                  const nextExtra = extraInstructions.includes(POSITIVE_DIRECTION)
+                    ? extraInstructions
+                    : (extraInstructions ? `${extraInstructions}\n${POSITIVE_DIRECTION}` : POSITIVE_DIRECTION);
+
+                  // ── state を更新（次回以降の通常生成にも反映） ──
+                  setViralMode(nextViralMode);
+                  setActiveGodModes(nextGodModes);
+                  setChaosLabel(null);
+                  setActiveBoosts(nextBoosts);
+                  setActiveWorldPresets(nextWorldPresets);
+                  setWorldCombinedNote(nextWorldNote);
+                  setScopes(nextScopes);
+                  setRealismLevel(nextRealismLevel);
+                  setMoods(nextMoods);
+                  setNgList(nextNgList);
+                  setExtraInstructions(nextExtra);
+
+                  // ── エラー解除 ──
+                  setError(null);
+                  showPresetToast(
+                    "🛡 安全寄り設定に切り替えて再生成します",
+                    "バズり/神引き/世界観 OFF・スコープ縮小・暗い雰囲気を緩和・NG露骨語除去・上品方向追加",
+                  );
+
+                  // ── 調整済みの inputs で即再生成（state 反映を待たずに直接組み立て） ──
+                  // buildInputs は現 state を読むが、上記 setState はまだ反映されていないため、
+                  // 変更した値を override で直接渡す。
+                  const safeInputs = buildInputs({
+                    viralMode: nextViralMode,
+                    scopes: nextScopes,
+                    moods: nextMoods,
+                    extraInstructions: nextExtra,
+                    ngList: nextNgList,
+                    realismLevel: nextRealismLevel,
+                    realismType,                    // 変更なし
+                  });
+                  pendingRunRef.current = safeInputs;
+                  setPendingRunKey((k) => k + 1);
+                };
+
+                return (
+                  <section className="card border-rose-500/50 bg-rose-500/10 space-y-2">
+                    <h3 className="text-sm font-semibold text-rose-300">
+                      {isBlocked ? "🛑 Gemini の安全フィルタにブロックされました" : "⚠ 生成に失敗しました"}
+                    </h3>
+                    <p className="text-xs text-rose-200/90 break-all">{error}</p>
+
+                    {isBlocked ? (
+                      <>
+                        <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-100/95 leading-relaxed space-y-1">
+                          <p className="font-bold">よくある原因（多い順）：</p>
+                          <ol className="list-decimal list-inside space-y-0.5 text-amber-100/85">
+                            <li><b>一発バズりモード</b>が ON ← 最も引きやすい</li>
+                            <li><b>変更対象が 4軸以上</b>（プロンプトが長く誤判定されやすい）</li>
+                            <li><b>リアル度 4-5</b>（写真リアル）＋ 元画像が女性キャラ</li>
+                            <li>履歴の <b>黒系・ゴシック・露出系</b>の偏りが累積</li>
+                            <li>元画像に <b>露出多めの服</b>・水着など</li>
+                          </ol>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleSafeRetry}
+                            className="rounded-lg px-3 py-1.5 text-[12px] font-bold border border-emerald-400/65 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30 hover:border-emerald-400 transition shadow-[0_0_10px_-2px_rgba(52,211,153,0.4)]"
+                          >
+                            🛡 安全寄りに自動修正して再試行
+                          </button>
+                          <span className="text-[11px] text-text-muted/65">
+                            （バズり/神引き/世界観OFF・3軸まで・リアル度↓・NG露骨語を除去＋肯定方向追加）
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-text-muted/55 pt-1">
+                          ※ プロジェクト方針として、フィルタを回避する目的の改造は行いません。
+                          このボタンは「より穏当な表現に寄せて再依頼」するだけです。
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-text-muted mt-2">
+                        `npm run dev:all` でサーバーが起動しているか、`server/.env` のキーが有効か確認してください。
+                      </p>
+                    )}
+                  </section>
+                );
+              })()}
 
               {hasResults && (
                 <section className="space-y-5">

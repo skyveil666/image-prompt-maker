@@ -1334,8 +1334,8 @@ function describeDetails(
       "- 元画像の『一部だけ』をSF的・デジタル的に変化させる。全身を別キャラに変換しない。\n" +
       "- 顔全体・顔の造形・目鼻立ち・表情・人物の同一性は絶対に変更しない。\n" +
       "- 体型・ポーズ・カメラ構図・背景は維持する（変更範囲に含まれていない限り）。\n" +
-      "- 生々しい欠損・損傷・血液・痛みを感じる表現は完全に禁止。\n" +
-      "- 機械化部位と生身部位の境界は自然なグラデーションで繋ぎ、美しいSFデザインとして統合する。\n" +
+      "- 生々しい・痛々しい方向の表現は避け、クリーンで美しいSFデザインに統合する。\n" +
+      "- 機械化部位と元の部位の境界は自然なグラデーションで繋ぎ、美しいSFデザインとして統合する。\n" +
       "- 変化は洗練されたSFアート・デザイン表現として描画する。"
     );
   }
@@ -1589,7 +1589,7 @@ function describeDetails(
       "- 大物は必ず人物の存在感・物語性・映像美を高める方向で演出する。\n" +
       "- 「ありふれた可愛い大物（巨大テディベア・巨大花束・普通のぬいぐるみ等）」は避ける。意外性・物語性・映画感・SNS映えを優先する。\n" +
       "- 「なぜそれがそこにあるの？」と思わせる意外な構図を優先する。\n" +
-      "- ホラー過剰・グロ・血液・身体的な欠損表現は一切禁止。あくまで美しくアート的な演出にする。\n" +
+      "- 過剰に怖い・生々しい方向の表現は避け、あくまで美しくアート的な演出にする。\n" +
       "- 各案でオブジェの種類・配置・状態・雰囲気を完全に差別化し、同じパターンを繰り返さない。"
     );
   }
@@ -1627,10 +1627,10 @@ function describeDetails(
       "【乗り物ルール — 絶対厳守】\n" +
       "- 人物（被写体）が主役。乗り物は脇役・背景要素として機能させる。乗り物の説明に終始しない。\n" +
       "- 顔の造形・目鼻立ち・表情・人物の同一性は完全維持。体型・ポーズは変更範囲に含まれていない限り維持。\n" +
-      "- ミリタリー車両（装甲車・戦車等）は必ず『展示・停止状態』として描写。戦闘シーンや動いている描写は禁止。\n" +
+      "- ミリタリー系の車両は必ず『展示・停止状態』として描写。動いている描写や争いの場面は描かない。\n" +
       "- 既存のアニメ・映画・ゲームに登場する固有の乗り物名（ガンダム・エヴァ等）は使わない。オリジナルデザインとして描く。\n" +
       "- ありきたりなクリシェ（ネオン光るバイク1台のみ・真っ黒スポーツカーのみ）は避け、構図・背景との調和を重視する。\n" +
-      "- 乗り物の演出は安全で美しいビジュアル表現とし、危険・暴力・破壊の描写は一切しない。"
+      "- 乗り物の演出は安全で美しいビジュアル表現とし、穏やかで上品な雰囲気にまとめる。"
     );
   }
 
@@ -1675,7 +1675,7 @@ function describeDetails(
       "- 顔の造形・目鼻立ち・表情・人物の同一性・衣装・ポーズは完全維持。\n" +
       "- 既存のアニメ・ゲーム・映画に登場する固有キャラクター名（ガンダム・ポケモン・DQ・FF等の固有名詞）は使わない。オリジナルデザインとして描く。\n" +
       "- 幻獣のデザインは神話の文化的特徴を活かしつつ、美しく・神秘的・迫力ある描写にする。\n" +
-      "- 血液・欠損・暴力・残虐な描写は一切しない。神聖・神秘・壮大・美麗なイメージで表現する。\n" +
+      "- 生々しい描写は避け、神聖・神秘・壮大・美麗なイメージで表現する。\n" +
       "- 各案で幻獣の種類・配置・色・雰囲気を完全に差別化し、同じパターンを繰り返さない。"
     );
   }
@@ -1995,20 +1995,21 @@ function sanitizerBlock(pt: PromptTarget): string {
 
 function viralBlock(pt: PromptTarget = "full"): string {
   const lines = [
-    "【🔥 一発バズりモード — 上品ではなく「刺さる」に全振り】",
-    "- SNSで「何これ？」と止まる画を目指す。整った安全な画ではなく、異常な印象・中毒性・一目で焼きつく画。",
+    "【🔥 一発バズりモード — SNS映え最大化】",
+    "- SNSで「何これ？」と止まる、強い印象と視覚的完成度を目指す。",
     `- 各案で以下のプールから "1つずつ異なる" インパクト要素を採用：${VIRAL_POOL.join("、")}`,
-    "- 強コントラスト・ドラマチック光源・印象的な構図・意外な色の衝突を最大化する。",
-    "- 「異常な組み合わせ」を積極採用：上品×破壊 / 広告×廃墟 / Y3K×和紙 / ゴシック×ポップ / 廃墟×高級ブランド / 軍×花畑",
-    "- 武器（刀・銃）は指定がない限り使わない。代わりに「主役級の小道具」で衝撃を与える。",
+    "- 強コントラスト・ドラマチック光源・印象的な構図・意外な色の組み合わせを活かす。",
+    "- 意外な世界観の組み合わせを積極採用：上品×ストリート / 広告×廃墟 / Y3K×和紙 / ゴシック×ポップ / 廃墟×高級ブランド",
+    "- 武器や危険物は使わない。代わりに「主役級のファッション小道具」でインパクトを与える。",
+    "- 衣装・ポーズ・ライティング・エフェクト・背景は上品かつ視覚的に強い表現にする。",
   ];
   if (pt === "full") {
     lines.push("- 色演出・光演出・空気感・空間対比でインパクトを演出。ファッション性×意外性×視覚的完成度を最大化。");
-    lines.push("- 被写体が若く見える場合は「清潔感・強さ・スタイル」で魅せる。花びら・羽・白い光の量産パターンは使わない。");
+    lines.push("- 架空のAIキャラクターとして「清潔感・スタイル・存在感」で魅せる。量産パターンは使わない。");
     lines.push("- 顔・外観スタイル・人物の同一性・アスペクト比は必ず固定。");
   } else {
     lines.push("- 視覚的インパクトはファッション・背景・ライティング・エフェクト・小物で表現する。");
-    lines.push("- 被写体の外観スタイル・視覚的一貫性・アスペクト比は必ず維持する。");
+    lines.push("- 架空キャラクターの外観スタイル・視覚的一貫性・アスペクト比は必ず維持する。");
   }
   return lines.join("\n");
 }
@@ -2117,7 +2118,7 @@ function avoidClicheBlock(): string {
     "▼ 避けるべき定番パターン（複数要素が同時に揃った場合に差し替える）：",
     "  ① ゴシック衣装 × ステンドグラス × 黒いバラ",
     "  ② 白いワンピース × 透明な羽 × 青白い幻想光",
-    "  ③ サイバー系 × 刀 × ネオン発光（ネオン刀含む）",
+    "  ③ サイバー系 × 鋭利な小道具 × ネオン発光",
     "  ④ 魔法少女風衣装 × 魔法陣 × 杖",
     "  ⑤ 黒ドレス × 教会背景 × 薔薇",
     "  ⑥ 白ドレス × 雪・氷・水晶 × 羽",
@@ -2131,15 +2132,15 @@ function avoidClicheBlock(): string {
     "▼ ズラし方の例（積極的に取り入れる）：",
     "  - ゴシック衣装 → 背景を「古い映画館」「廃ホテル」「ガラス温室」「夜の遊園地」などに変える",
     "  - 白い服 → 羽・魔法陣の代わりに「紙吹雪」「曇りガラス」「布のレイヤー」「影の演出」を使う",
-    "  - サイバー系 → 刀の代わりに「フィルムカメラ」「透明傘」「古い電話」「発光ケーブル」など",
+    "  - サイバー系 → 鋭利な小道具の代わりに「フィルムカメラ」「透明傘」「古い電話」「発光ケーブル」など",
     "  - 和風系 → 桜＋神社の代わりに「曼珠沙華」「蛍」「川の流れ」「廃神社」「夜の竹林」など",
     "  - 花演出 → バラ・桜だけに偏らず「椿」「百合」「アネモネ」「ドライフラワー」「花びらの影」に分散",
     "  - サイバー/未来系 → 青いHUDパネル・透明ホログラムUIの代わりに空間・光質感・テクスチャで表現",
     "",
     "▼ 出現頻度を下げる要素（完全禁止ではない。全案の25%以内に抑える）：",
-    "  黒いバラ / ステンドグラス / 透明な羽 / 魔法陣 / 刀 / ネオン街 / 桜＋神社の同時使用 /",
+    "  黒いバラ / ステンドグラス / 透明な羽 / 魔法陣 / 鋭利な小道具 / ネオン街 / 桜＋神社の同時使用 /",
     "  透明ホログラムパネル / HUDパネル / 汎用テックUI / 青ネオン単色 /",
-    "  花びら大量散布 / クリスタル装飾過多 / ネオン刀 / 白い羽大量",
+    "  花びら大量散布 / クリスタル装飾過多 / 発光する鋭利な小道具 / 白い羽大量",
     "",
     "各案で「よく見るSNS画像と同じ組み合わせ」になっていないか確認してから生成すること。",
     "「意外性のある一手」を加えることで保存率・拡散率が上がる。",
@@ -2408,6 +2409,507 @@ function comboControlBlock(req: GenerateRequest, pt: PromptTarget): string {
 }
 
 /**
+ * 色×軸重み制御ブロック（新方式）。
+ *
+ * 各色の 髪／服／背景 ごとに 0〜5 の重みを取り、
+ *   0 = 完全禁止 / 1 = 強抑制 / 2 = 抑制 / 4 = 推奨 / 5 = 強推奨
+ * を、該当軸（scope）に該当する場合のみ強く反映する。
+ *
+ * 「同じ色でも軸によって意味が変わる」ことを LLM に明確に伝える設計。
+ *   例：白系は『髪=禁止 / 背景=推奨』のような分離が可能。
+ */
+function colorWeightBlock(req: GenerateRequest, pt: PromptTarget): string {
+  const ctrl = req.colorWeights;
+  if (!Array.isArray(ctrl) || ctrl.length === 0) return "";
+
+  // 軸別にグループ化
+  type Axis = "hair" | "outfit" | "background";
+  const AXIS_JP: Record<Axis, string> = { hair: "髪", outfit: "服", background: "背景" };
+  const SCOPE_OF: Record<Axis, string> = { hair: "hair", outfit: "outfit", background: "background" };
+
+  const grouped: Record<Axis, Record<number, string[]>> = {
+    hair:       { 0: [], 1: [], 2: [], 4: [], 5: [] },
+    outfit:     { 0: [], 1: [], 2: [], 4: [], 5: [] },
+    background: { 0: [], 1: [], 2: [], 4: [], 5: [] },
+  };
+  for (const c of ctrl) {
+    if (!grouped[c.axis][c.weight]) continue;
+    grouped[c.axis][c.weight].push(c.jp);
+  }
+
+  // 何も無ければ出さない
+  const hasAny = (Object.values(grouped) as Record<number, string[]>[])
+    .some((g) => Object.values(g).some((arr) => arr.length > 0));
+  if (!hasAny) return "";
+
+  // スコープ未選択軸は弱い指示のみ
+  const scopeIncludes = (axis: Axis) => req.scopes.includes(SCOPE_OF[axis] as never);
+
+  const WEIGHT_LABEL: Record<number, string> = {
+    0: "完全禁止",
+    1: "強抑制（必要最小限）",
+    2: "抑制（控えめ）",
+    4: "推奨（積極的に取り入れる）",
+    5: "強推奨（最優先で使う）",
+  };
+
+  if (pt === "nano_safe") {
+    const lines: string[] = ["【色×軸 重み制御（簡潔反映）】"];
+    (["hair", "outfit", "background"] as Axis[]).forEach((axis) => {
+      const g = grouped[axis];
+      const parts: string[] = [];
+      ([5, 4, 0, 1, 2] as const).forEach((w) => {
+        if (g[w].length > 0) parts.push(`${WEIGHT_LABEL[w]}=${g[w].join("/")}`);
+      });
+      if (parts.length > 0) {
+        const tag = scopeIncludes(axis) ? "" : "（参考）";
+        lines.push(`${AXIS_JP[axis]}${tag}：${parts.join(" / ")}`);
+      }
+    });
+    return lines.join("\n");
+  }
+
+  // ChatGPT / full 向け詳細版
+  const lines: string[] = [
+    "【色×軸 重み制御 — 髪／服／背景 をそれぞれ独立に制御】",
+    "下記は利用者が指定した『軸ごとに別の重み』を持つ色制御です。",
+    "重要：同じ色でも軸が違えば扱いも変わります。下記の指示は**該当軸の値だけ**変えてください。",
+  ];
+
+  (["hair", "outfit", "background"] as Axis[]).forEach((axis) => {
+    const g = grouped[axis];
+    const hasContent = Object.values(g).some((arr) => arr.length > 0);
+    if (!hasContent) return;
+
+    lines.push("");
+    const inScope = scopeIncludes(axis);
+    lines.push(`▼ ${AXIS_JP[axis]}${inScope ? "（変更範囲ON：必ず反映）" : "（変更範囲外：参考レベル）"}`);
+
+    // 強い順に出す
+    ([5, 4, 0, 1, 2] as const).forEach((w) => {
+      if (g[w].length === 0) return;
+      lines.push(`  ・${WEIGHT_LABEL[w]}：${g[w].join("、")}`);
+    });
+
+    // 軸別の補足ガイド
+    if (g[0].length > 0) {
+      lines.push(`    ※ ${AXIS_JP[axis]}に「禁止」指定の色は微量のアクセントとしても使用しない。`);
+    }
+    if (g[5].length > 0 || g[4].length > 0) {
+      lines.push(`    ※ ${AXIS_JP[axis]}の「推奨／強推奨」色は、メイン配色の候補として優先的に検討する。`);
+    }
+  });
+
+  lines.push("");
+  lines.push("※ 変更範囲（scope）に含まれない軸については、勝手に色を変えない（参考扱い）。");
+  lines.push("※ 色固定ロックが入っている場合は、ロックを最優先で維持する。");
+  return lines.join("\n");
+}
+
+/**
+ * ユーザー画像評価バイアスブロック。
+ *
+ * 各案カードで「👍 良い / 😐 まあまあ / 👎 微妙 / 💀 失敗」と付けた評価を
+ * 軸別カテゴリに投票して集計したヒント。クライアント側で「変更範囲ON軸のみ」
+ * のフィルタ済み。
+ */
+/**
+ * 好みプロファイルブロック（実 Gemini 分析結果）。
+ *
+ * このブロックは「ユーザー本人の評価から AI が抽出した本物の好み傾向」を入れる。
+ * 経験則（ratingBias）より一段上位のヒント。
+ *
+ * - 変更範囲（scope）に含まれる軸のみ反映（背景/衣装/ポーズ）
+ * - preferKeywords / avoidKeywords は scope に関係なく注入される
+ */
+function preferenceProfileBlock(req: GenerateRequest, pt: PromptTarget): string {
+  const p = req.preferenceProfile;
+  if (!p) return "";
+
+  // scope に応じて軸別の likes/dislikes を採用
+  const scopeOf: Record<"bg" | "outfit" | "pose", string> = {
+    bg: "background", outfit: "outfit", pose: "pose",
+  };
+  const axisJp: Record<"bg" | "outfit" | "pose", string> = {
+    bg: "背景", outfit: "衣装", pose: "ポーズ",
+  };
+  const usableLikes:    { axis: string; like: string }[] = [];
+  const usableDislikes: { axis: string; dislike: string }[] = [];
+  for (const axis of ["bg", "outfit", "pose"] as const) {
+    if (req.scopes.includes(scopeOf[axis] as never)) {
+      if (p.likes[axis]    && p.likes[axis]    !== "明確な傾向なし") usableLikes.push({ axis: axisJp[axis], like: p.likes[axis] });
+      if (p.dislikes[axis] && p.dislikes[axis] !== "明確な傾向なし") usableDislikes.push({ axis: axisJp[axis], dislike: p.dislikes[axis] });
+    }
+  }
+  const kPrefer = p.preferKeywords ?? [];
+  const kAvoid  = p.avoidKeywords  ?? [];
+
+  if (usableLikes.length === 0 && usableDislikes.length === 0 && kPrefer.length === 0 && kAvoid.length === 0) {
+    return "";
+  }
+
+  if (pt === "nano_safe") {
+    const lines: string[] = ["【AI好みプロファイル（簡潔反映）】"];
+    if (p.summary) lines.push("概要：" + p.summary.slice(0, 80));
+    for (const l of usableLikes)    lines.push(`好む(${l.axis})：${l.like}`);
+    for (const d of usableDislikes) lines.push(`嫌う(${d.axis})：${d.dislike}`);
+    if (kPrefer.length > 0) lines.push("優先：" + kPrefer.join(" / "));
+    if (kAvoid.length  > 0) lines.push("回避：" + kAvoid.join(" / "));
+    return lines.join("\n");
+  }
+
+  const lines: string[] = [
+    "【AI 好みプロファイル — ユーザー評価データから抽出した好み傾向】",
+    `この内容は、ユーザー本人が過去 ${p.sampleSize} 件の画像に付けた評価を ${p.model} で分析した結果です。`,
+    "他のヒントより優先度が高いので、scope の範囲内で積極的に活用してください。",
+  ];
+  if (p.summary) {
+    lines.push("");
+    lines.push("▼ 全体傾向：");
+    lines.push(`  ${p.summary}`);
+  }
+  if (usableLikes.length > 0) {
+    lines.push("");
+    lines.push("▼ ユーザーが好む傾向（変更範囲内の軸のみ）：");
+    for (const l of usableLikes) lines.push(`  ・${l.axis}：${l.like}`);
+  }
+  if (usableDislikes.length > 0) {
+    lines.push("");
+    lines.push("▼ ユーザーが嫌う傾向（変更範囲内の軸のみ）：");
+    for (const d of usableDislikes) lines.push(`  ・${d.axis}：${d.dislike}`);
+  }
+  if (kPrefer.length > 0) {
+    lines.push("");
+    lines.push("▼ 優先キーワード（積極的に取り入れる）：");
+    lines.push(`  ${kPrefer.join("、")}`);
+  }
+  if (kAvoid.length > 0) {
+    lines.push("");
+    lines.push("▼ 回避キーワード（避ける）：");
+    lines.push(`  ${kAvoid.join("、")}`);
+  }
+  lines.push("");
+  lines.push("※ scope に含まれない軸の傾向は無視。固定軸は最優先で維持。");
+  return lines.join("\n");
+}
+
+function ratingBiasBlock(req: GenerateRequest, pt: PromptTarget): string {
+  const rb = req.ratingBias;
+  if (!rb) return "";
+  // 絶対スコープルールの二重防御：rec/avd の軸名（background/outfit/hair/camera/lighting）が
+  // 変更対象スコープに含まれるものだけを残す。フロントでも絞っているがサーバ側でも保証する。
+  const rec = (rb.recommended ?? []).filter((r) => req.scopes.includes(r.axis as never));
+  const avd = (rb.avoid       ?? []).filter((r) => req.scopes.includes(r.axis as never));
+  const pref = rb.preference;
+  // 軸別👍👎レポートが active のとき、scopes と一致する軸のみを抽出
+  const AXIS_SCOPE: Record<"bg"|"outfit"|"pose", string> = {
+    bg: "background", outfit: "outfit", pose: "pose",
+  };
+  const AXIS_JP: Record<"bg"|"outfit"|"pose", string> = {
+    bg: "背景", outfit: "衣装", pose: "ポーズ",
+  };
+  const prefAxes = (pref?.active ? pref.axes : []).filter((a) => req.scopes.includes(AXIS_SCOPE[a.axis] as never));
+  const prefSuccess = prefAxes.filter((a) => a.goodRatio >= 0.70 && (a.good + a.bad) >= 5);
+  const prefFail    = prefAxes.filter((a) => a.badRatio  >= 0.50 && (a.good + a.bad) >= 5);
+
+  if (rec.length === 0 && avd.length === 0 && prefSuccess.length === 0 && prefFail.length === 0) return "";
+
+  if (pt === "nano_safe") {
+    const lines: string[] = ["【ユーザー評価バイアス（簡潔反映）】"];
+    if (rec.length > 0) {
+      lines.push("好み：" + rec.slice(0, 5).map((r) => `${r.axis}=${r.label}`).join(" / "));
+    }
+    if (avd.length > 0) {
+      lines.push("回避：" + avd.slice(0, 5).map((r) => `${r.axis}=${r.label}`).join(" / "));
+    }
+    if (prefSuccess.length > 0) {
+      lines.push("好評軸：" + prefSuccess.map((a) => `${AXIS_JP[a.axis]}(${Math.round(a.goodRatio*100)}%)`).join(" / "));
+    }
+    if (prefFail.length > 0) {
+      lines.push("不評軸：" + prefFail.map((a) => `${AXIS_JP[a.axis]}(${Math.round(a.badRatio*100)}%)`).join(" / "));
+    }
+    return lines.join("\n");
+  }
+
+  const lines: string[] = [
+    "【ユーザー評価バイアス — 過去の画像評価から導いた方向性】",
+    "ユーザーが過去に各画像へ付けた評価（👍良い／😐まあまあ／👎微妙／💀失敗）を、",
+    "軸（背景・衣装・髪・カメラ・光）×カテゴリで集計した傾向です：",
+  ];
+  if (rec.length > 0) {
+    lines.push("");
+    lines.push("▼ 高評価が多い方向（積極的に取り入れる）：");
+    for (const r of rec.slice(0, 6)) {
+      lines.push(`  ・${r.axis}：${r.label}（評価スコア +${r.score.toFixed(1)}）`);
+    }
+  }
+  if (avd.length > 0) {
+    lines.push("");
+    lines.push("▼ 低評価が多い方向（できるだけ避ける）：");
+    for (const r of avd.slice(0, 6)) {
+      lines.push(`  ・${r.axis}：${r.label}（評価スコア ${r.score.toFixed(1)}）`);
+    }
+  }
+
+  // 軸別👍👎レポート（30件以上で本格活用）
+  if (prefSuccess.length > 0) {
+    lines.push("");
+    lines.push("▼ 軸別好評傾向（ユーザーが好む軸 — 安心して取り入れる）：");
+    for (const a of prefSuccess) {
+      const pct = Math.round(a.goodRatio * 100);
+      lines.push(`  ・${AXIS_JP[a.axis]}：高評価率 ${pct}%（👍 ${a.good} / 👎 ${a.bad}）— この軸はユーザーの好みに合っているので積極的に活用`);
+    }
+  }
+  if (prefFail.length > 0) {
+    lines.push("");
+    lines.push("▼ 軸別不評傾向（ユーザーが嫌う軸 — 慎重に扱う）：");
+    for (const a of prefFail) {
+      const pct = Math.round(a.badRatio * 100);
+      lines.push(`  ・${AXIS_JP[a.axis]}：低評価率 ${pct}%（👍 ${a.good} / 👎 ${a.bad}）— 過去の失敗傾向と被らないよう、別方向を慎重に検討`);
+    }
+  }
+  lines.push("");
+  lines.push("※ ユーザー本人の評価データなので、お気に入り学習や ZOZO トレンドより優先度は中〜高。");
+  lines.push("※ 変更範囲（scope）に含まれない軸は変えない。固定軸は最優先で維持。");
+  return lines.join("\n");
+}
+
+/**
+ * 画像分析バイアスブロック。
+ *
+ * フロント側で履歴の **生成結果画像** を perceptual hash でクラスタリングし、
+ * 視覚的に酷似した画像が多いとき・特定カテゴリの出現率が高すぎる時に注入する。
+ *
+ * 「プロンプト文言は違うが画像が似ている」ケースの回避が目的。
+ */
+function imageBiasBlock(req: GenerateRequest, pt: PromptTarget): string {
+  const ib = req.imageBias;
+  if (!ib) return "";
+  const overused  = ib.overused  ?? [];
+  const underused = ib.underused ?? [];
+  const dup       = ib.visualDupCount ?? 0;
+  if (overused.length === 0 && underused.length === 0 && dup < 3) return "";
+
+  if (pt === "nano_safe") {
+    const lines: string[] = ["【画像分析バイアス（簡潔反映）】"];
+    if (dup >= 3) lines.push(`視覚的に類似画像 ${dup} 枚あり：別方向必須`);
+    if (overused.length > 0) {
+      lines.push("避ける：" + overused.slice(0, 5).map((o) => `${o.axis}=${o.label}`).join(" / "));
+    }
+    if (underused.length > 0) {
+      lines.push("試す：" + underused.slice(0, 4).map((u) => `${u.axis}=${u.label}`).join(" / "));
+    }
+    return lines.join("\n");
+  }
+
+  const lines: string[] = [
+    "【画像分析バイアス — 過去の『生成結果画像』が示す偏り】",
+    "下記は過去の出力画像を視覚的に分析した結果です。プロンプト文言の重複ではなく、",
+    "実際に生成された画像が示している傾向です。優先的に従ってください：",
+  ];
+  if (dup >= 3) {
+    lines.push("");
+    lines.push(`▼ 視覚的に酷似する画像が ${dup} 枚連続しています`);
+    lines.push("  → 文言を変えても見た目が同じになっています。今回は明確に別ジャンル／別構図へ振ってください。");
+  }
+  if (overused.length > 0) {
+    lines.push("");
+    lines.push("▼ 頻出カテゴリ（画像で既に多すぎる、可能なら避ける）：");
+    for (const o of overused.slice(0, 6)) {
+      lines.push(`  ・${o.axis}：${o.label}（${Math.round(o.ratio * 100)}%）`);
+    }
+  }
+  if (underused.length > 0) {
+    lines.push("");
+    lines.push("▼ 未開拓カテゴリ（まだ画像になっていない、優先的に検討）：");
+    const byAxis = new Map<string, string[]>();
+    for (const u of underused) {
+      if (!byAxis.has(u.axis)) byAxis.set(u.axis, []);
+      byAxis.get(u.axis)!.push(u.label);
+    }
+    for (const [axis, labels] of byAxis.entries()) {
+      lines.push(`  ・${axis}：${labels.slice(0, 4).join("、")}`);
+    }
+  }
+  lines.push("");
+  lines.push("※ 変更範囲（scope）に含まれない軸は変えない。固定軸は最優先で維持。");
+  return lines.join("\n");
+}
+
+/**
+ * 質感・リアル度ブロック。
+ *
+ * 「背景だけリアルすぎる問題」を防ぐためのもの。人物と背景の質感統一が最優先。
+ *   1: 完全2Dイラスト寄り（背景もアニメ/絵画的）
+ *   2: デジタルペイント寄り
+ *   3: 2.5D（人物と背景を統一）← 既定。プロンプト非出力
+ *   4: リアル寄り（背景は実写寄りだが人物と馴染ませる）
+ *   5: 写真リアル
+ *
+ * 反映ルール（変更範囲外の軸には勝手に影響させない）：
+ *   - 背景ON      → 背景の質感に必ず反映
+ *   - 衣装ON      → 衣装の素材感にも反映
+ *   - カメラON    → レンズ感や写真感に反映
+ *   - ライティングON → 現実写真風かイラスト照明かを調整
+ *
+ * Nano Banana は短文化。
+ */
+function realismBlock(req: GenerateRequest, pt: PromptTarget): string {
+  const lv = req.realismLevel;
+  if (!lv || lv < 1 || lv > 5) return "";
+  if (lv === 3 && !req.realismType) return "";  // 標準値かつタイプ指定なし → 非出力
+
+  const scopes = req.scopes;
+  const affectsBg     = scopes.includes("background");
+  const affectsOutfit = scopes.includes("outfit");
+  const affectsCam    = scopes.includes("camera");
+  const affectsLight  = scopes.includes("lighting");
+  if (!affectsBg && !affectsOutfit && !affectsCam && !affectsLight && lv === 3) {
+    return ""; // 対象軸ゼロかつ標準 → 出力なし
+  }
+
+  // レベル別の主指示
+  const LEVEL_LEAD: Record<number, string> = {
+    1: "完全2Dイラスト寄り。背景もアニメ背景・セル画・手描き・絵画的にする。実写写真の質感は使わない。",
+    2: "デジタルペイント寄り。背景は描き込みのあるアニメ背景・ゲーム背景・油絵風・コンセプトアート風。",
+    3: "人物と背景の質感を2.5Dで統一する。写真すぎず、イラストすぎず。",
+    4: "リアル寄り。背景は実写寄りだが、人物と馴染むよう柔らかく調整する。",
+    5: "写真リアル。背景も実写写真のような質感を許可する。",
+  };
+
+  // タイプ別の補足
+  const TYPE_HINT: Record<string, string> = {
+    anime_bg:      "アニメ背景・セル画調の描き込み",
+    digital_paint: "デジタルペイント／厚塗り風",
+    oil_paint:     "油絵・厚塗り・絵画的タッチ",
+    watercolor:    "水彩・にじみ・透明感のある絵画調",
+    cel:           "セル画調・線画と平面塗り",
+    manga_bg:      "漫画背景・トーン・スクリーントーン質感",
+    game_bg:       "ゲーム背景・コンセプトアート寄り",
+    concept_art:   "コンセプトアート・大胆なライティングと構図",
+    photo_real:    "実写写真の質感・センサーノイズ感",
+    movie_bg:      "映画美術・シネマティックな空間設計",
+  };
+
+  if (pt === "nano_safe") {
+    const lines: string[] = ["【質感・リアル度（簡潔反映）】"];
+    lines.push(`Lv${lv}：${LEVEL_LEAD[lv]}`);
+    if (req.realismType && TYPE_HINT[req.realismType]) {
+      lines.push(`タイプ：${TYPE_HINT[req.realismType]}`);
+    }
+    // 軸ごとの極短指示
+    if (affectsBg)     lines.push(`背景：${lv <= 2 ? "非実写・絵画的" : lv === 3 ? "2.5D" : lv === 4 ? "実写寄り＋人物に馴染ませる" : "実写OK"}`);
+    if (affectsOutfit) lines.push(`衣装素材：${lv <= 2 ? "塗りで表現" : lv >= 4 ? "実物質感" : "中間"}`);
+    if (affectsCam)    lines.push(`レンズ感：${lv <= 2 ? "写真感は弱め" : lv >= 4 ? "写真寄り" : "中間"}`);
+    if (affectsLight)  lines.push(`照明：${lv <= 2 ? "イラスト的" : lv >= 4 ? "実写的" : "中間"}`);
+    return lines.join("\n");
+  }
+
+  // ChatGPT / full 向け詳細版
+  const lines: string[] = [
+    "【質感・リアル度 — 人物と背景の質感統一を最優先】",
+    `現在のレベル：Lv${lv}（${["イラスト", "デジタルペイント", "2.5D", "リアル寄り", "写真リアル"][lv - 1]}）`,
+    `指針：${LEVEL_LEAD[lv]}`,
+  ];
+  if (req.realismType && TYPE_HINT[req.realismType]) {
+    lines.push(`質感タイプ：${TYPE_HINT[req.realismType]}（このタイプの絵柄/描画スタイルを保つ）`);
+  }
+  lines.push("");
+  lines.push("▼ 軸別の反映（変更範囲に含まれない軸は変えない）：");
+  if (affectsBg) {
+    lines.push(
+      lv <= 2
+        ? "  ・背景：写真のように描かない。アニメ背景／2D背景／デジタルペイント／絵画的背景にする。"
+        : lv === 3
+        ? "  ・背景：人物と同じ2.5D質感で統一。実写写真に見えないようにする。"
+        : lv === 4
+        ? "  ・背景：実写寄りだが、人物のアニメ／2.5D質感と馴染むよう柔らかく調整。"
+        : "  ・背景：実写写真のような空間表現を許可する。"
+    );
+  }
+  if (affectsOutfit) {
+    lines.push(
+      lv <= 2
+        ? "  ・衣装の素材感：実写ではなく、塗り表現（セル画／ペイント）で示す。"
+        : lv >= 4
+        ? "  ・衣装の素材感：実物に近い質感・縫い目・布の落ち感を表現する。"
+        : "  ・衣装の素材感：2.5Dの落とし込み（実写ほど精緻でなく、しかし立体感は残す）。"
+    );
+  }
+  if (affectsCam) {
+    lines.push(
+      lv <= 2
+        ? "  ・レンズ感：写真用語は控えめに。被写界深度のボケや実レンズ歪みは強調しない。"
+        : lv >= 4
+        ? "  ・レンズ感：実写レンズの収差・ボケ・センサー感を意識する。"
+        : "  ・レンズ感：写真ともイラストとも取れる中間的な処理。"
+    );
+  }
+  if (affectsLight) {
+    lines.push(
+      lv <= 2
+        ? "  ・照明：イラスト的照明（影は塗り表現、ハイライトは色面で。）"
+        : lv >= 4
+        ? "  ・照明：現実の光の物理（柔らかい反射・GI・サブサーフェス）を意識する。"
+        : "  ・照明：2.5D的にややディフォルメ。実写ほど厳密ではない。"
+    );
+  }
+  lines.push("");
+  lines.push("※ 重要：人物がアニメ／2.5D寄りの場合、背景だけ実写写真にしない。人物と背景の質感を必ず合わせる。");
+  return lines.join("\n");
+}
+
+/**
+ * 色ポリシー（restrict / block）ブロック。
+ *
+ *  block    : その色を一切使わない（衣装・髪・背景・小物・ライティングすべての軸で禁止）
+ *  restrict : できるだけ控える（必要最小限、面積比 10% 未満）
+ *
+ * 「許可」は明示しない（既定状態）。
+ * 完全な NG は ngList 側にも代表トークンが追加される（フロントの getBlockedColorTokens 経由）。
+ * Nano Banana では短く圧縮。
+ */
+function colorControlBlock(req: GenerateRequest, pt: PromptTarget): string {
+  const ctrl = req.colorControls;
+  if (!Array.isArray(ctrl) || ctrl.length === 0) return "";
+
+  const blocks    = ctrl.filter((c) => c.policy === "block");
+  const restricts = ctrl.filter((c) => c.policy === "restrict");
+  if (blocks.length + restricts.length === 0) return "";
+
+  if (pt === "nano_safe") {
+    const lines: string[] = ["【色 制御（簡潔反映）】"];
+    if (blocks.length) {
+      lines.push("使わない色：" + blocks.map((c) => c.jp).join("、"));
+    }
+    if (restricts.length) {
+      lines.push("控える色（必要最小限）：" + restricts.map((c) => c.jp).join("、"));
+    }
+    return lines.join("\n");
+  }
+
+  const lines: string[] = [
+    "【色 制御 — 出現コントロール】",
+    "下記は利用者が指定した色ポリシーです。今回の【変更対象】に含まれる軸の色にのみ適用してください（変更対象外の軸の色は変えない）：",
+  ];
+  if (blocks.length > 0) {
+    lines.push("");
+    lines.push("▼ 一切使わない（候補から完全除外）：");
+    for (const c of blocks) lines.push(`  ・${c.jp}`);
+    lines.push("  ※ 微量のアクセントとしても使用しない。NG指定としても扱う。");
+  }
+  if (restricts.length > 0) {
+    lines.push("");
+    lines.push("▼ 控える（必要時のみ、画面占有率の目安は10%未満）：");
+    for (const c of restricts) lines.push(`  ・${c.jp}`);
+    lines.push("  ※ 主役色には選ばず、補助・小物・差し色程度に留める。");
+  }
+  lines.push("");
+  lines.push("※ 変更範囲（スコープ）に含まれない軸の色は変えない。色固定ロックは最優先で維持。");
+  return lines.join("\n");
+}
+
+/**
  * 風の強さブロック（0〜5）。
  * 髪・衣装・前景演出・ポーズ・カメラのいずれかが変更範囲ONの時のみ反映する。
  * 0 または対象スコープがない場合は何も出さない。
@@ -2423,30 +2925,103 @@ function windBlock(req: GenerateRequest): string {
     req.scopes.includes("camera");
   if (!affectsAny) return "";
 
-  // 反映対象に応じた要素ラベル
-  const targets: string[] = [];
-  if (req.scopes.includes("hair"))       targets.push("髪");
-  if (req.scopes.includes("outfit"))     targets.push("衣装の布・袖・裾");
-  if (req.scopes.includes("foreground")) targets.push("前景演出（花びら・布・粒子等）");
-  if (req.scopes.includes("pose"))       targets.push("ポーズの自然な動き");
-  if (req.scopes.includes("camera"))     targets.push("動きの切り取りタイミング");
+  const hasHair    = req.scopes.includes("hair");
+  const hasOutfit  = req.scopes.includes("outfit");
+  const hasForeg   = req.scopes.includes("foreground");
+  const hasPose    = req.scopes.includes("pose");
+  const hasCamera  = req.scopes.includes("camera");
 
-  const detail = (() => {
-    switch (lv) {
-      case 1: return "ごく弱い風。髪先や薄い布がほんの少しだけ動く程度の自然な揺らぎ。";
-      case 2: return "やや弱い風。髪や布の端が軽くなびく。静止画にわずかな動きを出す。";
-      case 3: return "標準的な風。髪・袖・布・リボンが自然になびき、静止画にほどよい動きを出す。";
-      case 4: return "強めの風。髪や服が大きく流れ、動きのある印象に。";
-      case 5: return "強風。髪・布・前景演出が大きく流れ、ドラマチックな構図に。";
-      default: return "";
-    }
-  })();
+  // ── レベル別：「数値・気象比喩・具体的な物理現象」を盛る。
+  //    LLM が「弱い」「強い」だけだとほぼ無視するので、毎レベルで違う具体名を入れる。
+  type LevelSpec = {
+    label:   string;   // 短いラベル
+    mps:     string;   // 風速（参考値）
+    analogy: string;   // 気象比喩（イメージ用）
+    hair:    string;
+    outfit:  string;
+    foreg:   string;
+    pose:    string;
+    camera:  string;
+    sharedFx: string;  // 共通で効かせる効果
+  };
+
+  const SPECS: Record<number, LevelSpec> = {
+    1: {
+      label: "微風", mps: "1〜2m/s 相当",
+      analogy: "そよ風（カフェのテラスで前髪がふっと持ち上がる程度）",
+      hair:   "毛先が数本だけ持ち上がる。前髪の先がわずかに乱れる。",
+      outfit: "薄いシフォン/レースの裾の端だけが 1〜2cm ふわっと浮く。",
+      foreg:  "細かい粒子（花粉・埃）が 1〜2粒、空中で漂う。",
+      pose:   "髪に触れる手や首をかしげる仕草で『風を感じる』身体反応を1か所だけ入れる。",
+      camera: "シャッタースピード 1/250 相当。動きはほぼ止めて捉える。",
+      sharedFx: "全体は概ね静止画。動きはアクセント1点のみ。",
+    },
+    2: {
+      label: "そよ風", mps: "3〜5m/s 相当",
+      analogy: "夏の朝（カーテンが軽く揺れる、髪が顔にかかる）",
+      hair:   "毛束のひと房が顔の前を横切る／後ろへ流れる。",
+      outfit: "スカート/長袖の裾・袖口が片側に軽く流れて 5〜10cm の動きが見える。",
+      foreg:  "花びら・木の葉などを 3〜5枚、被写体の脇に水平に流す。",
+      pose:   "髪を耳にかける・布を押さえるなど『風に応じた』ナチュラルな仕草を1〜2か所。",
+      camera: "シャッタースピード 1/125 相当。先端だけが軽くブレる。",
+      sharedFx: "動きは全体の 10〜20% の領域。",
+    },
+    3: {
+      label: "標準的な風", mps: "6〜8m/s 相当",
+      analogy: "海辺の散歩（髪が顔から後ろへ明確に流れる）",
+      hair:   "毛全体が片方向へ斜めに流れ、ボリュームが片寄る。後れ毛が顔の前を横切る。",
+      outfit: "袖・裾・スカーフが斜め後ろへはっきりとなびく（30〜50cm のフロー）。",
+      foreg:  "花びら・羽根・布片を 8〜12枚、被写体を取り囲むように斜めに流す。",
+      pose:   "片手で髪を押さえる／布を翻す等、風と相互作用するアクティブなポーズに。",
+      camera: "シャッタースピード 1/60 相当。流れる要素にわずかなモーションブラーを許可。",
+      sharedFx: "動きは画面の 30〜50% を占める。風向は必ず明示する（左→右 等）。",
+    },
+    4: {
+      label: "強い風", mps: "9〜12m/s 相当",
+      analogy: "嵐の前ぶれ（コートが舞い、髪が乱れる）",
+      hair:   "毛全体が強くたなびき、後ろへ尾を引く。前髪が大きく乱れて額や目元が見える瞬間。",
+      outfit: "ロングコート・ドレスの裾が斜め後方へ大きくはためく（パラシュート状）。布のシワが明確。",
+      foreg:  "花びら・葉・水滴・布片など 15〜25個を風線に沿って斜めに大量に流す。軌跡（streak）を描く。",
+      pose:   "前傾／髪を顔から払う／布を掴むなど『風に対抗する動的ポーズ』。バランスがダイナミック。",
+      camera: "シャッタースピード 1/30 相当。流れる要素に明確なモーションブラー／光跡を入れる。",
+      sharedFx: "動きが構図の主役。画面の 50〜70% を風の流れが支配する。",
+    },
+    5: {
+      label: "強風／突風", mps: "13m/s 以上",
+      analogy: "台風・嵐（映画のクライマックスシーン）",
+      hair:   "髪が完全に水平〜斜め上方向へ放射状にたなびく。一部の束は空中で軌跡を描く。",
+      outfit: "コート・ドレスが大きく翻り、布が空中に弧を描く。スカートやマントが旗のように張る。",
+      foreg:  "花びら・葉・砂・水しぶき・破片を 30+ 個、強い風線（streamlines）で表現。長い軌跡。",
+      pose:   "嵐に立ち向かう／髪と布が暴れる中で踏ん張る等、ドラマチックで物語性の高い瞬間。",
+      camera: "シャッタースピード 1/15 相当。明確な光跡・モーションブラー。シネマティック。",
+      sharedFx: "動きが画面全体を支配する。風の方向と速度感が一目で伝わる構図に。",
+    },
+  };
+
+  const s = SPECS[lv];
+
+  // ── 軸別の具体指示を組み立て ──
+  const axisLines: string[] = [];
+  if (hasHair)   axisLines.push(`  ・髪 ：${s.hair}`);
+  if (hasOutfit) axisLines.push(`  ・衣装：${s.outfit}`);
+  if (hasForeg)  axisLines.push(`  ・前景演出：${s.foreg}`);
+  if (hasPose)   axisLines.push(`  ・ポーズ：${s.pose}`);
+  if (hasCamera) axisLines.push(`  ・カメラ：${s.camera}`);
 
   return [
-    `【風の強さ Lv${lv}】`,
-    detail,
-    `対象：${targets.join("・")}（変更範囲ONの軸のみ）。`,
-    "※ 風の指定だけで背景・顔・人物の同一性を変更しない。固定軸はそのまま維持する。",
+    `【💨 風の強さ Lv${lv}／${s.label}（${s.mps}）— 必ず画面上で見える形で表現すること】`,
+    `イメージ：${s.analogy}`,
+    "",
+    "▼ 軸別の具体表現（変更範囲ONの軸のみ反映・他軸は変えない）：",
+    ...axisLines,
+    "",
+    `▼ 全体方針：${s.sharedFx}`,
+    "",
+    "▼ 厳守ルール：",
+    "  ・「風が吹いている」と一言書くだけでは不十分。上記の具体的な視覚要素を必ず描写に含める。",
+    "  ・無風・止まった印象になる表現（completely still / no motion / frozen pose）は禁止。",
+    "  ・風向は画面の中で一貫させる（左→右なら全要素が同じ方向に流れる）。バラバラな方向の風を混ぜない。",
+    "  ・背景・顔・人物の同一性は変えない。風はあくまで動きの演出。",
   ].join("\n");
 }
 
@@ -2469,6 +3044,30 @@ function zozoTrendBlock(req: GenerateRequest): string {
     ? `女性ファッショントレンド（参考年代：${z.ageLabel}）を衣装方針の『主軸』として最優先で反映する。`
     : `現在の女性ファッショントレンド（参考年代：${z.ageLabel}）を参考に、以下の傾向をリアルな衣装に落とし込む：`;
 
+  // トレンド候補をトップス/ボトムス/その他に分類（差別化指示に使う）
+  const TOPS_KEYWORDS    = ["カットソー", "ブラウス", "ニット", "シャツ", "トップス", "Ｔ", "T", "チューブ",
+                             "ベスト", "タンク", "キャミ", "オフショル"];
+  const BOTTOMS_KEYWORDS = ["パンツ", "スカート", "ワンピ", "デニム", "レギンス", "サロペット", "カーゴ"];
+  const hasTops    = z.traits.filter((t) => TOPS_KEYWORDS.some((kw) => t.includes(kw)));
+  const hasBottoms = z.traits.filter((t) => BOTTOMS_KEYWORDS.some((kw) => t.includes(kw)));
+  const hasOthers  = z.traits.filter((t) => !hasTops.includes(t) && !hasBottoms.includes(t));
+  const diversityNote =
+    (hasTops.length >= 2 || hasBottoms.length >= 2)
+      ? [
+          "",
+          "▼ 案ごとの差別化ルール（最重要）：",
+          `  - トップス候補（${hasTops.length}種）：${hasTops.map((t) => `「${t}」`).join("、")}`,
+          `    → 各案で【異なるトップス】を1つ選ぶ。同じトップスを複数案で使い回さない。`,
+          ...(hasBottoms.length >= 2
+            ? [`  - ボトムス候補（${hasBottoms.length}種）：${hasBottoms.map((t) => `「${t}」`).join("、")}`,
+               `    → 各案で【異なるボトムス】を選ぶ。同じボトムスを複数案で使い回さない。`]
+            : []),
+        ]
+      : [
+          "",
+          "  - 各案で組み合わせ方・色・シルエットを変えて差別化する。",
+        ];
+
   const lines: string[] = [
     heading,
     headLine,
@@ -2480,7 +3079,8 @@ function zozoTrendBlock(req: GenerateRequest): string {
     "  - 反映するのは衣装のみ。背景・顔・髪・ポーズ・カメラ・その他の固定軸は変更しない。",
     "  - 上記傾向を自然に組み合わせ、実際に着られそうな『今っぽいリアルなコーデ』にする" +
     "（非現実的な装飾過多・コスプレ的誇張にしない）。",
-    "  - 各案で組み合わせ方・色・シルエットを少しずつ変えて差別化する。",
+    ...(hasOthers.length > 0 ? [`  - 色・スタイル傾向（${hasOthers.map((t) => `「${t}」`).join("、")}）はすべての案で共通の方向性として活かす。`] : []),
+    ...diversityNote,
   ];
   if (priority) {
     lines.push(
@@ -2571,8 +3171,8 @@ function userStyleBlock(): string {
     "  光演出 / 影演出 / 質感演出 / 空気感演出 / 色対比演出 / 前景演出 /",
     "  抽象エフェクト / テクスチャ演出 / 空間演出 / 構図のトリック",
     "",
-    "▼ 武器ルール（特別演出として扱う。常時出力しない）：",
-    "  刀・銃・デジタル武器は、武器指定・バトル系・戦闘系が明示された場合のみ採用。",
+    "▼ 物騒な小道具ルール（特別演出として扱う。常時は出さない）：",
+    "  攻撃的に見える小道具は、ユーザーがその系統を明示した場合のみ採用する。",
     "  それ以外の場面では小物・アクセサリー・光・影・空間・テクスチャで代替する。",
     "",
     "▼ 連発禁止（案をまたいで連続しないよう分散）：",
@@ -2759,8 +3359,8 @@ function safetyOutputGuideBlock(): string {
     "",
     "▼ 小物・アクセサリーの記述方針：",
     "  小物はファッションアイテム・発光アクセサリー・光るオブジェクトとして表現する。",
-    "  刀やブレードを描く場合は「発光する小道具」「透明なライトオブジェクト」「光るスタイリッシュな小道具」と表現する。",
-    "  銃を描く場合は「スタイリッシュなアクセサリー」「未来的な小道具」と表現する。",
+    "  鋭利・物騒に見える小道具は描かず「発光する小道具」「透明なライトオブジェクト」「光るスタイリッシュな小道具」に置き換える。",
+    "  手に持つアイテムは「スタイリッシュなアクセサリー」「未来的な小道具」として表現する。",
     "",
     "▼ 視覚インパクトの表現方針：",
     "  SNSインパクトは「配色の強さ」「光演出」「前景エフェクト」「構図の迫力」「ファッション性の高さ」で表現する。",
@@ -2782,7 +3382,7 @@ function safetyOutputGuideBlock(): string {
     "    ▷ 小物はHUDパネル・透明オーブ・ホログラムUIを避け、近未来バッグ・発光アクセ・抽象オブジェ等から選ぶ。",
     "    ▷ 衣装は透明ボディスーツに固定せず、テックウェア・未来ランウェイ・ミニマル未来・クロームジャケット等を使う。",
     "    ▷ 背景はSF通路・電脳都市の雨に固定せず、未来ホテル・近未来ギャラリー・抽象空間・未来美術館等を使う。",
-    "    ▷ 各案で背景・色彩・衣装・小物・演出を完全に差別化する。武器・戦闘・危険物は避ける。",
+    "    ▷ 各案で背景・色彩・衣装・小物・演出を完全に差別化する。争いを思わせる要素は避ける。",
     "  ストリート：ファッション誌・モデルスナップ・アーバンカジュアルが基本（80%はこの方向）。",
     "    ▷ 「サイバーパンク」「電脳街」「ネオン路地」「黒×紫の雨のサイバー街」は全案の15%以内に制限する。",
     "    ▷ 衣装は白・ベージュ・デニム・カラフルな差し色を80%で優先。黒コーデは全案の1〜2割以内。",
@@ -2791,7 +3391,7 @@ function safetyOutputGuideBlock(): string {
     "    ▷ 威圧感・反社会的表現・危険な演出は避ける。",
     "  神話/幻獣：人物が主役で幻獣は演出要素。各案で幻獣種・配置・文化・スタイルを完全に差別化する。",
     "    ▷ 既存IPの固有名詞（ガンダム・ポケモン・DQ・FF等）は使わずオリジナルデザインで描く。",
-    "    ▷ 血液・欠損・暴力描写は禁止。神聖・神秘・壮大・美麗な表現で幻獣を描く。",
+    "    ▷ 生々しい描写は避け、神聖・神秘・壮大・美麗な表現で幻獣を描く。",
     "    ▷ 幻獣ばかりを説明するのではなく、人物と幻獣の関係性・世界観を画として表現する。",
     "  ゴシック・ダーク系：暗さは「深みのある」「ミステリアスな」「重厚感のある」「幻想的な」で表現する。",
     "",
@@ -2811,25 +3411,26 @@ function safetyOutputGuideBlock(): string {
     "  ❌ 彫刻的なシルエット     → ✅ 構造美のあるフォルム",
     "  ❌ 彫刻的なライン         → ✅ 立体的なデザインライン",
     "  ❌ エレガントなシルエット  → ✅ エレガントなフォルム",
-    "  ❌ セクシーなシルエット    → ✅ 洗練されたフォルム",
+    "  ❌ 体を強調するシルエット  → ✅ 洗練されたフォルム",
     "  ❌ ボディコン（衣装）      → ✅ フィット感のあるデザイン",
     "  ❌ タイトなシルエット      → ✅ シャープラインのデザイン",
     "  ❌ 細身のシルエット        → ✅ スマートなフォルム",
     "  ※ 「シルエット」は衣装デザインの文脈では使ってよい。体型・スリムと組み合わせない。",
     "",
-    "▼ 絶対に出力しない表現（どのモードでも）：",
-    "  悪魔・魔王・堕天使・妖艶・誘惑的・扇情的・官能的・セクシー・挑発的",
-    "  露出度・胸元・太もも・ボディライン・肉感・フェティッシュ・拘束・支配的",
-    "  刀・銃・ブレード・武器・戦闘・流血・傷跡・血・攻撃的・危険な雰囲気・闇落ち",
-    "→ 上記の表現が必要に感じる場合は必ず安全な代替表現（ゴシック調・ミステリアスな・発光アクセサリー等）に言い換えること。",
+    "▼ 出力全体のトーン規定（全モード共通）：",
+    "  生成するプロンプトは『全年齢対象のファッション広告・アート写真・編集モード誌』の水準に収める。",
+    "  大人向けの過激な方向や生々しい方向には振らず、上品・洗練・芸術的な方向でまとめる。",
+    "  キャラクターは衣装デザイン・シルエット・色・素材・雰囲気で魅力を表現し、身体そのものを主題にしない。",
+    "  危険物や争いを思わせる要素は用いず、ファッション・アート・幻想の文脈の小道具へ置き換える。",
+    "  暗さ・重厚感は『ミステリアス』『幻想的』『ゴシックモード』など雰囲気語で表現する。",
+    "→ 刺激が強くなりそうなときは、必ず上品な広告ビジュアル寄りの語へ言い換えてから出力する。",
     "",
     "【出力前 セルフチェック（必須）】",
-    "各案を出力する直前に以下を確認し、該当語があれば上記の代替語に書き換えてから出力すること：",
-    "  □ スリム＋衣装語（スリムドレス / スリムパンツ / スリムシルエット等）が含まれていないか",
-    "  □ 彫刻的なシルエット・彫刻的なライン等、体型輪郭を強調する表現がないか",
-    "  □ タイト・ボディコン・フィット感を体型強調として使っていないか",
-    "  □ 上記「絶対に出力しない表現」の語句が含まれていないか",
-    "  → 発見した場合はその場で安全な代替表現に書き換えて出力すること。",
+    "各案を出力する直前に以下を確認し、該当すれば上品な代替表現へ書き換えてから出力すること：",
+    "  □ 全年齢のファッション広告として問題ない表現になっているか",
+    "  □ 体型そのものを強調する語（スリム＋衣装語・ボディコン・彫刻的なライン等）を使っていないか",
+    "  □ 衣装は『デザイン・シルエット・素材・色』の語で表現できているか",
+    "  → 該当すれば、その場で上品・洗練・アート寄りの語に書き換えて出力する。",
   ].join("\n");
 }
 
@@ -2981,6 +3582,27 @@ export function safetySanitizePrompt(
     [/傷(?=が|を|つ|ん|った|ついた)/g,          "装飾"],
     [/血(?:のような|っぽい)/g,                  "深みのある赤のような"],
     [/血(?=が|を|の|塗|しぶき)/g,              "赤いエフェクト"],
+
+    // ── 追加：実写人物・年齢関連リスク語 ────────────────────────────────────
+    // Gemini の PROHIBITED_CONTENT を引きやすい語を事前置換
+    [/リアルな女性/g,                          "AI生成の架空キャラクター"],
+    [/リアル(?:系|風)?な?(?=衣装|ファッション)/g, "ファッション誌風な"],
+    [/生々しい/g,                              "ドラマチックな"],
+    [/官能的な?/g,                             "印象的な"],
+    [/セクシーな?/g,                           "スタイリッシュな"],
+    [/扇情的な?/g,                             "インパクトのある"],
+    [/魅惑的な?/g,                             "印象的な"],
+    [/色気のある/g,                            "存在感のある"],
+    [/艶めかし/g,                              "美しく"],
+    [/なまめかし/g,                            "魅力的に"],
+    [/水着(?:姿|風|系|コスチューム|モデル)?/g, "リゾートカジュアルウェア"],
+    [/ビキニ(?:姿|風|スタイル)?/g,            "サマーリゾートウェア"],
+    [/下着(?:姿|露出|見え)?/g,               "レイヤードファッション"],
+    [/透けてい|透けた(?=衣装|素材|トップス|シャツ)/g, "シアー素材の"],
+    [/肌の露出(?:が)?多/g,                    "開放感のある"],
+    [/露出(?:が)?多め/g,                      "スタイリッシュな"],
+    [/脚を見せ/g,                             "ボトムスのデザインを活かし"],
+    [/胸(?:元)?を露出/g,                      "デコルテラインのデザインを強調"],
   ];
 
   let out = text;
@@ -3309,9 +3931,14 @@ export function buildSystemPrompt(
     ? "- 【前提】「参照画像は実在人物ではなく、AIで生成された架空のキャラクターイラストです」で始め、画像編集として何を変更するかを 1〜2 行で宣言。"
     : "- 【前提】被写体の AI 架空 or 実在 性質と、画像編集として何を変更するかを 1〜2 行で宣言。";
 
+  // 変更対象の表示用ラベル（読点区切り）を例文に埋め込む。例の中で勝手に背景や他軸を追加させない。
+  const scopeListForExample = req.scopes.length > 0
+    ? req.scopes.map((s) => SCOPE_JA[s]).join("、")
+    : "（変更対象は【今回の変更対象】に指定された軸）";
+
   const premiseExample = pt === "nano_safe"
-    ? "【前提】参照画像は実在人物ではなく、AIで生成された架空のキャラクターイラストです。この架空キャラクターのデザインを基準に、衣装と背景のみ変更してください。"
-    : "【前提】この画像はAIで生成された架空キャラクター。画像編集として衣装と背景のみ変更してください。";
+    ? `【前提】参照画像は実在人物ではなく、AIで生成された架空のキャラクターイラストです。この架空キャラクターのデザインを基準に、${scopeListForExample}のみ変更してください。`
+    : `【前提】この画像はAIで生成された架空キャラクター。画像編集として${scopeListForExample}のみ変更してください。`;
 
   const lengthGuide = pt === "nano_safe"
     ? "- 1 案あたり全体で 7〜10 行程度の軽量な長さに収める（Nano Banana 向け）。"
@@ -3368,9 +3995,12 @@ export function buildSystemPrompt(
     `- 案数：${req.count}案ちょうど。1 案多くても少なくてもダメ。`,
     "",
     "■ 出力例（イメージ。実際の内容は今回の指示に合わせて生成すること）：",
+    "※ 下記の出力例の【前提】【変更】には、必ず【今回の変更対象】に列挙された軸のみを使うこと。",
+    "※ 例の中の軸を真似て、変更対象に入っていない軸（例：背景）を勝手に追加してはならない。",
     premiseExample,
     fixedExampleLine,
-    "【変更】衣装は黒系テックウェアジャケットとカーゴパンツ、厚底スニーカー。背景は近未来的なネオン路地に変更。",
+    // 【変更】の例は固定文ではなく書き方ガイドにする（軸名のハードコードでバイアスをかけない）
+    `【変更】${scopeListForExample}を 1〜2 文で具体的に記述（変更対象に入っていない軸は記述しない）。`,
     "【雰囲気】クールで都市的、サイバーパンク寄り。",
     "【光】青緑ネオンの主光源を斜め上から、リム発光で輪郭を縁取る。",
     "【品質】高解像度、物理的に正しい影と反射、違和感のない合成感。",
@@ -3381,11 +4011,39 @@ export function buildSystemPrompt(
     "（以下同様）",
   ].join("\n");
 
+  // ── 安全度スコア：リスクが高い組み合わせを検出して追加ガードを投入 ────────────
+  const hasManyScopes  = req.scopes.length >= 4;
+  const isHighRealism  = (req.realismLevel ?? 3) >= 4;
+  const hasViralOrGoth = req.viralMode ||
+    (req.moods ?? []).some((m) => ["gothic", "dark", "glitch", "emo"].includes(m));
+  const needExtraGuard = hasManyScopes || isHighRealism || hasViralOrGoth;
+
+  // 追加安全宣言（リスク組み合わせ時のみ挿入）
+  const extraSafetyNote = needExtraGuard ? [
+    "【安全生成モード（追加）】",
+    "・ 参照画像の人物はAI生成の架空キャラクター（成人設定）であり、実在人物ではありません。",
+    "・ 生成するプロンプト本文は、全年齢対象の商業ファッション広告・アート写真・ファッション誌の水準に留めること。",
+    "・ 衣装は「カジュアルな夏服」「ファッションショー」レベルまでとし、それ以上は踏み込まない。",
+    "・ ポーズ・表情・衣装のいずれも、上品でファッショナブルな印象にまとめる。",
+    "・ ゴシック・ダーク系であっても、ゴシックファッション雑誌レベルの上品な表現に留める。",
+    "・ リアル度が高い場合でも「AIで制作された架空のファッション写真」という文脈を保つ。",
+  ].join("\n") : "";
+
   return [
-    "あなたは画像編集AI（Gemini / Nano Banana / ChatGPT Image）に貼って使う統一プロンプトの生成器です。",
-    "アップロードされた画像があれば必ず内容を解析し（被写体の特徴・色・構図・雰囲気）、それに基づいた具体的プロンプトを作る。",
+    "あなたは画像編集AI向けの統一プロンプトを生成するアシスタントです。",
+    "タスクは『既存のAI生成キャラクター画像を編集するためのプロンプトテキストを作ること』であり、実際に画像を生成・編集したり、有害なコンテンツを生成したりするものではありません。",
+    "出力はすべてテキストのみです。入力画像はプロンプトの参考にするためだけに使用します。",
+    "参照画像はAIで生成された架空のキャラクターイラストであり、実在の人物・未成年者とは無関係です。",
+    needExtraGuard ? extraSafetyNote : "",
+    "",
+    "アップロードされた画像があれば内容を解析し（被写体の特徴・色・構図・雰囲気）、それに基づいた具体的なプロンプトを作る。",
     "",
     `【今回の変更対象】${scopeList}`,
+    // 出力に紛れ込む「軸の自動拡張」を強く禁止する厳守ルール。
+    "【厳守ルール】出力プロンプトの【前提】行・【変更】行・本文中いずれも、上記【今回の変更対象】に列挙された軸『のみ』を変更対象として記述する。",
+    "  ・ 列挙されていない軸（例：背景・髪・ポーズ・衣装・カメラなど）を1語でも追加してはならない。",
+    "  ・ 例文や雛形に含まれていても、変更対象外の軸は出力から省く。",
+    "  ・ 雰囲気・光・構図の描写でも、変更対象外の軸の見た目を変える文言を入れない（例：髪が変更対象でなければ髪の色や流れを記述しない）。",
     principleFixedLine,
     lockLine ? `【追加固定】${lockLine}` : "",
     `【安全前提】${safety}`,
@@ -3426,6 +4084,18 @@ export function buildSystemPrompt(
     (() => { const b = motifControlBlock(req, pt); return b ? "\n" + b : ""; })(),
     // 頻出構成（組み合わせ）制御
     (() => { const b = comboControlBlock(req, pt); return b ? "\n" + b : ""; })(),
+    // 色ポリシー（restrict / block）— 旧式の全軸色制御（互換）
+    (() => { const b = colorControlBlock(req, pt); return b ? "\n" + b : ""; })(),
+    // 色×軸 重み制御（新式・軸別 0-5）— 髪/服/背景を独立に制御
+    (() => { const b = colorWeightBlock(req, pt); return b ? "\n" + b : ""; })(),
+    // 画像分析バイアス — 生成結果画像のクラスタリングから得た偏り情報
+    (() => { const b = imageBiasBlock(req, pt); return b ? "\n" + b : ""; })(),
+    // AI 好みプロファイル（実 Gemini 分析）— 最優先度の好み反映
+    (() => { const b = preferenceProfileBlock(req, pt); return b ? "\n" + b : ""; })(),
+    // ユーザー画像評価バイアス — 👍/👎 から導いた方向性ヒント
+    (() => { const b = ratingBiasBlock(req, pt); return b ? "\n" + b : ""; })(),
+    // 質感・リアル度 — 人物と背景の質感統一（背景だけリアルすぎる問題の防止）
+    (() => { const b = realismBlock(req, pt); return b ? "\n" + b : ""; })(),
     detailLines ? `\n【詳細設定】\n${detailLines}` : "",
     extra ? `\n【ユーザー追加指示】${extra}` : "",
     "",

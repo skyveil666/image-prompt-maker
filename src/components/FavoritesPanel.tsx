@@ -11,7 +11,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptHistoryItem, Mood, Scope } from "../types";
-import { getAll, updateItem } from "../lib/history";
+import { getAll, updateItem, getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES } from "../lib/history";
 import { makeThumbnail } from "../lib/imageThumb";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 
@@ -121,10 +121,21 @@ function CompareModal({
       >
         {/* ヘッダー */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <span className="text-base font-bold text-text-base">
               {OUTPUT_LABEL[item.outputType]} 案{item.proposalIndex}
             </span>
+            {item.derivedFromId && (
+              <span className="text-xs px-2 py-1 rounded-lg border border-violet-400/50 bg-violet-500/15 text-violet-100 flex items-center gap-1">
+                ✨ アレンジ保存
+                {item.arrangeCaseNumber && <span className="opacity-75">（案{item.arrangeCaseNumber}）</span>}
+              </span>
+            )}
+            {item.derivedFromDate && (
+              <span className="text-xs text-violet-200/60">
+                元：{formatDateTime(item.derivedFromDate)}
+              </span>
+            )}
             {item.presetName && (
               <span className="text-xs px-2 py-0.5 rounded-full border border-accent/40 bg-accent/12 text-accent/90">
                 {item.presetName}
@@ -142,12 +153,47 @@ function CompareModal({
           </button>
         </div>
 
+        {/* アレンジ保存情報 */}
+        {item.derivedFromId && (
+          <div className="rounded-xl border border-violet-400/30 bg-violet-500/8 px-3 py-2 space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[12px] font-bold text-violet-100">✨ アレンジ保存の詳細</span>
+              {item.arrangeCaseNumber && (
+                <span className="text-[11px] text-violet-200/70">案 {item.arrangeCaseNumber}</span>
+              )}
+              {item.derivedFromDate && (
+                <span className="text-[11px] text-violet-200/55">元：{formatDateTime(item.derivedFromDate)}</span>
+              )}
+            </div>
+            {(item.arrangeUsedScopes ?? []).length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] text-emerald-300/70 font-semibold">使用：</span>
+                {(item.arrangeUsedScopes ?? []).map((s) => (
+                  <span key={s} className="text-[10px] px-1.5 py-0.5 rounded-full border border-violet-400/40 bg-violet-400/12 text-violet-200/85 leading-none">
+                    {SCOPE_LABEL[s] ?? s}
+                  </span>
+                ))}
+              </div>
+            )}
+            {(item.arrangeExcludedScopes ?? []).length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] text-rose-300/60 font-semibold">除外：</span>
+                {(item.arrangeExcludedScopes ?? []).map((s) => (
+                  <span key={s} className="text-[10px] px-1.5 py-0.5 rounded-full border border-white/10 bg-white/3 text-text-muted/50 leading-none">
+                    {SCOPE_LABEL[s] ?? s}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 画像比較 */}
         <div className="grid grid-cols-2 gap-4">
           {/* 左：元画像 */}
           <div className="space-y-2">
             <p className="text-[11px] font-semibold text-text-muted/70 text-center uppercase tracking-wide">
-              元画像
+              {item.derivedFromId ? "アレンジ元画像" : "元画像"}
             </p>
             {item.sourceImageThumbnail ? (
               <img
@@ -162,23 +208,46 @@ function CompareModal({
             )}
           </div>
 
-          {/* 右：生成結果 */}
+          {/* 右：生成結果（最大3枚） */}
           <div className="space-y-2">
-            <p className="text-[11px] font-semibold text-text-muted/70 text-center uppercase tracking-wide">
-              生成結果
-            </p>
-            {item.resultImageData ? (
-              <img
-                src={item.resultImageData}
-                alt="生成結果"
-                className="w-full rounded-2xl object-contain max-h-[65vh] bg-black/60 border border-bg-border"
-              />
-            ) : (
-              <div className="aspect-square rounded-2xl bg-bg-panel/60 border border-bg-border border-dashed flex flex-col items-center justify-center gap-2 text-text-muted/40">
-                <span className="text-2xl">🖼</span>
-                <span className="text-xs">未登録</span>
-              </div>
-            )}
+            {(() => {
+              const imgs = getResultImages(item);
+              const total = imgs.length;
+              return (
+                <>
+                  <p className="text-[11px] font-semibold text-text-muted/70 text-center uppercase tracking-wide">
+                    生成結果 {total > 0 && <span className="text-text-muted/50">（{total}枚）</span>}
+                  </p>
+                  {total === 0 ? (
+                    <div className="aspect-square rounded-2xl bg-bg-panel/60 border border-bg-border border-dashed flex flex-col items-center justify-center gap-2 text-text-muted/40">
+                      <span className="text-2xl">🖼</span>
+                      <span className="text-xs">未登録</span>
+                    </div>
+                  ) : total === 1 ? (
+                    <img
+                      src={imgs[0]}
+                      alt="生成結果"
+                      className="w-full rounded-2xl object-contain max-h-[65vh] bg-black/60 border border-bg-border"
+                    />
+                  ) : (
+                    <div className="flex flex-col gap-2 max-h-[65vh] overflow-y-auto">
+                      {imgs.map((url, i) => (
+                        <div key={i} className="relative">
+                          <img
+                            src={url}
+                            alt={`生成結果 ${i + 1}`}
+                            className="w-full rounded-2xl object-contain max-h-[40vh] bg-black/60 border border-bg-border"
+                          />
+                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 text-emerald-200 text-[11px] font-bold leading-none">
+                            {i + 1} / {total}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </div>
 
@@ -344,17 +413,73 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
     } catch { /* noop */ }
   };
 
-  const handleImage = useCallback(async (url: string) => {
-    // url が空文字の場合は削除
-    await onUpdate(item.id, { resultImageData: url || null });
-  }, [item.id, onUpdate]);
+  const resultImages = getResultImages(item);
+
+  /** 末尾に追加（GeneratedImageSlot は1スロットなのでファースト枠 / 追加枠で使い分け） */
+  const handleAppend = useCallback(async (url: string) => {
+    if (!url) {
+      // 空文字 = 全削除（後方互換）
+      await onUpdate(item.id, buildResultImagesPatch([]));
+      return;
+    }
+    const next = [...resultImages, url].slice(0, MAX_RESULT_IMAGES);
+    await onUpdate(item.id, buildResultImagesPatch(next));
+  }, [item.id, onUpdate, resultImages]);
+
+  /** 指定インデックスの画像を差し替え or 削除（url="" で削除） */
+  const handleReplaceAt = useCallback(async (idx: number, url: string) => {
+    if (!url) {
+      const next = resultImages.filter((_, i) => i !== idx);
+      await onUpdate(item.id, buildResultImagesPatch(next));
+      return;
+    }
+    const next = [...resultImages];
+    next[idx] = url;
+    await onUpdate(item.id, buildResultImagesPatch(next));
+  }, [item.id, onUpdate, resultImages]);
 
   const scopes = item.scopes.slice(0, 3);
   const moods  = (item.moods ?? []).slice(0, 3);
-  const hasResult = !!item.resultImageData;
+  const hasResult = resultImages.length > 0;
+  const isArranged = !!item.derivedFromId;
 
   return (
-    <article className="rounded-2xl border border-bg-border bg-bg-card overflow-hidden hover:border-accent/40 transition-colors duration-200">
+    <article className={[
+      "rounded-2xl border overflow-hidden transition-colors duration-200",
+      isArranged
+        ? "border-violet-400/40 bg-violet-500/5 hover:border-violet-400/65"
+        : "border-bg-border bg-bg-card hover:border-accent/40",
+    ].join(" ")}>
+
+      {/* ── アレンジ保存バナー（派生元ありの場合のみ） ──────────── */}
+      {isArranged && (
+        <div className="px-3 py-1.5 border-b border-violet-400/20 bg-violet-500/10 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-bold text-violet-100 flex items-center gap-1">
+            ✨ アレンジ保存
+            {item.arrangeCaseNumber && (
+              <span className="text-[10px] text-violet-300/80">（案{item.arrangeCaseNumber}）</span>
+            )}
+          </span>
+          {item.derivedFromDate && (
+            <span className="text-[10px] text-violet-200/65">
+              元：{formatDateTime(item.derivedFromDate)}
+            </span>
+          )}
+          {/* 使用要素チップ */}
+          {(item.arrangeUsedScopes ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1 ml-auto">
+              {(item.arrangeUsedScopes ?? []).slice(0, 4).map((s) => (
+                <span key={s} className="text-[9px] px-1.5 py-0.5 rounded-full border border-violet-400/40 bg-violet-400/12 text-violet-200/85 leading-none">
+                  {SCOPE_LABEL[s] ?? s}
+                </span>
+              ))}
+              {(item.arrangeUsedScopes ?? []).length > 4 && (
+                <span className="text-[9px] text-violet-300/60">+{(item.arrangeUsedScopes ?? []).length - 4}</span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── ヘッダー ──────────────────────────────────────────────── */}
       <div className="px-3 pt-3 pb-1.5 flex items-center gap-2">
@@ -373,6 +498,12 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
             {item.presetName}
           </span>
         )}
+        {/* hasImage バッジ */}
+        {hasResult && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-200/85 leading-none">
+            🖼 画像{resultImages.length}枚
+          </span>
+        )}
         {item.viralMode && (
           <span className="text-[9px] px-1.5 py-0.5 rounded-full border border-rose-400/35 bg-rose-400/8 text-rose-300/70">
             🔥
@@ -383,6 +514,18 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
         </span>
       </div>
 
+      {/* ── 除外要素（アレンジ保存時のみ） ────────────────────────── */}
+      {isArranged && (item.arrangeExcludedScopes ?? []).length > 0 && (
+        <div className="px-3 pb-1 flex items-center gap-1 flex-wrap">
+          <span className="text-[9px] text-text-muted/45">除外：</span>
+          {(item.arrangeExcludedScopes ?? []).slice(0, 4).map((s) => (
+            <span key={s} className="text-[9px] px-1.5 py-0.5 rounded-full border border-white/10 bg-white/3 text-text-muted/50 leading-none line-through decoration-text-muted/25">
+              {SCOPE_LABEL[s] ?? s}
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* ── 生成チェーン ──────────────────────────────────────────── */}
       <div className="px-3 pb-2.5 flex items-center gap-2.5">
 
@@ -390,14 +533,26 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
         {item.sourceImageThumbnail ? (
           <WithImagePreview
             src={item.sourceImageThumbnail}
-            label="元画像"
-            sublabel={`${OUTPUT_LABEL[item.outputType]} 案${item.proposalIndex}`}
+            label={isArranged ? "アレンジ元画像" : "元画像"}
+            sublabel={isArranged && item.derivedFromDate
+              ? formatDateTime(item.derivedFromDate)
+              : `${OUTPUT_LABEL[item.outputType]} 案${item.proposalIndex}`}
           >
-            <img
-              src={item.sourceImageThumbnail}
-              alt="元画像"
-              className="w-20 h-20 rounded-xl object-cover border border-bg-border cursor-zoom-in"
-            />
+            <div className="relative">
+              <img
+                src={item.sourceImageThumbnail}
+                alt="元画像"
+                className={[
+                  "w-20 h-20 rounded-xl object-cover cursor-zoom-in",
+                  isArranged ? "border-2 border-violet-400/50" : "border border-bg-border",
+                ].join(" ")}
+              />
+              {isArranged && (
+                <span className="absolute -top-1.5 -left-1.5 px-1.5 py-0.5 rounded-md bg-violet-600/85 text-[8px] font-bold text-white leading-none shadow">
+                  元
+                </span>
+              )}
+            </div>
           </WithImagePreview>
         ) : (
           <div className="w-20 h-20 rounded-xl bg-bg-panel/50 border border-bg-border flex flex-col items-center justify-center gap-1 flex-shrink-0">
@@ -408,30 +563,46 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
 
         {/* 矢印 */}
         <div className="flex flex-col items-center gap-0.5 flex-shrink-0 w-6">
-          <span className="text-text-muted/45 text-base leading-none">→</span>
+          <span className={[
+            "text-base leading-none",
+            isArranged ? "text-violet-400/65" : "text-text-muted/45",
+          ].join(" ")}>→</span>
           {hasResult && (
             <span className="text-[7px] text-emerald-400/50">✓</span>
           )}
         </div>
 
-        {/* 生成結果スロット */}
-        {item.resultImageData ? (
-          <WithImagePreview
-            src={item.resultImageData}
-            label="生成結果"
-            sublabel={`案${item.proposalIndex} · ${formatDateTime(item.createdAt)}`}
-          >
-            <GeneratedImageSlot
-              imageUrl={item.resultImageData}
-              onImage={handleImage}
-            />
-          </WithImagePreview>
-        ) : (
-          <GeneratedImageSlot
-            imageUrl={null}
-            onImage={handleImage}
-          />
-        )}
+        {/* 生成結果スロット（最大3枚：既存スロットを縦に並べる） */}
+        <div className="flex flex-col gap-1">
+          {resultImages.length === 0 ? (
+            <GeneratedImageSlot imageUrl={null} onImage={handleAppend} />
+          ) : (
+            <>
+              {resultImages.map((url, i) => (
+                <div key={i} className="relative">
+                  <WithImagePreview
+                    src={url}
+                    label={`生成結果 ${i + 1}`}
+                    sublabel={`案${item.proposalIndex} · ${formatDateTime(item.createdAt)}`}
+                  >
+                    <GeneratedImageSlot
+                      imageUrl={url}
+                      onImage={async (nu) => { await handleReplaceAt(i, nu); }}
+                    />
+                  </WithImagePreview>
+                  {resultImages.length > 1 && (
+                    <span className="absolute top-1 left-1 px-1 rounded bg-black/70 text-emerald-200/95 text-[9px] leading-none font-bold pointer-events-none">
+                      {i + 1}/{resultImages.length}
+                    </span>
+                  )}
+                </div>
+              ))}
+              {resultImages.length < MAX_RESULT_IMAGES && (
+                <GeneratedImageSlot imageUrl={null} onImage={handleAppend} />
+              )}
+            </>
+          )}
+        </div>
 
         {/* スコープ＋ムードタグ */}
         <div className="flex-1 min-w-0 flex flex-col gap-1.5">
@@ -542,7 +713,7 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
         {hasResult && (
           <button
             type="button"
-            onClick={() => onUseAsSource(item.resultImageData!)}
+            onClick={() => onUseAsSource(resultImages[0]!)}
             title="この生成結果を元画像として使用してさらに生成"
             className="rounded-lg px-2.5 py-1.5 text-[11px] font-semibold border border-emerald-400/40 bg-emerald-400/8 text-emerald-200 hover:bg-emerald-400/18 transition"
           >
@@ -615,7 +786,7 @@ export function FavoritesPanel({ open, onClose, onArrange, onUseAsSource }: Prop
     onUseAsSource(url);
   }, [onClose, onUseAsSource]);
 
-  const chainCount  = favorites.filter((it) => !!it.resultImageData).length;
+  const chainCount  = favorites.filter((it) => getResultImages(it).length > 0).length;
   const totalCount  = favorites.length;
 
   return (

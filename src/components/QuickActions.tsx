@@ -23,6 +23,13 @@ export type { SnsType, CultureType, WorldPreset, EffectPreset };
 /** 旧型名エイリアス（外部コードとの互換性維持） */
 export type FashionPreset = WorldPreset;
 
+/** 神引きモードの短い表示ラベル（アクティブチップ用） */
+const GOD_DISPLAY: Record<string, string> = {
+  normal: "👑 ノーマル", chaos: "🎲 カオス", outfit: "🧥 衣装", bg: "🌍 背景",
+  composition: "📷 構図", color: "🎨 色", world_god: "🌌 世界観",
+  props: "🎁 小物", bigobject: "🏛️ 大物", myth: "🐉 神話", movie: "🎬 映画",
+};
+
 // ── Props ──────────────────────────────────────────────────────────────────────
 
 interface QuickActionsProps {
@@ -47,9 +54,13 @@ interface QuickActionsProps {
   onWorldPresetToggle: (preset: WorldPreset) => void;
   onEffectToggle:      (effect: EffectPreset) => void;
   onGodToggle:         (mode: string) => void;
-  onAssistToggle:      (mode: "gap" | "anti") => void;
+  // "anti"（量産回避）は撤去済み — avoidCliche に統合された
+  onAssistToggle:      (mode: "gap") => void;
   /** 神引き補助モディファイア（被り回避・別世界・バズ寄せ・顔映え）トグル */
   onBoostToggle?:      (id: string) => void;
+  /** 量産回避（avoidCliche・サーバ側 cliche 回避ブロック。既定ON） */
+  avoidCliche?:        boolean;
+  onAvoidClicheChange?: (v: boolean) => void;
   // アクティブ状態（ボタン active 表示用）
   activeGodModes?:      string[];
   activeBoosts?:        string[];
@@ -179,10 +190,15 @@ export function QuickActions({
   onMassProductionCheck,
   onWorldPresetToggle, onEffectToggle,
   onGodToggle, onAssistToggle, onBoostToggle,
+  avoidCliche = true, onAvoidClicheChange,
   onResetAll,
   onToggleFavPanel, onShowCalendar,
 }: QuickActionsProps) {
-  const [godMore, setGodMore] = useState(false);
+  // 神引きはドロップダウンに統合（種類が多く常時展開すると煩雑なため）
+  const [godOpen, setGodOpen] = useState(false);
+  const activeGodChips = activeGodModes.map((m) =>
+    m === "chaos" && chaosLabel ? `🎲 ${chaosLabel}` : (GOD_DISPLAY[m] ?? m)
+  );
 
   return (
     <div className="card !py-3 !px-4 space-y-2.5">
@@ -223,49 +239,51 @@ export function QuickActions({
 
       <div className="border-t border-white/5" />
 
-      {/* ══════ 👑 神引きシリーズ ══════ */}
+      {/* ══════ 👑 神引き（ドロップダウン統合） ══════ */}
       <CategoryRow label="神引き">
-        <TagBtn label="👑 ノーマル"     title="全スコープON・最大インパクトで設定を適用（設定のみ）"                                                                       onClick={() => onGodToggle("normal")}      disabled={disabled} variant="gold" active={activeGodModes.includes("normal")} />
-        <TagBtn label={chaosLabel ? `🎲 ${chaosLabel}` : "🎲 カオス"} title="普段あり得ない世界観を3〜4軸強制融合。毎回前例のない組み合わせを生成（AIテンプレ完全禁止）" onClick={() => onGodToggle("chaos")}       disabled={disabled} variant="gold" active={activeGodModes.includes("chaos")} />
-        <TagBtn label="🧥 衣装"         title="衣装スコープのみ変更。顔・背景・ポーズ・カメラは完全固定。毎回異なる高品質な衣装を選ぶ（最大2コンボ）"                  onClick={() => onGodToggle("outfit")}      disabled={disabled} variant="gold" active={activeGodModes.includes("outfit")} />
-        <TagBtn label="🌍 背景"         title="人物固定。温室・美術館・地下図書館など珍しい背景を毎回ランダムに選ぶ（最大2コンボ）"                                     onClick={() => onGodToggle("bg")}          disabled={disabled} variant="gold" active={activeGodModes.includes("bg")} />
-        <TagBtn label="📷 構図"         title="カメラ視点・フレーミングをランダムに強変更。超寄り・魚眼・ドローン・肩越しなど毎回異なる特殊構図を選ぶ。顔固定"           onClick={() => onGodToggle("composition")} disabled={disabled} variant="gold" active={activeGodModes.includes("composition")} />
-        <TagBtn label="🎨 色"           title="色彩・パレット主導の画面設計。8種の色方向（モノクローム・ジュエル・パステル・ゴールド等）から毎回異なる配色を選ぶ（最大2コンボ）" onClick={() => onGodToggle("color")}  disabled={disabled} variant="gold" active={activeGodModes.includes("color")} />
-        <TagBtn label="🌌 世界観"       title="異世界・異空間の世界観を全力で引く。宇宙神社・水没図書館・鏡の宮殿など8方向から毎回異なる空間を選ぶ（最大2コンボ）"   onClick={() => onGodToggle("world_god")}   disabled={disabled} variant="gold" active={activeGodModes.includes("world_god")} />
-
-        {/* ── 補助モディファイア（複数選択可・固定ルールは常に優先）── */}
-        <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
-        <TagBtn label="🔁 被り回避" title="直近の生成と似た背景・衣装・色・前景・カメラ・世界観を避ける。ネオン/サイバー/黒衣装/剣/花びら/廃墟/屋上などの連続使用を回避（複数選択可）" onClick={() => onBoostToggle?.("avoid_overlap")} disabled={disabled} variant="sky" active={activeBoosts.includes("avoid_overlap")} />
-        <TagBtn label="🎲 別世界"   title="顔・同一性は維持したまま、変更対象の軸を前回と全く違う世界観へ大胆に変化（1つの完成された世界観としてまとめる・複数選択可）"        onClick={() => onBoostToggle?.("other_world")}  disabled={disabled} variant="sky" active={activeBoosts.includes("other_world")} />
-        <TagBtn label="🧲 バズ寄せ" title="SNS映えする構図・色・前景に寄せる。明暗差・顔周りの視線誘導・印象的な背景・強い一要素（ネオン偏りは回避・複数選択可）"            onClick={() => onBoostToggle?.("buzz")}         disabled={disabled} variant="sky" active={activeBoosts.includes("buzz")} />
-        <TagBtn label="🎯 顔映え"   title="顔は絶対に変更しない。光・構図・背景・前景を最適化して顔を引き立てる（リムライト/キャッチライト/視線誘導・複数選択可）"          onClick={() => onBoostToggle?.("face_pop")}     disabled={disabled} variant="sky" active={activeBoosts.includes("face_pop")} />
-        {activeBoosts.length > 0 && (
-          <span className="text-[11px] text-sky-300/70 font-semibold self-center ml-0.5">
-            {activeBoosts.length}選択中
-          </span>
-        )}
-
-        {/* もっとトグル */}
         <button
           type="button"
-          onClick={() => setGodMore((v) => !v)}
+          onClick={() => setGodOpen((v) => !v)}
           disabled={disabled}
-          className="rounded-lg px-2.5 py-1.5 text-[12px] font-semibold border border-amber-400/25 bg-transparent text-amber-300/50 hover:text-amber-200 hover:border-amber-400/55 disabled:opacity-40 disabled:cursor-not-allowed transition leading-none whitespace-nowrap"
+          title="神引き＝変更対象と詳細を自動で埋める強力プリセット。クリックで種類を展開"
+          className={[
+            "rounded-lg px-3 py-1.5 text-[12px] font-bold border leading-none whitespace-nowrap transition",
+            activeGodChips.length > 0
+              ? "border-amber-400/65 bg-amber-400/15 text-amber-100 shadow-[0_0_8px_-2px_rgba(251,191,36,0.5)]"
+              : "border-amber-400/30 bg-transparent text-amber-300/70 hover:text-amber-200 hover:border-amber-400/55",
+            "disabled:opacity-40 disabled:cursor-not-allowed",
+          ].join(" ")}
         >
-          {godMore ? "▲ 閉じる" : "▼ もっと"}
+          👑 神引き {godOpen ? "▲" : "▼"}
         </button>
-        {activeGodModes.filter((m) => !["normal", "chaos", "composition"].includes(m)).length > 1 && (
-          <span className="text-[11px] text-amber-300/70 font-semibold self-center ml-1">
-            {activeGodModes.filter((m) => !["normal", "chaos", "composition"].includes(m)).length}選択中
+        {/* アクティブな神引きをチップ表示（閉じていても何が効いているか分かる） */}
+        {activeGodChips.map((label, i) => (
+          <span key={i} className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded border border-amber-400/45 bg-amber-400/10 text-amber-100 leading-none">
+            {label}
           </span>
+        ))}
+        {activeGodChips.length === 0 && (
+          <span className="text-[11px] text-text-muted/40 self-center">未選択</span>
         )}
-        {godMore && (
-          <>
-            <TagBtn label="🎁 小物"         title="アイテム主導の映え設計。光る蝶・王冠・ガラスの剣・花冠など10種から選び、文脈・ムードまで一緒に設計する（最大2コンボ）"  onClick={() => onGodToggle("props")}     disabled={disabled} variant="gold" active={activeGodModes.includes("props")} />
-            <TagBtn label="🏛️ 大物"        title="場を支配する大きな物体主導の画面設計。巨大クリスタル・古代石像・花のインスタレーションなど8種から選ぶ（最大2コンボ）"   onClick={() => onGodToggle("bigobject")} disabled={disabled} variant="gold" active={activeGodModes.includes("bigobject")} />
-            <TagBtn label="🐉 神話"         title="神話・伝説・幻獣を使った世界観構築。白龍・鳳凰・天使・白狐など8種から選び、神話的な荘厳さを演出する（最大2コンボ）"    onClick={() => onGodToggle("myth")}      disabled={disabled} variant="gold" active={activeGodModes.includes("myth")} />
-            <TagBtn label="🎬 映画神引き"   title="映画ジャンル特化の画面設計。ノワール・SF叙事詩・ゴシックホラー・黒澤風など8方向から毎回異なる映画美学を選ぶ（最大2コンボ）" onClick={() => onGodToggle("movie")}  disabled={disabled} variant="gold" active={activeGodModes.includes("movie")} />
-          </>
+
+        {/* 展開：全11種をまとめて表示 */}
+        {godOpen && (
+          <div className="w-full mt-1.5 p-2 rounded-lg border border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1.5">
+            <span className="w-full text-[10px] text-amber-300/60 leading-none mb-0.5">
+              ※ 神引きは「変更対象・詳細設定を自動で埋める」プリセットです。押すと該当の変更対象が自動でONになります。
+            </span>
+            <TagBtn label="👑 ノーマル"   title="全スコープON・最大インパクトで設定を適用（設定のみ）"                                              onClick={() => onGodToggle("normal")}      disabled={disabled} variant="gold" active={activeGodModes.includes("normal")} />
+            <TagBtn label={chaosLabel ? `🎲 ${chaosLabel}` : "🎲 カオス"} title="普段あり得ない世界観を3〜4軸強制融合。毎回前例のない組み合わせを生成" onClick={() => onGodToggle("chaos")}       disabled={disabled} variant="gold" active={activeGodModes.includes("chaos")} />
+            <TagBtn label="🧥 衣装"       title="衣装スコープのみ変更。顔・背景・ポーズ・カメラは固定。毎回異なる高品質な衣装（最大2コンボ）"        onClick={() => onGodToggle("outfit")}      disabled={disabled} variant="gold" active={activeGodModes.includes("outfit")} />
+            <TagBtn label="🌍 背景"       title="人物固定。温室・美術館・地下図書館など珍しい背景を毎回ランダム（最大2コンボ）"                       onClick={() => onGodToggle("bg")}          disabled={disabled} variant="gold" active={activeGodModes.includes("bg")} />
+            <TagBtn label="📷 構図"       title="カメラ視点・フレーミングを強変更。超寄り・魚眼・ドローン・肩越しなど。顔固定"                       onClick={() => onGodToggle("composition")} disabled={disabled} variant="gold" active={activeGodModes.includes("composition")} />
+            <TagBtn label="🎨 色"         title="色彩・パレット主導の画面設計。8種の色方向から毎回異なる配色（最大2コンボ）"                          onClick={() => onGodToggle("color")}       disabled={disabled} variant="gold" active={activeGodModes.includes("color")} />
+            <TagBtn label="🌌 世界観"     title="異世界・異空間を全力で引く。宇宙神社・水没図書館・鏡の宮殿など8方向（最大2コンボ）"                  onClick={() => onGodToggle("world_god")}   disabled={disabled} variant="gold" active={activeGodModes.includes("world_god")} />
+            <TagBtn label="🎁 小物"       title="アイテム主導の映え設計。光る蝶・王冠・ガラスの剣・花冠など10種（最大2コンボ）"                       onClick={() => onGodToggle("props")}       disabled={disabled} variant="gold" active={activeGodModes.includes("props")} />
+            <TagBtn label="🏛️ 大物"      title="場を支配する大きな物体主導。巨大クリスタル・古代石像・花のインスタレーションなど8種（最大2コンボ）"   onClick={() => onGodToggle("bigobject")}   disabled={disabled} variant="gold" active={activeGodModes.includes("bigobject")} />
+            <TagBtn label="🐉 神話"       title="神話・伝説・幻獣を使った世界観構築。白龍・鳳凰・天使・白狐など8種（最大2コンボ）"                    onClick={() => onGodToggle("myth")}        disabled={disabled} variant="gold" active={activeGodModes.includes("myth")} />
+            <TagBtn label="🎬 映画"       title="映画ジャンル特化の画面設計。ノワール・SF叙事詩・ゴシックホラー・黒澤風など8方向（最大2コンボ）"      onClick={() => onGodToggle("movie")}       disabled={disabled} variant="gold" active={activeGodModes.includes("movie")} />
+          </div>
         )}
       </CategoryRow>
 
@@ -273,22 +291,27 @@ export function QuickActions({
 
       {/* ══════ 生成補助 ══════ */}
       <CategoryRow label="生成補助">
+        {/* A. 強化系 */}
         <TagBtn label={viralMode ? "🔥 バズりON" : "🔥 バズり"} title={viralMode ? "一発バズりモードをOFF（設定は維持）" : "SNS映えスタイルに補正モードをON（設定のみ）"} onClick={viralMode ? onViralOff : onViral} active={viralMode} variant="rose" disabled={disabled} />
-        <TagBtn label="🧪 量産回避"  title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避け、珍しい場所・意外な色・映画的構図を優先（ギャップ化と同時選択可）" onClick={() => onAssistToggle("anti")} disabled={disabled} variant="amber" active={activeAssistModes.includes("anti")} />
-        <TagBtn label="🎭 ギャップ化" title="現在の雰囲気と逆方向へ振る。かわいい→ダーク、ストリート→高級など「映えるギャップ」を毎回ランダムに選ぶ（量産回避と同時選択可）" onClick={() => onAssistToggle("gap")} disabled={disabled} variant="rose" active={activeAssistModes.includes("gap")} />
-        {activeAssistModes.length > 1 && (
-          <span className="text-[11px] text-orange-300/70 font-semibold self-center">2コンボ</span>
-        )}
-        <TagBtn label="🎲 おまかせ"  title="変更範囲・雰囲気・案数をすべてランダムに決めて設定適用"                                                     onClick={onRandom}        disabled={disabled} variant="default" />
-        <TagBtn label="🔄 別案"      title="現在の画像と設定を保持したまま雰囲気をひと揺らしして再生成"                                                onClick={onVariant}       disabled={disabled || !canVariant} variant="cyan" />
-        <TagBtn label="📈 SNSバズ"   title="SNS向けビジュアル補正をランダム追加（最大2コンボ。詳細設定の「SNS」タブでも選択可）"                       onClick={onSnsSingle}     disabled={disabled} variant="rose"    active={activeSnsLabels.length > 0} />
-        {activeSnsLabels.length > 1 && (
-          <span className="text-[11px] text-rose-300/70 font-semibold self-center">{activeSnsLabels.length}コンボ</span>
-        )}
-        <TagBtn label="🌐 カルチャー" title="都市・文化圏の世界観をランダム追加（最大2コンボ。詳細設定の「カルチャー」タブでも選択可）"                 onClick={onCultureSingle} disabled={disabled} variant="teal"   active={activeCultureLabels.length > 0} />
-        {activeCultureLabels.length > 1 && (
-          <span className="text-[11px] text-teal-300/70 font-semibold self-center">{activeCultureLabels.length}コンボ</span>
-        )}
+        <TagBtn label="🧲 バズ寄せ" title="SNS映えする構図・色・前景に寄せる。明暗差・顔周りの視線誘導・印象的な背景・強い一要素（複数選択可）" onClick={() => onBoostToggle?.("buzz")}     disabled={disabled} variant="rose" active={activeBoosts.includes("buzz")} />
+        <TagBtn label="🎯 顔映え"   title="顔は絶対に変更しない。光・構図・背景・前景を最適化して顔を引き立てる（複数選択可）"                  onClick={() => onBoostToggle?.("face_pop")} disabled={disabled} variant="rose" active={activeBoosts.includes("face_pop")} />
+
+        {/* 区切り：回避系 */}
+        <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
+        <TagBtn label={avoidCliche ? "🛡 量産回避ON" : "🛡 量産回避"} title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避ける常時補正（既定ON・サーバ側で全案に効く）" onClick={() => onAvoidClicheChange?.(!avoidCliche)} disabled={disabled} variant="amber" active={avoidCliche} />
+        <TagBtn label="🔁 被り回避"  title="直近の生成と似た背景・衣装・色・前景・カメラ・世界観を避ける（複数選択可）"                          onClick={() => onBoostToggle?.("avoid_overlap")} disabled={disabled} variant="amber" active={activeBoosts.includes("avoid_overlap")} />
+        <TagBtn label="🎭 ギャップ化" title="現在の雰囲気と逆方向へ振る。かわいい→ダーク等の映えるギャップを毎回ランダム"                          onClick={() => onAssistToggle("gap")}         disabled={disabled} variant="amber" active={activeAssistModes.includes("gap")} />
+        <TagBtn label="🌀 別世界"    title="顔・同一性は維持したまま、変更対象の軸を前回と全く違う世界観へ大胆に変化（複数選択可）"                onClick={() => onBoostToggle?.("other_world")} disabled={disabled} variant="amber" active={activeBoosts.includes("other_world")} />
+
+        {/* 区切り：SNS / 文化 */}
+        <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
+        <TagBtn label="📈 SNSバズ"   title="SNS向けビジュアル補正をランダム追加（最大2コンボ。詳細設定の「SNS」でも選択可）"           onClick={onSnsSingle}     disabled={disabled} variant="rose"  active={activeSnsLabels.length > 0} />
+        <TagBtn label="🌐 カルチャー" title="都市・文化圏の世界観をランダム追加（最大2コンボ。詳細設定の「カルチャー」でも選択可）"     onClick={onCultureSingle} disabled={disabled} variant="teal"  active={activeCultureLabels.length > 0} />
+
+        {/* 区切り：操作系 */}
+        <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
+        <TagBtn label="🎲 おまかせ"  title="変更範囲・雰囲気・案数をすべてランダムに決めて設定適用"            onClick={onRandom}  disabled={disabled} variant="default" />
+        <TagBtn label="🔄 別案"      title="現在の画像と設定を保持したまま雰囲気をひと揺らしして再生成"       onClick={onVariant} disabled={disabled || !canVariant} variant="cyan" />
       </CategoryRow>
 
       <div className="border-t border-white/5" />

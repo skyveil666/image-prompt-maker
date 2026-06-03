@@ -5,6 +5,7 @@ import { deleteItem, getAll, getByDate, updateItem } from "../lib/history";
 import { CalendarView } from "./CalendarView";
 import { HistoryItemRow } from "./HistoryItemRow";
 import { ArrangePreviewPanel } from "./ArrangePreviewPanel";
+import { HistoryMiniExplorer } from "./HistoryMiniExplorer";
 import type { FavoriteProfile } from "../lib/favoriteProfile";
 import {
   runAutoCleanup,
@@ -20,10 +21,12 @@ interface Props {
   initialFavoritesOnly?: boolean;
   /** その場でアレンジ生成し結果を返す（選択した要素のみ使用）。 */
   onArrangeInline?: (item: PromptHistoryItem, scopes: Scope[]) => Promise<ArrangeResult | null>;
-  /** アレンジ案をお気に入りとして履歴に保存する。 */
-  onSaveArranged?: (result: ArrangeResult, proposal: GeneratedProposal) => Promise<void> | void;
+  /** アレンジ案をお気に入りとして履歴に保存する（生成画像・評価を含む）。 */
+  onSaveArranged?: (result: ArrangeResult, proposal: GeneratedProposal, localState?: import("./ArrangePreviewPanel").ProposalLocalState) => Promise<void> | void;
   /** アレンジ元の設定を生成画面へ送る（メイン画面に遷移）。 */
   onSendToGenerator?: (item: PromptHistoryItem) => void;
+  /** 同じ構成で再生成：全設定をメイン画面に復元する。 */
+  onRestore?: (item: PromptHistoryItem) => void;
   /** お気に入り学習プロファイル（分析カード表示用）。 */
   favoriteProfile?: FavoriteProfile | null;
   /** お気に入り学習が現在ONか（「反映中」表示用）。 */
@@ -38,7 +41,10 @@ type ExtraFilter =
   | "hasOutfit"
   | "hasHair"
   | "hasCamera"
-  | "hasProps";
+  | "hasProps"
+  | "isArranged"
+  | "hasImage"
+  | "hasDerived";
 
 const FILTER_LABELS: { id: FilterMode; label: string }[] = [
   { id: "all", label: "全件" },
@@ -56,11 +62,14 @@ const EXTRA_FILTER_LABELS: { id: ExtraFilter; label: string }[] = [
   { id: "hasHair",       label: "💇 髪変更" },
   { id: "hasCamera",     label: "📷 カメラ変更" },
   { id: "hasProps",      label: "🎒 持ち物あり" },
+  { id: "isArranged",    label: "✨ アレンジ保存" },
+  { id: "hasImage",      label: "🖼 画像あり" },
+  { id: "hasDerived",    label: "🔀 派生元あり" },
 ];
 
 export function HistoryView({
   onBack, initialFavoritesOnly = false,
-  onArrangeInline, onSaveArranged, onSendToGenerator,
+  onArrangeInline, onSaveArranged, onSendToGenerator, onRestore,
   favoriteProfile = null, favoriteLearnEnabled = false,
 }: Props) {
   const [analysisOpen, setAnalysisOpen] = useState(false);
@@ -78,6 +87,8 @@ export function HistoryView({
   const [arrangeResult, setArrangeResult]   = useState<ArrangeResult | null>(null);
   const [arrangeBusy, setArrangeBusy]       = useState(false);
   const [pinned, setPinned]                 = useState(false);
+  /** HistoryMiniExplorer で選択した参照画像 dataURL */
+  const [refImage, setRefImage]             = useState<string | null>(null);
 
   const panelOpen = arrangeBusy || pinned || arrangeSource !== null;
 
@@ -179,6 +190,9 @@ export function HistoryView({
       if (extraFilters.has("hasHair")       && !it.scopes?.includes("hair"))      return false;
       if (extraFilters.has("hasCamera")     && !it.scopes?.includes("camera"))    return false;
       if (extraFilters.has("hasProps")      && !it.scopes?.includes("props"))     return false;
+      if (extraFilters.has("isArranged")    && !it.derivedFromId)                 return false;
+      if (extraFilters.has("hasImage")      && !it.resultImageData)               return false;
+      if (extraFilters.has("hasDerived")    && !it.derivedFromId)                 return false;
 
       // 検索
       if (q) {
@@ -283,8 +297,10 @@ export function HistoryView({
       <div
         className={
           panelOpen
-            ? "lg:grid lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_minmax(440px,50%)] lg:gap-4"
-            : "lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-5"
+            /* 3カラム：左サイドバー(320px固定) / 中央一覧(1fr) / 右アレンジ(42%) */
+            ? "lg:grid lg:grid-cols-[320px_minmax(0,1fr)_minmax(0,42%)] lg:gap-4"
+            /* 2カラム：左サイドバー(320px固定) / 中央一覧(1fr) */
+            : "lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:gap-4"
         }
       >
         {/* Left: calendar + filter + 管理（sticky） */}
@@ -293,6 +309,16 @@ export function HistoryView({
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             refreshKey={refreshKey}
+          />
+
+          {/* 📁 小型Explorer（カレンダー直下） */}
+          <HistoryMiniExplorer
+            selectedImage={refImage}
+            onSelectImage={setRefImage}
+            onUseForArrange={(url) => {
+              setRefImage(url);
+              // アレンジパネルが開いていなければ促す
+            }}
           />
 
           {/* ⭐ お気に入り分析 */}
@@ -590,6 +616,7 @@ export function HistoryView({
                   onUpdate={onUpdate}
                   onDelete={onDelete}
                   onArrange={onArrangeInline ? handleArrangeSelect : undefined}
+                  onRestore={onRestore}
                   highlight={arrangeSource?.id === it.id}
                   busy={arrangeBusy && arrangeSource?.id === it.id}
                 />
@@ -612,8 +639,10 @@ export function HistoryView({
               pinned={pinned}
               onTogglePin={() => setPinned((v) => !v)}
               onClose={handleCloseArrange}
-              onSaveFavorite={(p) => {
-                if (arrangeResult && onSaveArranged) return onSaveArranged(arrangeResult, p);
+              refImage={refImage}
+              onClearRefImage={() => setRefImage(null)}
+              onSaveFavorite={(p, ls) => {
+                if (arrangeResult && onSaveArranged) return onSaveArranged(arrangeResult, p, ls);
               }}
               onReArrange={(p) => void handleReArrange(p)}
               onSendToGenerator={() => {

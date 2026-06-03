@@ -2,17 +2,24 @@
  * 変更の強さ / 守るもの — コンパクト統合カード
  *
  * ┌─────────────────────────────────────────┐
- * │ 変更強度 [1][2][3][4][5]  やや控えめ    │
- * │ 光沢感   [1][2][3][4][5]  標準          │
- * │ 立体感   [1][2][3][4][5]  2.5D          │
+ * │ 変更強度   [1][2][3][4][5]  やや控えめ          │
+ * │ 光沢感     [1][2][3][4][5]  標準                │
+ * │ 🎨 リアル度 [1][2][3][4][5]  2.5D                │
+ * │  ▾ 質感タイプ：[なし][アニメ背景][写真リアル]…  │
  * ├─────────────────────────────────────────┤
  * │ 守るもの                                │
  * │ [🔒顔/同一性][体型/ポーズ][色味][構図][量産回避] │
  * ├─────────────────────────────────────────┤
  * │ [☑質感/立体感を反映] [元画像維持] [リセット] │
  * └─────────────────────────────────────────┘
+ *
+ * 立体感ボタン (dimensionLevel) は分かりにくいので廃止。代わりに「質感・リアル度」を露出。
+ * これは「背景だけリアルすぎる問題」を防ぐためのもので、scope に応じて
+ *   背景／衣装／カメラ／ライティング
+ * のプロンプトに反映される。
  */
 
+import { useState } from "react";
 import type { Scope } from "../types";
 
 // ── Step button colors (sky→teal→neutral→orange→rose) ────────────────────────
@@ -51,25 +58,58 @@ const GLOSS_LABELS: Record<number, string> = {
   5: "高光沢",
 };
 
-const DIM_LABELS: Record<number, string> = {
-  1: "2D寄り",
-  2: "やや平面的",
+/**
+ * 質感・リアル度（1=完全2D ↔ 5=写真リアル）。
+ * 人物と背景の質感統一が目的なので、ユーザーには「ラベル」だけ見せる。
+ * 旧 DIM_LABELS（立体感 2D↔3D）は廃止。代わりにこちらを露出する。
+ */
+const REALISM_LABELS: Record<number, string> = {
+  1: "イラスト",
+  2: "デジタルペイント",
   3: "2.5D",
-  4: "立体感強め",
-  5: "3D寄り",
+  4: "リアル寄り",
+  5: "写真リアル",
 };
+
+const REALISM_HINTS: Record<number, string> = {
+  1: "背景もアニメ背景・セル画・絵画的に。実写は使わない",
+  2: "背景はデジタルペイント／ゲーム背景／コンセプトアート風",
+  3: "人物と背景を2.5Dで統一（既定）",
+  4: "背景は実写寄りだが人物と馴染ませる",
+  5: "背景は写真のような実写質感を許可",
+};
+
+/** 質感タイプ（折りたたみ）。null=未指定 */
+export const REALISM_TYPES: { id: string; jp: string; emoji: string }[] = [
+  { id: "anime_bg",       jp: "アニメ背景",      emoji: "🎴" },
+  { id: "digital_paint",  jp: "デジタルペイント", emoji: "🖌" },
+  { id: "oil_paint",      jp: "油絵",           emoji: "🎨" },
+  { id: "watercolor",     jp: "水彩",           emoji: "💧" },
+  { id: "cel",            jp: "セル画",         emoji: "📺" },
+  { id: "manga_bg",       jp: "漫画背景",       emoji: "📖" },
+  { id: "game_bg",        jp: "ゲーム背景",     emoji: "🎮" },
+  { id: "concept_art",    jp: "コンセプトアート", emoji: "🖼" },
+  { id: "photo_real",     jp: "写真リアル",     emoji: "📷" },
+  { id: "movie_bg",       jp: "映画背景",       emoji: "🎬" },
+];
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
   strength: number;
   glossLevel: number;
-  dimensionLevel: number;
+  /** 質感・リアル度（1〜5、既定3）。dimensionLevel は廃止し、こちらに統一。 */
+  realismLevel: number;
+  /** 質感タイプ（"anime_bg" 等）。null = 指定なし */
+  realismType: string | null;
   textureOriginal: boolean;
   textureDisabled: boolean;
   onStrengthChange: (v: number) => void;
   onGlossChange: (v: number) => void;
-  onDimensionChange: (v: number) => void;
+  /** リアル度の変更 */
+  onRealismLevelChange: (v: number) => void;
+  /** 質感タイプの変更（null=指定なし） */
+  onRealismTypeChange: (v: string | null) => void;
   onTextureOriginalChange: (v: boolean) => void;
   onTextureDisabledChange: (v: boolean) => void;
   bodyPoseLock: boolean;
@@ -88,12 +128,14 @@ interface Props {
 export function TextureSliders({
   strength,
   glossLevel,
-  dimensionLevel,
+  realismLevel,
+  realismType,
   textureOriginal,
   textureDisabled,
   onStrengthChange,
   onGlossChange,
-  onDimensionChange,
+  onRealismLevelChange,
+  onRealismTypeChange,
   onTextureOriginalChange,
   onTextureDisabledChange,
   bodyPoseLock,
@@ -109,11 +151,13 @@ export function TextureSliders({
   const poseConflict     = scopes.includes("pose");
   const compConflict     = scopes.includes("camera") || scopes.includes("aspect_ratio");
   const glossDimDisabled = textureDisabled || textureOriginal;
+  const [typeOpen, setTypeOpen] = useState(false);
 
   function handleReset() {
     onStrengthChange(2);
     onGlossChange(3);
-    onDimensionChange(3);
+    onRealismLevelChange(3);
+    onRealismTypeChange(null);
     onTextureOriginalChange(false);
     onTextureDisabledChange(false);
   }
@@ -121,7 +165,7 @@ export function TextureSliders({
   return (
     <section className="card !p-2">
 
-      {/* ── 変更強度 / 光沢感 / 立体感 ────────────────── */}
+      {/* ── 変更強度 / 光沢感 / 質感・リアル度 ────────────────── */}
       <div className="space-y-1">
         <ButtonRow
           label="変更強度"
@@ -140,11 +184,48 @@ export function TextureSliders({
             onChange={onGlossChange}
           />
           <ButtonRow
-            label="立体感"
-            value={dimensionLevel}
-            labels={DIM_LABELS}
-            onChange={onDimensionChange}
+            label="🎨 リアル度"
+            value={realismLevel}
+            labels={REALISM_LABELS}
+            onChange={onRealismLevelChange}
           />
+          {/* リアル度の補足ヒント */}
+          <p className="text-[11px] text-text-muted/55 pl-[3.6rem] leading-snug">
+            {REALISM_HINTS[realismLevel] ?? ""}
+            {realismType && (
+              <span className="ml-2 text-violet-300/80">
+                ・タイプ：{REALISM_TYPES.find((t) => t.id === realismType)?.jp}
+              </span>
+            )}
+          </p>
+          {/* 質感タイプ：折りたたみ */}
+          <div className="pl-[3.6rem]">
+            <button
+              type="button"
+              onClick={() => setTypeOpen((v) => !v)}
+              className="text-[11px] text-text-muted/60 hover:text-text-base leading-none px-1 py-0.5 rounded transition"
+            >
+              {typeOpen ? "▾" : "▸"} 質感タイプ（任意）
+              {realismType && <span className="ml-1 text-violet-300/80">●</span>}
+            </button>
+            {typeOpen && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                <TypeChip
+                  label="なし"
+                  active={realismType === null}
+                  onClick={() => onRealismTypeChange(null)}
+                />
+                {REALISM_TYPES.map((t) => (
+                  <TypeChip
+                    key={t.id}
+                    label={`${t.emoji} ${t.jp}`}
+                    active={realismType === t.id}
+                    onClick={() => onRealismTypeChange(t.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -293,6 +374,25 @@ function ButtonRow({ label, value, labels, onChange }: ButtonRowProps) {
         {labels[value] ?? ""}
       </span>
     </div>
+  );
+}
+
+// ── TypeChip（質感タイプ折りたたみ用） ────────────────────────────────────────
+
+function TypeChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={[
+        "text-[11px] font-medium px-1.5 py-0.5 rounded border leading-none transition select-none whitespace-nowrap",
+        active
+          ? "border-violet-400/65 bg-violet-500/18 text-violet-100"
+          : "border-bg-border/45 bg-transparent text-text-muted/55 hover:border-violet-400/40 hover:text-text-base",
+      ].join(" ")}
+    >
+      {label}
+    </button>
   );
 }
 

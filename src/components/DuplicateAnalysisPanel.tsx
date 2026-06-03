@@ -9,7 +9,7 @@
  * - 重複リセット / ジャンル分散 / 提案を反映 の3アクション
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { BiasAnalysisResult } from "../lib/biasAnalyzer";
 import { biasRiskLabel, biasRiskTextClass, biasRiskBorderClass } from "../lib/biasAnalyzer";
 import type {
@@ -20,6 +20,13 @@ import type { MotifLevel, LevelMap, ComboPolicy, ComboPolicyMap } from "../lib/m
 import { getLevel, levelMeta, LEVEL_META, countLevels, getComboPolicy, countComboPolicies } from "../lib/motifPolicy";
 import type { MotifCombo } from "../lib/historyAnalyzer";
 import type { AgentAnalysis, AgentActionId } from "../lib/aiAgent";
+import type { ImageAnalysisResult } from "../lib/imageAnalyzer";
+import type { RatingAnalysis } from "../lib/ratingAnalyzer";
+import { type PreferenceProfile, profileSummaryLines, MIN_SAMPLES } from "../lib/preferenceProfile";
+import type { ColorAnalysis, ColorAxis } from "../lib/colorAnalyzer";
+import { COLOR_GROUPS, COLOR_AXES } from "../lib/colorAnalyzer";
+import type { ColorWeight, ColorWeightMap, ColorAxisCtrl } from "../lib/colorPolicy";
+import { WEIGHT_META, COLOR_AXIS_CTRL, getColorEntry, countWeights } from "../lib/colorPolicy";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -57,6 +64,55 @@ interface Props {
   /** コンボごとのポリシー変更ハンドラ */
   onComboPolicyChange: (comboKey: string, policy: ComboPolicy) => void;
 
+  // ── 🎨 色分析（生成制御センター） ──
+  /** 色分析結果（履歴×ウィンドウサイズで集計） */
+  colorAnalysis:     ColorAnalysis | null;
+  /** 色×軸の重み（髪/服/背景それぞれ 0-5） */
+  colorWeights:      ColorWeightMap;
+  /** 色×軸の重み変更ハンドラ */
+  onColorWeightChange: (colorId: string, axis: ColorAxisCtrl, weight: ColorWeight) => void;
+  /** 全色を既定に戻す */
+  onColorWeightsReset: () => void;
+  /** 自動調整（偏り減点・未使用加点） */
+  onColorAutoAdjust:    (preserveManual: boolean) => void;
+  /** 自動調整 Undo */
+  onColorUndoAdjust:    () => void;
+  /** Undo 可能か */
+  canColorUndo:         boolean;
+  /** 直近で自動調整された (colorId,axis) ペア（行ハイライト用） */
+  colorChangedKeys:     ReadonlySet<string>;
+  /** 分析対象ウィンドウ（直近何件） */
+  colorWindowSize:   50 | 100;
+  /** ウィンドウ切替 */
+  onColorWindowSizeChange: (size: 50 | 100) => void;
+
+  // ── 📸 画像分析 ──
+  /** 画像分析結果 */
+  imageAnalysis:        ImageAnalysisResult | null;
+  /** タブを開いたときに発火：未解析サムネを段階的にハッシュ化 */
+  onStartImageAnalysis: () => void;
+  /** 進捗（未解析件数の解析中表示） */
+  imageAnalyzeProgress: { done: number; total: number } | null;
+
+  // ── 💡 好み分析（軸別👍👎 + 実 AI 分析） ──
+  /** 評価分析（軸別👍👎の集計を含む） */
+  ratingAnalysis:       RatingAnalysis | null;
+  /** 実 Gemini 分析の結果プロファイル（null=未分析） */
+  preferenceProfile:    PreferenceProfile | null;
+  /** 分析実行中フラグ */
+  analyzingProfile:     boolean;
+  /** 直近の分析エラー */
+  profileError:         string | null;
+  /** サンプル可能件数（評価が1つでも付いている画像数） */
+  profileSampleCount:   number;
+  /** 分析実行ボタン */
+  onRunPreferenceAnalysis: () => void;
+  /** プロファイル削除（再分析準備） */
+  onClearPreferenceProfile: () => void;
+  /** 自動学習 ON/OFF */
+  autoLearnEnabled: boolean;
+  onToggleAutoLearn: (enabled: boolean) => void;
+
   // ── 🤖 AI分析エージェント ──
   agent:             AgentAnalysis | null;
   onAgentAction:     (id: AgentActionId) => void;
@@ -65,6 +121,21 @@ interface Props {
   onReroll:          () => void;
   onResetBias:       () => void;
   onDismiss:         () => void;
+
+  // ── 📊 分析対象サマリ（見出しの件数表示用） ──
+  analysisStats?: {
+    windowDays: number;
+    totalItems: number;
+    promptCount: number;
+    imageAnalyzedCount: number;
+    ratedCount: number;
+  };
+  /** 現在の変更対象スコープ（反映状況の「変更対象外」判定に使う） */
+  activeScopes?:        string[];
+  /** お気に入り傾向プロファイル（反映中表示用） */
+  favoriteProfile?:     { traitPhrases: string[] } | null;
+  /** お気に入り傾向が現在ONか */
+  favoriteLearnEnabled?: boolean;
 }
 
 // ── 小コンポーネント ──────────────────────────────────────────────────────────
@@ -128,6 +199,36 @@ function ActionBtn({ icon, label, onClick, cls, title }: {
   );
 }
 
+/** 反映状況の1行（ラベル＋名前付きチップ群）。「現在生成に反映中」で使用。 */
+function ReflectRow({ color, label, items }: {
+  color: "rose" | "sky" | "emerald" | "amber"; label: string; items: string[];
+}) {
+  if (items.length === 0) return null;
+  const chip: Record<string, string> = {
+    rose:    "border-rose-400/40 bg-rose-400/10 text-rose-200/90",
+    sky:     "border-sky-400/40 bg-sky-400/10 text-sky-200/90",
+    emerald: "border-emerald-400/40 bg-emerald-400/10 text-emerald-200/90",
+    amber:   "border-amber-400/40 bg-amber-400/10 text-amber-200/90",
+  };
+  const lbl: Record<string, string> = {
+    rose: "text-rose-300/80", sky: "text-sky-300/80",
+    emerald: "text-emerald-300/80", amber: "text-amber-300/80",
+  };
+  const shown = items.slice(0, 8);
+  const extra = items.length - shown.length;
+  return (
+    <div className="flex items-start gap-1.5">
+      <span className={["text-[10px] font-bold shrink-0 mt-0.5 leading-none", lbl[color]].join(" ")}>{label}</span>
+      <div className="flex flex-wrap gap-1">
+        {shown.map((t, i) => (
+          <span key={i} className={["text-[10px] px-1.5 py-0.5 rounded-full border leading-none", chip[color]].join(" ")}>{t}</span>
+        ))}
+        {extra > 0 && <span className="text-[10px] text-text-muted/45 leading-none mt-0.5">+{extra}</span>}
+      </div>
+    </div>
+  );
+}
+
 /** 出現制御コントロール（一発NG + 0〜5 セグメント） */
 function LevelControl({
   level, onChange,
@@ -173,6 +274,907 @@ function LevelControl({
         })}
       </span>
     </span>
+  );
+}
+
+// ── セクション：💡 好み分析レポート（軸別👍👎） ─────────────────────────
+
+function PreferenceReportSection({
+  ratingAnalysis, profile, analyzing, profileError, profileSampleCount,
+  onRunAnalysis, onClearProfile, autoLearnEnabled, onToggleAutoLearn,
+}: {
+  ratingAnalysis: RatingAnalysis | null;
+  profile: PreferenceProfile | null;
+  analyzing: boolean;
+  profileError: string | null;
+  profileSampleCount: number;
+  onRunAnalysis: () => void;
+  onClearProfile: () => void;
+  autoLearnEnabled: boolean;
+  onToggleAutoLearn: (enabled: boolean) => void;
+}) {
+  const rep = ratingAnalysis?.preferenceReport;
+  // 「実行可能か」= サンプル数 >= MIN_SAMPLES
+  const canRun = profileSampleCount >= MIN_SAMPLES && !analyzing;
+  // 経過時間表示
+  const lastAnalyzedText = profile
+    ? new Date(profile.generatedAt).toLocaleString("ja-JP")
+    : "未実行";
+
+  if (!ratingAnalysis && !profile) {
+    return (
+      <div className="px-2 py-3 space-y-3">
+        <p className="text-[12px] text-slate-400">
+          💡 まだ評価データがありません。各案カードで生成結果画像を登録し、
+          評価ボタン（👍/😐/👎/💀 と 背景/衣装/ポーズ × 👍👎）を付けると分析できるようになります。
+        </p>
+        <RealAnalysisCard
+          profile={null}
+          analyzing={analyzing}
+          profileError={profileError}
+          sampleCount={profileSampleCount}
+          canRun={false}
+          lastAnalyzedText={lastAnalyzedText}
+          onRun={onRunAnalysis}
+          onClear={onClearProfile}
+          autoLearnEnabled={autoLearnEnabled}
+          onToggleAutoLearn={onToggleAutoLearn}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 py-2">
+      {/* ── 実 AI 分析カード（最上部、最重要） ─────────────── */}
+      <RealAnalysisCard
+        profile={profile}
+        analyzing={analyzing}
+        profileError={profileError}
+        sampleCount={profileSampleCount}
+        canRun={canRun}
+        lastAnalyzedText={lastAnalyzedText}
+        onRun={onRunAnalysis}
+        onClear={onClearProfile}
+        autoLearnEnabled={autoLearnEnabled}
+        onToggleAutoLearn={onToggleAutoLearn}
+      />
+
+      {/* ── サンプル統計（ヒューリスティック・嘘なし） ─────── */}
+      {rep && rep.totalAxisRatings > 0 ? (
+      <div className="rounded-lg border border-white/12 bg-white/3 px-2.5 py-2 space-y-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[12px] font-bold text-slate-200">
+            📊 評価サンプル統計（実数値）
+          </span>
+          <span className="ml-auto text-[10px] text-slate-400">
+            合計 {rep.totalAxisRatings} 件（背景/衣装/ポーズの 👍👎）
+          </span>
+        </div>
+        <p className="text-[10px] text-slate-400/85 leading-snug">
+          これはローカル集計です。実際の「ユーザーが好む傾向」分析は上の AI 分析ボタンを押してください。
+        </p>
+      </div>
+      ) : null}
+
+      {/* ── 軸別の好評/不評率（数値のみ・嘘なし） ───────────── */}
+      {rep && rep.totalAxisRatings > 0 && (
+        <div>
+          <SectionTitle icon="📊">軸別の評価集計</SectionTitle>
+          <div className="space-y-1.5 px-1">
+            {rep.axes.map((a) => (
+              <AxisPrefRow key={a.axis} stat={a} />
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-400 px-1 pt-1 leading-snug">
+            ※ これは画像評価ボタンの集計結果です。あくまで数値であり、傾向解釈は AI 分析を実行してください。
+          </p>
+        </div>
+      )}
+
+      <p className="text-[10px] text-slate-400 px-1 leading-snug border-t border-white/5 pt-2">
+        ※ 評価は画像単位で IndexedDB に保存されます。再クリックで評価を変えられます。
+      </p>
+    </div>
+  );
+}
+
+// ── 実 AI 分析カード（最重要）─────────────────────────────────────
+
+function RealAnalysisCard({
+  profile, analyzing, profileError, sampleCount, canRun, lastAnalyzedText,
+  onRun, onClear, autoLearnEnabled, onToggleAutoLearn,
+}: {
+  profile: PreferenceProfile | null;
+  analyzing: boolean;
+  profileError: string | null;
+  sampleCount: number;
+  canRun: boolean;
+  lastAnalyzedText: string;
+  onRun: () => void;
+  onClear: () => void;
+  autoLearnEnabled: boolean;
+  onToggleAutoLearn: (enabled: boolean) => void;
+}) {
+  const isFresh = profile && (Date.now() - profile.generatedAt) < 1000 * 60 * 60 * 24 * 7;  // 1週間以内
+  // 次回自動分析までに必要な新規評価数
+  const nextAutoNeed = profile
+    ? Math.max(0, (profile.sampleSize + 5) - sampleCount)  // +5 = AUTO_NEW_SAMPLE_THRESHOLD
+    : Math.max(0, MIN_SAMPLES - sampleCount);
+
+  return (
+    <div className="rounded-lg border border-violet-400/50 bg-violet-500/8 px-3 py-2.5 space-y-2">
+      {/* ヘッダ */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[13px] font-bold text-violet-100">
+          🤖 AI 好み分析（実 Gemini 呼び出し）
+        </span>
+        {profile ? (
+          <span className={[
+            "text-[10px] px-1.5 py-0.5 rounded border leading-none",
+            isFresh
+              ? "border-emerald-400/55 bg-emerald-500/15 text-emerald-100"
+              : "border-amber-400/55 bg-amber-500/15 text-amber-100",
+          ].join(" ")}>
+            {isFresh ? "✓ 分析済み・生成に反映中" : "⚠ 古い（再分析推奨）"}
+          </span>
+        ) : (
+          <span className="text-[10px] px-1.5 py-0.5 rounded border border-slate-400/35 bg-slate-500/10 text-slate-300 leading-none">
+            未分析
+          </span>
+        )}
+      </div>
+
+      {/* 🔁 自動学習トグル */}
+      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/3 px-2.5 py-1.5">
+        <button
+          type="button"
+          onClick={() => onToggleAutoLearn(!autoLearnEnabled)}
+          className="flex items-center gap-1.5 text-[12px] font-semibold leading-none"
+          title="評価が増えるたびに自動で再分析する"
+        >
+          <span className={[
+            "relative w-9 h-4 rounded-full transition-colors shrink-0",
+            autoLearnEnabled ? "bg-emerald-500/75" : "bg-white/15",
+          ].join(" ")}>
+            <span className={[
+              "absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform",
+              autoLearnEnabled ? "translate-x-5" : "translate-x-0.5",
+            ].join(" ")} />
+          </span>
+          <span className={autoLearnEnabled ? "text-emerald-200" : "text-slate-400"}>
+            🔁 自動学習 {autoLearnEnabled ? "ON" : "OFF"}
+          </span>
+        </button>
+        <span className="ml-auto text-[10px] text-slate-400 leading-snug text-right">
+          {autoLearnEnabled
+            ? (nextAutoNeed > 0
+                ? `あと ${nextAutoNeed} 件の評価で自動分析`
+                : "条件達成・まもなく自動分析")
+            : "手動分析のみ"}
+        </span>
+      </div>
+
+      {/* メタ情報 */}
+      <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300/85">
+        <div>📅 最終分析: <span className="text-slate-100">{lastAnalyzedText}</span></div>
+        <div>🤖 使用モデル: <span className="text-slate-100">{profile?.model ?? "—"}</span></div>
+        <div>📦 分析対象: <span className="text-slate-100">{profile?.sampleSize ?? 0} 件</span></div>
+        <div>💾 現サンプル数: <span className="text-slate-100">{sampleCount} 件</span></div>
+      </div>
+
+      {/* 分析結果（あれば） */}
+      {profile && (
+        <div className="rounded-md border border-violet-400/30 bg-bg-base/40 px-2.5 py-1.5 space-y-1.5">
+          <p className="text-[11px] font-bold text-violet-200">📝 分析結果サマリ</p>
+          <p className="text-[11px] text-text-base/90 leading-relaxed">{profile.summary}</p>
+
+          <div className="space-y-1 pt-1 border-t border-violet-400/15">
+            {profileSummaryLines(profile).map((row) => (
+              <div key={row.axis} className="text-[10px] leading-snug">
+                <span className="font-bold text-slate-100">{row.emoji} {row.jp}</span>
+                <div className="ml-3">
+                  <span className="text-emerald-300/85">好む傾向：</span>
+                  <span className="text-slate-200/90">{row.likes}</span>
+                </div>
+                <div className="ml-3">
+                  <span className="text-rose-300/85">嫌う傾向：</span>
+                  <span className="text-slate-200/90">{row.dislikes}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {(profile.preferKeywords.length > 0 || profile.avoidKeywords.length > 0) && (
+            <div className="space-y-0.5 pt-1 border-t border-violet-400/15">
+              {profile.preferKeywords.length > 0 && (
+                <div className="text-[10px]">
+                  <span className="font-bold text-emerald-300">優先：</span>
+                  {profile.preferKeywords.map((k, i) => (
+                    <span key={i} className="ml-1 px-1 rounded bg-emerald-500/15 text-emerald-100">
+                      {k}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {profile.avoidKeywords.length > 0 && (
+                <div className="text-[10px]">
+                  <span className="font-bold text-rose-300">回避：</span>
+                  {profile.avoidKeywords.map((k, i) => (
+                    <span key={i} className="ml-1 px-1 rounded bg-rose-500/15 text-rose-100">
+                      {k}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* エラー表示 */}
+      {profileError && (
+        <div className="rounded-md border border-rose-400/55 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100/95">
+          ⚠ 分析失敗: {profileError}
+        </div>
+      )}
+
+      {/* 実行ボタン */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={onRun}
+          disabled={!canRun}
+          className={[
+            "rounded-lg px-3 py-1.5 text-[12px] font-bold border leading-none transition",
+            analyzing
+              ? "border-amber-400/65 bg-amber-500/20 text-amber-100 cursor-progress"
+              : canRun
+                ? "border-violet-400/70 bg-violet-500/25 text-violet-100 hover:bg-violet-500/35"
+                : "border-white/10 bg-white/4 text-text-muted/45 cursor-not-allowed",
+          ].join(" ")}
+        >
+          {analyzing
+            ? "⏳ AI分析中..."
+            : profile
+              ? "🔄 再分析を実行"
+              : "🤖 AI分析を実行"}
+        </button>
+        {!canRun && !analyzing && (
+          <span className="text-[10px] text-amber-300/85">
+            サンプル不足（{sampleCount} / 最低 {MIN_SAMPLES}件）— 画像評価を増やしてください
+          </span>
+        )}
+        {profile && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-[10px] px-2 py-1 rounded border border-rose-400/30 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition leading-none"
+          >
+            🗑 プロファイル削除
+          </button>
+        )}
+      </div>
+
+      <p className="text-[9px] text-slate-400 leading-snug">
+        ※ 評価データを Gemini Flash に送信して分析します（画像は送信せず、プロンプト本文と評価のみ）。
+        分析結果は localStorage に保存され、次回生成プロンプトに自動注入されます。
+      </p>
+    </div>
+  );
+}
+
+function AxisPrefRow({ stat }: { stat: { jp: string; emoji: string; good: number; bad: number; total: number; goodRatio: number; badRatio: number; confidence: string } }) {
+  const goodPct = stat.total > 0 ? stat.goodRatio * 100 : 0;
+  const badPct  = stat.total > 0 ? stat.badRatio  * 100 : 0;
+  return (
+    <div className="rounded-md border border-white/8 bg-white/3 px-2 py-1.5">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[11px] font-bold text-slate-200 shrink-0">
+          {stat.emoji} {stat.jp}
+        </span>
+        {stat.total === 0 ? (
+          <span className="text-[10px] text-slate-400">評価なし</span>
+        ) : (
+          <>
+            <span className="text-[10px] text-emerald-200/85">👍 {stat.good}</span>
+            <span className="text-[10px] text-rose-200/85">👎 {stat.bad}</span>
+            <span className="ml-auto text-[9px] text-slate-400">
+              信頼性：{stat.confidence === "high" ? "高" : stat.confidence === "medium" ? "中" : stat.confidence === "low" ? "低" : "—"}
+            </span>
+          </>
+        )}
+      </div>
+      {stat.total > 0 && (
+        <div className="flex items-center gap-1">
+          <div className="flex-1 h-2 rounded-full bg-white/8 overflow-hidden flex">
+            <div className="h-full bg-emerald-400/70 transition-all" style={{ width: `${goodPct}%` }} />
+            <div className="h-full bg-rose-400/70 transition-all"    style={{ width: `${badPct}%` }} />
+          </div>
+          <span className="text-[9px] text-slate-400 tabular-nums w-16 text-right">
+            {Math.round(goodPct)}% / {Math.round(badPct)}%
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── セクション：📸 画像分析（生成結果画像の重複・出現率） ───────────────
+
+function ImageAnalysisSection({
+  analysis, progress,
+}: {
+  analysis: ImageAnalysisResult | null;
+  progress: { done: number; total: number } | null;
+}) {
+  if (!analysis || analysis.totalEligible === 0) {
+    return (
+      <div className="px-2 py-3 space-y-2">
+        <p className="text-[12px] text-slate-400">
+          📸 生成結果画像がまだありません。各案カードで「生成結果」を登録すると画像分析が始まります。
+        </p>
+      </div>
+    );
+  }
+
+  const remaining = analysis.totalEligible - analysis.totalAnalyzed;
+
+  return (
+    <div className="space-y-3 py-2">
+      {/* ── ヘッダ：統計＋進捗 ─────────────────────────── */}
+      <div className="flex items-center justify-between px-1 flex-wrap gap-1">
+        <p className="text-[11px] text-slate-400">
+          対象：<span className="text-emerald-200 font-bold">{analysis.totalAnalyzed}</span> 件解析済
+          {remaining > 0 && (
+            <span className="text-slate-400">（残 {remaining} 件）</span>
+          )}
+          ・クラスタ <span className="text-emerald-200">{analysis.clusters.length}</span>
+          ・単独 <span className="text-slate-300">{analysis.uniqueCount}</span>
+        </p>
+        {progress && progress.total > 0 && progress.done < progress.total && (
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[10px] text-emerald-200">
+              解析中 {progress.done}/{progress.total}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── 視覚クラスタ TOP10 ──────────────────────────── */}
+      {analysis.clusters.length > 0 && (
+        <div>
+          <SectionTitle icon="🔁">視覚的に類似した画像クラスタ（TOP10）</SectionTitle>
+          <div className="space-y-1.5 px-1">
+            {analysis.clusters.slice(0, 10).map((c, i) => (
+              <div
+                key={c.representativeHash}
+                className="flex items-center gap-2 py-1 border-b border-white/5 last:border-0"
+              >
+                <span className="text-[10px] text-slate-400 w-5 text-right">{i + 1}位</span>
+                {c.representativeThumb ? (
+                  <img
+                    src={c.representativeThumb}
+                    alt=""
+                    className="w-10 h-10 rounded object-cover border border-white/15 shrink-0"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded bg-white/5 border border-white/15 shrink-0" />
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-slate-200">
+                    <span className={c.size >= 5 ? "text-rose-200 font-bold" : c.size >= 3 ? "text-amber-200 font-bold" : ""}>
+                      {c.size} 枚
+                    </span>
+                    の視覚的に類似画像
+                  </p>
+                  <p className="text-[9px] text-slate-400 truncate">
+                    hash: {c.representativeHash.slice(0, 8)}…
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-400 px-1 pt-1 leading-snug">
+            ※ プロンプトの文言が違っても見た目が酷似している場合に検出されます。
+          </p>
+        </div>
+      )}
+
+      {/* ── カテゴリ出現率 ────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <RateCard title="🏞 背景"        rates={analysis.backgroundRates} />
+        <RateCard title="👗 衣装"        rates={analysis.outfitRates} />
+        <RateCard title="💇 髪型"        rates={analysis.hairRates} />
+        <RateCard title="📷 カメラ"      rates={analysis.cameraRates} />
+        <RateCard title="💡 ライティング" rates={analysis.lightingRates} />
+      </div>
+
+      {/* ── 頻出カテゴリ警告 ────────────────────────────── */}
+      {analysis.overusedCategories.length > 0 && (
+        <div>
+          <SectionTitle icon="⚠">頻出カテゴリ（重みを下げ推奨）</SectionTitle>
+          <div className="space-y-1 px-1">
+            {analysis.overusedCategories.map((c, i) => (
+              <div
+                key={i}
+                className={[
+                  "rounded-md border px-2 py-1 text-[11px]",
+                  c.ratio >= 0.70
+                    ? "border-rose-400/55 bg-rose-500/10 text-rose-100"
+                    : "border-amber-400/45 bg-amber-500/10 text-amber-100",
+                ].join(" ")}
+              >
+                <span className="font-bold">{c.axis}：{c.label}</span>
+                <span className="opacity-70 ml-1.5">{Math.round(c.ratio * 100)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 未開拓カテゴリ ────────────────────────────── */}
+      {analysis.underusedCategories.length > 0 && (
+        <div>
+          <SectionTitle icon="🌈">未開拓カテゴリ（試すと新規性が上がる）</SectionTitle>
+          <div className="flex flex-wrap gap-1 px-1">
+            {analysis.underusedCategories.slice(0, 24).map((c, i) => (
+              <span
+                key={i}
+                className="inline-flex items-center text-[11px] px-1.5 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-100 leading-none"
+              >
+                <span className="opacity-75 mr-1">{c.axis}</span>
+                {c.label}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* フッタ説明 */}
+      <p className="text-[10px] text-slate-400 px-1 leading-snug border-t border-white/5 pt-2">
+        ※ 画像分析は生成結果画像の <strong>perceptual hash</strong> による視覚的類似度＋
+        履歴の構造化 details からの集計です。文言が違っても見た目が似た画像を捕捉します。
+        次回プロンプト生成時に、頻出カテゴリ回避・未開拓カテゴリ推奨としてサーバに送信されます。
+      </p>
+    </div>
+  );
+}
+
+function RateCard({ title, rates }: { title: string; rates: { label: string; count: number; ratio: number }[] }) {
+  const total = rates.reduce((s, r) => s + r.count, 0);
+  return (
+    <div className="rounded-md border border-white/12 bg-white/3 px-2 py-1.5">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] font-bold text-slate-200">{title}</span>
+        <span className="text-[10px] text-slate-400">{total}回</span>
+      </div>
+      {rates.length === 0 ? (
+        <p className="text-[12px] text-slate-400">記録なし</p>
+      ) : (
+        <div className="space-y-0.5 ipm-list">
+          {rates.slice(0, 4).map((r) => (
+            <div key={r.label} className="flex items-center gap-1.5 px-1 py-0.5">
+              <span className="text-[12px] text-slate-200 flex-1 truncate">{r.label}</span>
+              <div className="w-12 h-1 rounded-full bg-white/8 overflow-hidden">
+                <div className="h-full bg-emerald-400/70" style={{ width: `${Math.max(2, r.ratio * 100)}%` }} />
+              </div>
+              <span className="text-[11px] text-slate-300 tabular-nums w-8 text-right">{Math.round(r.ratio * 100)}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── セクション：🎨 色生成制御センター ─────────────────────────────────────
+
+function ColorAnalysisSection({
+  analysis, weights, onWeightChange, onReset,
+  onAutoAdjust, onUndoAdjust, canUndo, changedKeys,
+  windowSize, onWindowSizeChange,
+}: {
+  analysis:   ColorAnalysis | null;
+  weights:    ColorWeightMap;
+  onWeightChange: (colorId: string, axis: ColorAxisCtrl, w: ColorWeight) => void;
+  onReset:        () => void;
+  onAutoAdjust:   (preserveManual: boolean) => void;
+  onUndoAdjust:   () => void;
+  canUndo:        boolean;
+  changedKeys:    ReadonlySet<string>;
+  windowSize:        50 | 100;
+  onWindowSizeChange: (size: 50 | 100) => void;
+}) {
+  if (!analysis || analysis.windowSize === 0) {
+    return (
+      <div className="px-2 py-3 space-y-2">
+        <p className="text-[12px] text-slate-400">
+          🎨 履歴が不足しています。数回生成すると色分析が動き始めます。
+        </p>
+        <ColorWeightGrid weights={weights} onWeightChange={onWeightChange} onReset={onReset}
+          onAutoAdjust={onAutoAdjust} onUndoAdjust={onUndoAdjust} canUndo={canUndo}
+          changedKeys={changedKeys} canAutoAdjust={false} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 py-2">
+      {/* ── ウィンドウ切替 ─────────────────────────────────── */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-[11px] text-slate-400">
+          対象：直近 <span className="text-amber-200 font-bold">{analysis.windowSize}</span> 件
+        </p>
+        <div className="flex gap-1">
+          {([50, 100] as const).map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onWindowSizeChange(n)}
+              className={[
+                "text-[10px] font-semibold px-2 py-0.5 rounded border leading-none transition",
+                windowSize === n
+                  ? "border-amber-400/70 bg-amber-500/20 text-amber-100"
+                  : "border-white/15 bg-white/5 text-slate-400 hover:text-slate-100",
+              ].join(" ")}
+            >
+              {n}件
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 偏り警告 ─────────────────────────────────── */}
+      {analysis.biasWarnings.length > 0 && (
+        <div className="space-y-1.5">
+          <SectionTitle icon="⚠">色偏り警告</SectionTitle>
+          {analysis.biasWarnings.map((w, i) => (
+            <div
+              key={i}
+              className={[
+                "rounded-lg border px-2.5 py-1.5 text-[12px] leading-snug",
+                w.severity === "high"
+                  ? "border-rose-400/55 bg-rose-500/10 text-rose-100"
+                  : "border-amber-400/45 bg-amber-500/10 text-amber-100",
+              ].join(" ")}
+            >
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className={[
+                  "w-2.5 h-2.5 rounded-sm border border-white/20",
+                ].join(" ")} style={{ backgroundColor: COLOR_GROUPS.find((c) => c.id === w.colorId)?.swatch }} />
+                <span className="font-bold">
+                  {w.axis === "global" ? "全体" : COLOR_AXES.find((a) => a.id === w.axis)?.jp}
+                </span>
+                <span className="text-[10px] opacity-70">
+                  {Math.round(w.ratio * 100)}%
+                </span>
+              </div>
+              <p>{w.message}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── 色別ランキング（軸を問わない総出現） ──────────────── */}
+      <div>
+        <SectionTitle icon="📊">色別ランキング（全軸合計）</SectionTitle>
+        <div className="space-y-1 px-1 ipm-list">
+          {analysis.globalRanking.filter((r) => r.count > 0).slice(0, 12).map((r) => (
+            <ColorBar key={r.colorId} colorId={r.colorId} count={r.count} ratio={r.ratio} />
+          ))}
+          {analysis.globalRanking.every((r) => r.count === 0) && (
+            <p className="text-[11px] text-slate-400">色情報が検出されませんでした。</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── 軸別カード ─────────────────────────────────── */}
+      <div>
+        <SectionTitle icon="🎯">軸別の色傾向</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 px-1">
+          {analysis.perAxis.map((ax) => (
+            <AxisCard key={ax.axis} axis={ax.axis} total={ax.total} byColor={ax.byColor} topColor={ax.topColor} />
+          ))}
+        </div>
+      </div>
+
+      {/* ── 配色ランキング ───────────────────────────────── */}
+      {analysis.comboRanking.length > 0 && (
+        <div>
+          <SectionTitle icon="🎭">配色ランキング（軸ペアの組合せ）</SectionTitle>
+          <div className="space-y-1 px-1">
+            {analysis.comboRanking.map((c, i) => (
+              <ComboColorRow key={i} entry={c} rank={i + 1} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 未開拓カラー ─────────────────────────────────── */}
+      {analysis.unexploredColors.length > 0 && (
+        <div>
+          <SectionTitle icon="🌈">未開拓カラー（まだ使っていない色）</SectionTitle>
+          <div className="flex flex-wrap gap-1 px-1">
+            {analysis.unexploredColors.map((id) => {
+              const g = COLOR_GROUPS.find((c) => c.id === id);
+              if (!g) return null;
+              return (
+                <span
+                  key={id}
+                  className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-100 leading-none"
+                >
+                  <span className="w-2 h-2 rounded-sm border border-white/20" style={{ backgroundColor: g.swatch }} />
+                  {g.jp}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── 色×軸重みグリッド（生成制御の主役） ─────────── */}
+      <ColorWeightGrid weights={weights} onWeightChange={onWeightChange} onReset={onReset}
+        onAutoAdjust={onAutoAdjust} onUndoAdjust={onUndoAdjust} canUndo={canUndo}
+        changedKeys={changedKeys} canAutoAdjust={true} />
+    </div>
+  );
+}
+
+// ── 色×軸 重みグリッド（生成制御センターの主役） ──────────────────────────
+
+function ColorWeightGrid({
+  weights, onWeightChange, onReset,
+  onAutoAdjust, onUndoAdjust, canUndo,
+  changedKeys, canAutoAdjust,
+}: {
+  weights:       ColorWeightMap;
+  onWeightChange: (colorId: string, axis: ColorAxisCtrl, w: ColorWeight) => void;
+  onReset:       () => void;
+  onAutoAdjust:  (preserveManual: boolean) => void;
+  onUndoAdjust:  () => void;
+  canUndo:       boolean;
+  changedKeys:   ReadonlySet<string>;
+  canAutoAdjust: boolean;
+}) {
+  const { block, suppress, boost, customized } = countWeights(weights);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between px-1 flex-wrap gap-1">
+        <SectionTitle icon="🎛">色×軸 生成制御（髪/服/背景を独立に 0-5）</SectionTitle>
+        <div className="flex gap-1 items-center">
+          {canAutoAdjust && (
+            <button
+              type="button"
+              onClick={() => onAutoAdjust(true)}
+              title="偏り色を減点・未使用色を加点（手動設定は保護）"
+              className="text-[10px] font-semibold text-violet-100 bg-violet-500/20 border border-violet-400/55 px-1.5 py-0.5 rounded leading-none hover:bg-violet-500/30 transition"
+            >
+              ✨ 提案を反映
+            </button>
+          )}
+          {canAutoAdjust && (
+            <button
+              type="button"
+              onClick={() => onAutoAdjust(false)}
+              title="手動設定も含めて全色を上書きで自動調整"
+              className="text-[10px] font-semibold text-amber-100 bg-amber-500/15 border border-amber-400/45 px-1.5 py-0.5 rounded leading-none hover:bg-amber-500/25 transition"
+            >
+              全上書き
+            </button>
+          )}
+          {canUndo && (
+            <button
+              type="button"
+              onClick={onUndoAdjust}
+              title="直前の自動調整を取り消す"
+              className="text-[10px] text-slate-300 border border-white/20 bg-white/5 px-1.5 py-0.5 rounded leading-none hover:bg-white/10 transition"
+            >
+              ↶ 元に戻す
+            </button>
+          )}
+          {customized > 0 && (
+            <button
+              type="button"
+              onClick={onReset}
+              title="全色を既定（普通=3）に戻す"
+              className="text-[10px] text-slate-400 hover:text-slate-100 px-1.5 py-0.5 rounded border border-white/15 hover:border-white/30 leading-none"
+            >
+              🗑 全リセット
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 凡例 */}
+      <div className="flex items-center gap-2 px-1 text-[10px] text-slate-400 flex-wrap">
+        <span>凡例：</span>
+        {([0, 1, 2, 3, 4, 5] as ColorWeight[]).map((w) => (
+          <span key={w} className="inline-flex items-center gap-0.5">
+            <span className={["w-3 h-3 rounded-sm border", WEIGHT_META[w].cls].join(" ")} />
+            <span>{WEIGHT_META[w].jp}</span>
+          </span>
+        ))}
+      </div>
+
+      {/* ヘッダ行 */}
+      <div className="grid grid-cols-[3.4rem_1fr_1fr_1fr] gap-x-2 px-1 text-[10px] text-slate-400 font-semibold">
+        <span></span>
+        {COLOR_AXIS_CTRL.map((a) => (
+          <span key={a.id} className="text-center">
+            {a.emoji} {a.jp}
+          </span>
+        ))}
+      </div>
+
+      <div className="space-y-1 px-1">
+        {COLOR_GROUPS.map((g) => {
+          const entry = getColorEntry(weights, g.id);
+          return (
+            <div key={g.id} className="grid grid-cols-[3.4rem_1fr_1fr_1fr] gap-x-2 items-center py-1 border-b border-white/4 last:border-0">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span
+                  className="w-3.5 h-3.5 rounded-sm border border-white/20 shrink-0"
+                  style={{ backgroundColor: g.swatch }}
+                />
+                <span className="text-[11px] text-slate-200 truncate">{g.jp}</span>
+              </div>
+              {COLOR_AXIS_CTRL.map((a) => (
+                <WeightCells
+                  key={a.id}
+                  value={entry[a.id]}
+                  changed={changedKeys.has(`${g.id}:${a.id}`)}
+                  onChange={(w) => onWeightChange(g.id, a.id, w)}
+                />
+              ))}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* フッタ情報 */}
+      <p className="text-[10px] text-slate-400 px-1 pt-2 leading-snug">
+        ※ 「禁止」(0) 指定の色はその軸で使わない（さらに NG トークンとしても扱われる）。
+        「強推奨」(5) は最優先で取り入れる。3=普通は何も指示しない。
+      </p>
+      <p className="text-[10px] text-slate-400 px-1 leading-snug">
+        現在：制御中 <span className="text-violet-200">{customized}</span> 色
+        ・禁止 <span className="text-rose-200">{block}</span>
+        ・抑制 <span className="text-amber-200">{suppress}</span>
+        ・推奨 <span className="text-sky-200">{boost}</span>
+      </p>
+    </div>
+  );
+}
+
+// ── 重みセル（6ボタン水平、ハイライト対応） ────────────────────────────
+
+function WeightCells({
+  value, changed, onChange,
+}: {
+  value:    ColorWeight;
+  changed:  boolean;
+  onChange: (w: ColorWeight) => void;
+}) {
+  return (
+    <div className={[
+      "flex gap-0.5 justify-center",
+      changed ? "ring-1 ring-violet-400/55 rounded-md p-0.5 -m-0.5" : "",
+    ].join(" ")}>
+      {([0, 1, 2, 3, 4, 5] as ColorWeight[]).map((w) => {
+        const active = value === w;
+        const meta = WEIGHT_META[w];
+        return (
+          <button
+            key={w}
+            type="button"
+            onClick={() => onChange(w)}
+            title={`${w} ${meta.jp}`}
+            className={[
+              "w-5 h-5 text-[9px] font-bold rounded border leading-none transition select-none",
+              active
+                ? `${meta.cls} ${meta.textCls}`
+                : "border-white/10 bg-white/4 text-slate-400 hover:border-white/25 hover:text-slate-200",
+            ].join(" ")}
+          >
+            {meta.short}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── 色バー（ランキング用） ────────────────────────────
+
+function ColorBar({ colorId, count, ratio }: { colorId: string; count: number; ratio: number }) {
+  const g = COLOR_GROUPS.find((c) => c.id === colorId);
+  if (!g) return null;
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-3 h-3 rounded-sm border border-white/20 shrink-0" style={{ backgroundColor: g.swatch }} />
+      <span className="text-[11px] text-slate-200 w-12 shrink-0">{g.jp}</span>
+      <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${Math.max(2, ratio * 100)}%`, backgroundColor: g.swatch, opacity: 0.85 }}
+        />
+      </div>
+      <span className="text-[10px] text-slate-400 w-16 text-right tabular-nums">
+        {count}回 / {Math.round(ratio * 100)}%
+      </span>
+    </div>
+  );
+}
+
+// ── 軸別カード ────────────────────────────────────
+
+function AxisCard({
+  axis, total, byColor, topColor,
+}: {
+  axis:    ColorAxis;
+  total:   number;
+  byColor: { colorId: string; count: number; ratio: number }[];
+  topColor?: { colorId: string; ratio: number };
+}) {
+  const meta = COLOR_AXES.find((a) => a.id === axis)!;
+  const isStrongBias = topColor && topColor.ratio >= 0.70;
+  return (
+    <div className={[
+      "rounded-md border px-2 py-1.5",
+      isStrongBias ? "border-rose-400/40 bg-rose-500/5" : "border-white/12 bg-white/3",
+    ].join(" ")}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-[11px] font-bold text-slate-200 flex items-center gap-1">
+          <span>{meta.emoji}</span>
+          <span>{meta.jp}</span>
+        </span>
+        <span className="text-[10px] text-slate-400">{total}回</span>
+      </div>
+      {total === 0 ? (
+        <p className="text-[10px] text-slate-400">検出なし</p>
+      ) : (
+        <div className="space-y-0.5">
+          {byColor.filter((c) => c.count > 0).slice(0, 4).map((c) => {
+            const g = COLOR_GROUPS.find((x) => x.id === c.colorId)!;
+            return (
+              <div key={c.colorId} className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm border border-white/20 shrink-0" style={{ backgroundColor: g.swatch }} />
+                <span className="text-[10px] text-slate-300 flex-1 truncate">{g.jp}</span>
+                <span className="text-[9px] text-slate-400 tabular-nums">{Math.round(c.ratio * 100)}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── 配色ペア表示 ──────────────────────────────────
+
+function ComboColorRow({ entry, rank }: { entry: { axes: { axis: ColorAxis; colorId: string }[]; count: number }; rank: number }) {
+  return (
+    <div className="flex items-center gap-2 py-1 border-b border-white/5 last:border-0">
+      <span className="text-[10px] text-slate-400 w-5 text-right">{rank}位</span>
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        {entry.axes.map((a, i) => {
+          const g = COLOR_GROUPS.find((c) => c.id === a.colorId);
+          const ax = COLOR_AXES.find((x) => x.id === a.axis);
+          if (!g || !ax) return null;
+          return (
+            <span key={i} className="flex items-center gap-1 text-[10px]">
+              {i > 0 && <span className="text-slate-400">×</span>}
+              <span className="w-2.5 h-2.5 rounded-sm border border-white/20" style={{ backgroundColor: g.swatch }} />
+              <span className="text-slate-300">{ax.jp.replace("色", "")}/{g.jp.replace("系", "")}</span>
+            </span>
+          );
+        })}
+      </div>
+      <span className="text-[10px] text-slate-400 tabular-nums shrink-0">{entry.count}回</span>
+    </div>
   );
 }
 
@@ -257,7 +1259,7 @@ function AgentSection({
         </div>
       </div>
 
-      <p className="text-[10px] text-text-muted/40 leading-snug px-1 border-t border-white/10 pt-1.5">
+      <p className="text-[10px] text-text-muted/60 leading-snug px-1 border-t border-white/10 pt-1.5">
         ⚠ AI分析エージェントは設定を勝手に変更しません。ボタンを押した時だけ反映します。
       </p>
     </div>
@@ -332,7 +1334,7 @@ function ComboRanking({
               <span className="flex flex-wrap items-center gap-1 min-w-0 flex-1">
                 {c.motifLabels.map((label, idx) => (
                   <span key={idx} className="inline-flex items-center gap-1">
-                    {idx > 0 && <span className="text-slate-500 text-[11px]">＋</span>}
+                    {idx > 0 && <span className="text-slate-400 text-[11px]">＋</span>}
                     <span className="text-[12px] px-1.5 py-0.5 rounded border border-violet-400/40 bg-violet-400/10 text-violet-100 leading-none">
                       {label}
                     </span>
@@ -439,7 +1441,7 @@ function FrequencyRanking({
             ↶ 自動調整を元に戻す
           </button>
         )}
-        <span className="text-[10px] text-text-muted/40 leading-snug ml-1">
+        <span className="text-[10px] text-text-muted/60 leading-snug ml-1">
           頻出回数に応じて自動で 0〜5 を設定（NGはNG指定に反映）
         </span>
       </div>
@@ -465,7 +1467,7 @@ function FrequencyRanking({
         </button>
       </div>
 
-      <div className="space-y-px px-1">
+      <div className="space-y-px px-1 ipm-list">
         {show.map((mc) => {
           const level = getLevel(levels, mc.motif.id);
           const m = levelMeta(level);
@@ -595,7 +1597,7 @@ function BiasRadar({ radarData }: { radarData: RadarEntry[] }) {
               entry.stars >= 4 ? "text-rose-400"
               : entry.stars >= 3 ? "text-orange-400"
               : entry.stars >= 2 ? "text-amber-300"
-              : "text-slate-500",
+              : "text-slate-400",
             ].join(" ")}>
               {starsLabel(entry.stars)}
             </span>
@@ -635,15 +1637,31 @@ export function DuplicateAnalysisPanel({
   onLevelChange, onApplyPolicies, onUnapplyPolicies, onResetPolicies, onBulkLevel, onClearNg,
   onAutoAdjust, onUndoAutoAdjust, canUndoAuto, changedIds,
   comboPolicies, onComboPolicyChange,
+  colorAnalysis,
+  colorWeights, onColorWeightChange, onColorWeightsReset,
+  onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
+  colorWindowSize, onColorWindowSizeChange,
+  imageAnalysis, onStartImageAnalysis, imageAnalyzeProgress,
+  ratingAnalysis,
+  preferenceProfile, analyzingProfile, profileError, profileSampleCount,
+  onRunPreferenceAnalysis, onClearPreferenceProfile,
+  autoLearnEnabled, onToggleAutoLearn,
   agent, onAgentAction,
   onAutoFix, onReroll, onResetBias, onDismiss,
+  analysisStats, activeScopes, favoriteProfile, favoriteLearnEnabled,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [tab, setTab] = useState<"dup" | "agent">("dup");
+  const [tab, setTab] = useState<"dup" | "agent" | "color" | "image" | "pref">("dup");
+
+  // 画像分析タブを開いた時に解析を発火
+  useEffect(() => {
+    if (tab === "image" && expanded) onStartImageAnalysis();
+  }, [tab, expanded, onStartImageAnalysis]);
 
   // 反映時のサマリー（制御中 = 非4 件数 / NG件数）
   const { controlled: controlledCount, ng: ngCount } = countLevels(levels);
   const { block: comboBlockCount, alt: comboAltCount } = countComboPolicies(comboPolicies);
+  const { block: colorBlockCount, suppress: colorSuppressCount, boost: colorBoostCount } = countWeights(colorWeights);
   const hasStagedPolicies = controlledCount > 0 || comboBlockCount + comboAltCount > 0;
 
   // ヘッダーデータ
@@ -654,6 +1672,44 @@ export function DuplicateAnalysisPanel({
   const riskTextCls = biasRiskTextClass(risk);
   const compact3 = biasResult?.topMotifs.slice(0, 3) ?? [];
   const ha = historyAnalysis;
+
+  // ── 現在生成に「反映中」の要素を名前付きで集計（スコープ考慮） ──
+  // policyApplied のときだけ生成に効く。変更対象外の軸は「未反映」として分ける。
+  const AXIS_JP: Record<string, string> = {
+    background: "背景", outfit: "衣装", hair: "髪", camera: "カメラ",
+    lighting: "ライティング", pose: "ポーズ", props: "小物", foreground: "前景",
+  };
+  const scopeSet = new Set(activeScopes ?? []);
+  const axisInScope = (axis: string) => scopeSet.size === 0 ? true : scopeSet.has(axis);
+
+  // 画像分析：頻出＝抑制／未開拓＝推奨。変更対象外はスキップ一覧へ。
+  const imgSuppress: string[] = [];
+  const imgSkipped:  string[] = [];
+  for (const o of (imageAnalysis?.overusedCategories ?? []).slice(0, 8)) {
+    const label = `${AXIS_JP[o.axis] ?? o.axis}:${o.label}`;
+    if (axisInScope(o.axis)) imgSuppress.push(label);
+    else imgSkipped.push(`${AXIS_JP[o.axis] ?? o.axis}`);
+  }
+  const imgBoost: string[] = [];
+  for (const u of (imageAnalysis?.underusedCategories ?? []).slice(0, 8)) {
+    if (axisInScope(u.axis)) imgBoost.push(`${AXIS_JP[u.axis] ?? u.axis}:${u.label}`);
+  }
+  // 重複分析：抑制モチーフ(level<=2)／優先モチーフ(level5)
+  const motifAvoid:  string[] = [];
+  const motifPrefer: string[] = [];
+  for (const m of (ha?.topMotifs ?? [])) {
+    const lv = getLevel(levels, m.motif.id);
+    if (lv <= 2) motifAvoid.push(m.motif.label);
+    else if (lv >= 5) motifPrefer.push(m.motif.label);
+  }
+  // 構成：今後出さない
+  const comboBlocked: string[] = [];
+  for (const c of (ha?.topCombos ?? [])) {
+    if (getComboPolicy(comboPolicies, c.comboKey) === "block") comboBlocked.push(c.motifLabels.join("＋"));
+  }
+  // お気に入り傾向（ONのときのみ）
+  const favTraits = (favoriteLearnEnabled && favoriteProfile) ? favoriteProfile.traitPhrases.slice(0, 6) : [];
+  const skippedAxes = Array.from(new Set(imgSkipped));
 
   return (
     <div className={["rounded-xl border transition-all", borderCls].join(" ")}>
@@ -669,18 +1725,27 @@ export function DuplicateAnalysisPanel({
           <span className="flex items-center gap-1.5 leading-none">
             <span className="text-[12px] text-slate-300">重複度</span>
             <span className={["text-[16px] font-black", riskTextCls].join(" ")}>{dupScore}</span>
-            <span className="text-[11px] text-slate-500">/100</span>
-            <span className="text-slate-600 text-[11px] mx-0.5">·</span>
+            <span className="text-[11px] text-slate-400">/100</span>
+            <span className="text-slate-400 text-[11px] mx-0.5">·</span>
             <span className="text-[12px] text-slate-300">新規性</span>
             <span className={[
               "text-[16px] font-black",
               novScore >= 60 ? "text-emerald-300" : novScore >= 35 ? "text-amber-300" : "text-rose-300",
             ].join(" ")}>{novScore}</span>
-            <span className="text-[11px] text-slate-500">/100</span>
+            <span className="text-[11px] text-slate-400">/100</span>
           </span>
-          {ha && (
+          {analysisStats ? (
+            <span className="text-[11px] text-slate-400 leading-none" title="偏り検出は直近90日のみが対象。お気に入り傾向・評価学習は全期間が対象です。">
+              分析対象：直近{analysisStats.windowDays}日 / {analysisStats.promptCount}件
+              <span className="text-slate-400 mx-1">·</span>
+              画像解析 {analysisStats.imageAnalyzedCount}件
+              <span className="text-slate-400 mx-1">·</span>
+              評価 {analysisStats.ratedCount}件
+              <span className="text-slate-400 ml-1">（全{analysisStats.totalItems}件保存）</span>
+            </span>
+          ) : ha && (
             <span className="text-[11px] text-slate-400 leading-none">
-              (全{ha.totalItems}件/分析{ha.windowSize}件)
+              分析対象：直近{ha.windowDays}日 / {ha.windowSize}件
             </span>
           )}
           {policyApplied && (
@@ -768,12 +1833,108 @@ export function DuplicateAnalysisPanel({
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => setTab("color")}
+              className={[
+                "text-[12px] font-bold px-2.5 py-1 rounded-md transition leading-none flex items-center gap-1",
+                tab === "color"
+                  ? "bg-amber-500/20 text-amber-100 border border-amber-400/45"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
+              ].join(" ")}
+            >
+              🎨 色分析
+              {colorAnalysis && colorAnalysis.biasWarnings.some((w) => w.severity === "high") && (
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+              )}
+              {(colorBlockCount + colorSuppressCount + colorBoostCount) > 0 && (
+                <span className="text-[9px] text-amber-200/70 leading-none">
+                  ({colorBlockCount + colorSuppressCount + colorBoostCount})
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("image")}
+              className={[
+                "text-[12px] font-bold px-2.5 py-1 rounded-md transition leading-none flex items-center gap-1",
+                tab === "image"
+                  ? "bg-emerald-500/20 text-emerald-100 border border-emerald-400/45"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
+              ].join(" ")}
+            >
+              📸 画像分析
+              {imageAnalysis && imageAnalysis.clusters.length > 0 && (
+                <span className="text-[9px] text-emerald-200/70 leading-none">
+                  ({imageAnalysis.clusters[0]?.size}枚被り)
+                </span>
+              )}
+              {imageAnalyzeProgress && imageAnalyzeProgress.total > 0 && imageAnalyzeProgress.done < imageAnalyzeProgress.total && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("pref")}
+              className={[
+                "text-[12px] font-bold px-2.5 py-1 rounded-md transition leading-none flex items-center gap-1",
+                tab === "pref"
+                  ? "bg-pink-500/20 text-pink-100 border border-pink-400/45"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
+              ].join(" ")}
+            >
+              💡 好み分析
+              {ratingAnalysis?.preferenceReport.active && (
+                <span className="text-[9px] text-pink-200/70 leading-none">
+                  ({ratingAnalysis.preferenceReport.totalAxisRatings})
+                </span>
+              )}
+            </button>
           </div>
 
           <div className="px-3 overflow-y-auto max-h-[62vh]">
 
             {/* === AI分析タブ === */}
             {tab === "agent" && <AgentSection agent={agent} onAction={onAgentAction} />}
+
+            {/* === 画像分析タブ === */}
+            {tab === "image" && (
+              <ImageAnalysisSection
+                analysis={imageAnalysis}
+                progress={imageAnalyzeProgress}
+              />
+            )}
+
+            {/* === 好み分析タブ（軸別👍👎集計 + 実 AI 分析） === */}
+            {tab === "pref" && (
+              <PreferenceReportSection
+                ratingAnalysis={ratingAnalysis}
+                profile={preferenceProfile}
+                analyzing={analyzingProfile}
+                profileError={profileError}
+                profileSampleCount={profileSampleCount}
+                onRunAnalysis={onRunPreferenceAnalysis}
+                onClearProfile={onClearPreferenceProfile}
+                autoLearnEnabled={autoLearnEnabled}
+                onToggleAutoLearn={onToggleAutoLearn}
+              />
+            )}
+
+            {/* === 色分析タブ（生成制御センター） === */}
+            {tab === "color" && (
+              <ColorAnalysisSection
+                analysis={colorAnalysis}
+                weights={colorWeights}
+                onWeightChange={onColorWeightChange}
+                onReset={onColorWeightsReset}
+                onAutoAdjust={onColorAutoAdjust}
+                onUndoAdjust={onColorUndoAdjust}
+                canUndo={canColorUndo}
+                changedKeys={colorChangedKeys}
+                windowSize={colorWindowSize}
+                onWindowSizeChange={onColorWindowSizeChange}
+              />
+            )}
 
             {/* === 重複分析タブ === */}
             {tab === "dup" && <>
@@ -833,7 +1994,7 @@ export function DuplicateAnalysisPanel({
 
             {/* データなし */}
             {!ha && !biasResult && (
-              <p className="py-3 text-center text-[11px] text-text-muted/35">
+              <p className="py-3 text-center text-[11px] text-text-muted/60">
                 生成後に分析が始まります
               </p>
             )}
@@ -844,22 +2005,49 @@ export function DuplicateAnalysisPanel({
           {/* ── フッター：反映状態 + 一括操作 ──────────────── */}
           <div className="border-t border-text-muted/10 px-3.5 py-2.5 space-y-2">
 
-            {/* 反映状態バナー */}
+            {/* 反映状態バナー（名前付き・現在生成に効いている要素） */}
             {policyApplied ? (
-              <div className="rounded-lg border border-violet-400/30 bg-violet-400/8 px-2.5 py-1.5 flex items-center justify-between gap-2">
-                <span className="text-[12px] text-violet-200/85 leading-snug">
-                  ✓ 出現制御を反映中
-                  <span className="text-violet-300/60 ml-1.5">
-                    （要素：制御 {controlledCount}件 / 完全NG {ngCount}件
-                    {(comboBlockCount + comboAltCount > 0) && <>
-                      　・構成：禁止 {comboBlockCount}件 / 別ジャンル化 {comboAltCount}件
-                    </>}）
-                  </span>
-                </span>
-                <button type="button" onClick={onUnapplyPolicies}
-                  className="text-[11px] text-violet-200/60 hover:text-violet-100 underline leading-none whitespace-nowrap">
-                  解除
-                </button>
+              <div className="rounded-lg border border-violet-400/30 bg-violet-400/8 px-2.5 py-2 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-bold text-violet-100 leading-none">✓ 現在、生成に反映中</span>
+                  <button type="button" onClick={onUnapplyPolicies}
+                    className="text-[11px] text-violet-200/60 hover:text-violet-100 underline leading-none whitespace-nowrap">
+                    反映を解除
+                  </button>
+                </div>
+
+                {/* 回避中 */}
+                {(motifAvoid.length > 0 || comboBlocked.length > 0 || imgSuppress.length > 0) && (
+                  <ReflectRow color="rose" label="回避中" items={[
+                    ...motifAvoid, ...comboBlocked,
+                  ]} />
+                )}
+                {/* 画像分析から（抑制） */}
+                {imgSuppress.length > 0 && (
+                  <ReflectRow color="sky" label="画像分析から抑制" items={imgSuppress} />
+                )}
+                {/* 優先中 */}
+                {(motifPrefer.length > 0 || imgBoost.length > 0) && (
+                  <ReflectRow color="emerald" label="優先中" items={[...motifPrefer, ...imgBoost]} />
+                )}
+                {/* お気に入りから */}
+                {favTraits.length > 0 && (
+                  <ReflectRow color="amber" label="お気に入りから" items={favTraits} />
+                )}
+                {/* スコープ外で未反映の軸 */}
+                {skippedAxes.length > 0 && (
+                  <p className="text-[10px] text-text-muted/55 leading-snug pt-0.5">
+                    ⚠ {skippedAxes.join("・")}は変更対象外のため、回避は今回は未反映です。
+                  </p>
+                )}
+                {/* 何も具体名が無い時のフォールバック（カウント表示） */}
+                {motifAvoid.length === 0 && comboBlocked.length === 0 && imgSuppress.length === 0 &&
+                 motifPrefer.length === 0 && imgBoost.length === 0 && favTraits.length === 0 && (
+                  <p className="text-[11px] text-violet-200/70 leading-snug">
+                    出現制御を反映中（制御 {controlledCount}件 / 完全NG {ngCount}件
+                    {(comboBlockCount + comboAltCount > 0) && <> ・構成 禁止 {comboBlockCount}件 / 別ジャンル化 {comboAltCount}件</>}）
+                  </p>
+                )}
               </div>
             ) : hasStagedPolicies ? (
               <div className="rounded-lg border border-amber-400/25 bg-amber-400/5 px-2.5 py-1.5">
@@ -870,7 +2058,7 @@ export function DuplicateAnalysisPanel({
                 </p>
               </div>
             ) : (
-              <p className="text-[11px] text-text-muted/40 leading-snug px-0.5">
+              <p className="text-[11px] text-text-muted/60 leading-snug px-0.5">
                 頻出構成は「🚫 今後出さない」「🎭 別ジャンル化」、頻出要素は 0〜5 段階で設定。「提案を反映」で生成に効かせます。
               </p>
             )}

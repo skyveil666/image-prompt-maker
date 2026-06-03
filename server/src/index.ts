@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import type { GenerateRequest, GenerateResponse } from "./types.ts";
-import { MODEL_NAME, generate } from "./gemini.ts";
+import { MODEL_NAME, generate, analyzePreferences, type AnalyzePreferenceSample } from "./gemini.ts";
 
 const PORT = Number(process.env.PORT || 3001);
 
@@ -112,6 +112,132 @@ app.post("/api/generate", async (req, res) => {
           !!c && Array.isArray(c.labels) && (c.policy === "block" || c.policy === "alt"))
         .map((c) => ({ labels: c.labels.slice(0, 4).map(String), policy: c.policy })),
     }),
+    ...(typeof raw.realismLevel === "number" && raw.realismLevel >= 1 && raw.realismLevel <= 5 && {
+      realismLevel: Math.floor(raw.realismLevel),
+    }),
+    ...(typeof raw.realismType === "string" && raw.realismType.length > 0 && raw.realismType.length <= 30 && {
+      realismType: String(raw.realismType),
+    }),
+    ...(Array.isArray(raw.colorControls) && {
+      colorControls: raw.colorControls
+        .slice(0, 12)
+        .filter((c): c is { colorId: string; jp: string; policy: "restrict" | "block" } =>
+          !!c
+          && typeof c.colorId === "string"
+          && typeof c.jp === "string"
+          && (c.policy === "restrict" || c.policy === "block"))
+        .map((c) => ({
+          colorId: String(c.colorId),
+          jp:      String(c.jp),
+          policy:  c.policy,
+        })),
+    }),
+    ...(Array.isArray(raw.colorWeights) && {
+      colorWeights: raw.colorWeights
+        .slice(0, 60)  // 12色 × 3軸 × 一応の上限余裕
+        .filter((c): c is { colorId: string; jp: string; axis: "hair" | "outfit" | "background"; weight: 0|1|2|4|5 } =>
+          !!c
+          && typeof c.colorId === "string"
+          && typeof c.jp === "string"
+          && (c.axis === "hair" || c.axis === "outfit" || c.axis === "background")
+          && typeof c.weight === "number"
+          && [0, 1, 2, 4, 5].includes(c.weight))
+        .map((c) => ({
+          colorId: String(c.colorId),
+          jp:      String(c.jp),
+          axis:    c.axis,
+          weight:  c.weight,
+        })),
+    }),
+    ...(raw.preferenceProfile && typeof raw.preferenceProfile === "object" && {
+      preferenceProfile: (() => {
+        const p = raw.preferenceProfile as Record<string, unknown>;
+        const str = (v: unknown, max = 300) => typeof v === "string" ? v.slice(0, max) : "";
+        const arr = (v: unknown, max = 5) =>
+          Array.isArray(v)
+            ? v.filter((x): x is string => typeof x === "string").slice(0, max).map((s) => s.slice(0, 60))
+            : [];
+        const triple = (v: unknown) => {
+          const o = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+          return { bg: str(o.bg, 200), outfit: str(o.outfit, 200), pose: str(o.pose, 200) };
+        };
+        return {
+          generatedAt: typeof p.generatedAt === "number" ? p.generatedAt : Date.now(),
+          model:       str(p.model, 60),
+          sampleSize:  typeof p.sampleSize === "number" ? Math.max(0, Math.floor(p.sampleSize)) : 0,
+          likes:       triple(p.likes),
+          dislikes:    triple(p.dislikes),
+          preferKeywords: arr(p.preferKeywords),
+          avoidKeywords:  arr(p.avoidKeywords),
+          summary:        str(p.summary, 500),
+        };
+      })(),
+    }),
+    ...(raw.ratingBias && typeof raw.ratingBias === "object" && {
+      ratingBias: {
+        ...(Array.isArray(raw.ratingBias.recommended) && {
+          recommended: raw.ratingBias.recommended
+            .slice(0, 10)
+            .filter((c): c is { axis: string; label: string; score: number } =>
+              !!c && typeof c.axis === "string" && typeof c.label === "string" && typeof c.score === "number")
+            .map((c) => ({
+              axis:  String(c.axis).slice(0, 20),
+              label: String(c.label).slice(0, 40),
+              score: Math.max(-5, Math.min(5, c.score)),
+            })),
+        }),
+        ...(Array.isArray(raw.ratingBias.avoid) && {
+          avoid: raw.ratingBias.avoid
+            .slice(0, 10)
+            .filter((c): c is { axis: string; label: string; score: number } =>
+              !!c && typeof c.axis === "string" && typeof c.label === "string" && typeof c.score === "number")
+            .map((c) => ({
+              axis:  String(c.axis).slice(0, 20),
+              label: String(c.label).slice(0, 40),
+              score: Math.max(-5, Math.min(5, c.score)),
+            })),
+        }),
+        ...(raw.ratingBias.preference && typeof raw.ratingBias.preference === "object" && Array.isArray(raw.ratingBias.preference.axes) && {
+          preference: {
+            active: !!raw.ratingBias.preference.active,
+            axes: raw.ratingBias.preference.axes
+              .slice(0, 3)
+              .filter((a): a is { axis: "bg"|"outfit"|"pose"; good: number; bad: number; goodRatio: number; badRatio: number } =>
+                !!a && (a.axis === "bg" || a.axis === "outfit" || a.axis === "pose")
+                && typeof a.good === "number" && typeof a.bad === "number"
+                && typeof a.goodRatio === "number" && typeof a.badRatio === "number")
+              .map((a) => ({
+                axis:      a.axis,
+                good:      Math.max(0, Math.floor(a.good)),
+                bad:       Math.max(0, Math.floor(a.bad)),
+                goodRatio: Math.max(0, Math.min(1, a.goodRatio)),
+                badRatio:  Math.max(0, Math.min(1, a.badRatio)),
+              })),
+          },
+        }),
+      },
+    }),
+    ...(raw.imageBias && typeof raw.imageBias === "object" && {
+      imageBias: {
+        ...(Array.isArray(raw.imageBias.overused) && {
+          overused: raw.imageBias.overused
+            .slice(0, 10)
+            .filter((c): c is { axis: string; label: string; ratio: number } =>
+              !!c && typeof c.axis === "string" && typeof c.label === "string" && typeof c.ratio === "number")
+            .map((c) => ({ axis: String(c.axis).slice(0, 20), label: String(c.label).slice(0, 40), ratio: Math.max(0, Math.min(1, c.ratio)) })),
+        }),
+        ...(Array.isArray(raw.imageBias.underused) && {
+          underused: raw.imageBias.underused
+            .slice(0, 12)
+            .filter((c): c is { axis: string; label: string } =>
+              !!c && typeof c.axis === "string" && typeof c.label === "string")
+            .map((c) => ({ axis: String(c.axis).slice(0, 20), label: String(c.label).slice(0, 40) })),
+        }),
+        ...(typeof raw.imageBias.visualDupCount === "number" && {
+          visualDupCount: Math.max(0, Math.floor(raw.imageBias.visualDupCount)),
+        }),
+      },
+    }),
   };
 
   try {
@@ -121,6 +247,52 @@ app.post("/api/generate", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[/api/generate] failed:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+// ── 好みプロファイル分析エンドポイント（実 AI 呼び出し） ─────────────────
+app.post("/api/analyze-preferences", async (req, res) => {
+  const raw = req.body as { samples?: unknown } | undefined;
+  if (!raw || !Array.isArray(raw.samples)) {
+    res.status(400).json({ error: "samples must be an array" });
+    return;
+  }
+  if (raw.samples.length === 0) {
+    res.status(400).json({ error: "samples is empty" });
+    return;
+  }
+  // 入力バリデーション（一定の型に絞り込む）
+  const samples: AnalyzePreferenceSample[] = (raw.samples as unknown[])
+    .slice(0, 100)
+    .filter((s): s is Record<string, unknown> => !!s && typeof s === "object")
+    .map((s) => ({
+      prompt:    typeof s.prompt === "string" ? s.prompt.slice(0, 1500) : "",
+      overall:   typeof s.overall === "number" && [1, 2, 3, 5].includes(s.overall) ? s.overall : 3,
+      bg:        s.bg     === 5 || s.bg     === 1 ? s.bg     : null,
+      outfit:    s.outfit === 5 || s.outfit === 1 ? s.outfit : null,
+      pose:      s.pose   === 5 || s.pose   === 1 ? s.pose   : null,
+      createdAt: typeof s.createdAt === "number" ? s.createdAt : Date.now(),
+    }))
+    .filter((s) => s.prompt.length > 0);
+
+  if (samples.length === 0) {
+    res.status(400).json({ error: "no valid samples after sanitization" });
+    return;
+  }
+
+  console.log(`[/api/analyze-preferences] start: ${samples.length} samples`);
+  try {
+    const { result, model } = await analyzePreferences(samples);
+    res.json({
+      result,
+      model,
+      sampleSize: samples.length,
+      generatedAt: Date.now(),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[/api/analyze-preferences] failed:", message);
     res.status(500).json({ error: message });
   }
 });

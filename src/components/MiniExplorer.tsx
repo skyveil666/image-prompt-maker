@@ -65,8 +65,6 @@ interface Props {
   onOpen: () => void;
   width: number;
   onResize: (w: number) => void;
-  /** 左下に表示するアシスタント要素（AssistantCharacter）。省略可。 */
-  assistantSlot?: React.ReactNode;
 }
 
 interface TreeCtx {
@@ -506,7 +504,7 @@ function TreeItem({
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onResize, assistantSlot }: Props) {
+export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onResize }: Props) {
   // ── Core navigation state ────────────────────────────────────────────
   const [rootHandle,  setRootHandle]  = useState<FileSystemDirectoryHandle | null>(null);
   const [navHistory,  setNavHistory]  = useState<NavEntry[]>([]);
@@ -1060,9 +1058,6 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
             </div>
           </div>
         </div>
-
-        {/* ─── アシスタントキャラ（左下スロット） ─────────────────────── */}
-        {assistantSlot}
 
         {/* ─── Status bar ───────────────────────────────────────────── */}
         <div className="shrink-0 px-3 py-1 border-t border-bg-border bg-bg-panel/50 flex items-center gap-2 text-[12px] text-text-muted/90">

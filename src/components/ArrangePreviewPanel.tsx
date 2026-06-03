@@ -8,10 +8,29 @@
  *         [選択要素でアレンジ生成] を押して生成 → 結果表示。
  */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ArrangeResult, GeneratedProposal, PromptHistoryItem, Scope } from "../types";
 import { ARRANGE_AXES, ALL_SCOPE_LABELS, arrangeCandidateScopes } from "../lib/arrange";
 import { WithImagePreview } from "./ImagePreviewTooltip";
+import {
+  MAX_RESULT_IMAGES, RATING_LABELS,
+  AXIS_RATING_META, type RatingAxisKey,
+} from "../lib/history";
+import { makeThumbnail } from "../lib/imageThumb";
+
+/** 1案ごとの画像・評価ローカル state の型 */
+export interface ProposalLocalState {
+  images:  string[];                  // 最大 MAX_RESULT_IMAGES 枚
+  ratings: (number | null)[];         // 全体評価（5/3/2/1/null）
+  memos:   (string | null)[];
+  bgRatings:     (number | null)[];
+  outfitRatings: (number | null)[];
+  poseRatings:   (number | null)[];
+}
+
+export function emptyProposalLocalState(): ProposalLocalState {
+  return { images: [], ratings: [], memos: [], bgRatings: [], outfitRatings: [], poseRatings: [] };
+}
 
 interface Props {
   /** 選択中のアレンジ元（カードのアレンジを押すと設定される） */
@@ -27,9 +46,17 @@ interface Props {
   pinned:            boolean;
   onTogglePin:       () => void;
   onClose:           () => void;
-  onSaveFavorite:    (proposal: GeneratedProposal) => void | Promise<void>;
+  /**
+   * お気に入り保存：画像・評価を含む拡張版。
+   * localState が undefined のときは旧来の保存（画像なし）。
+   */
+  onSaveFavorite:    (proposal: GeneratedProposal, localState?: ProposalLocalState) => void | Promise<void>;
   onReArrange:       (proposal: GeneratedProposal) => void;
   onSendToGenerator: () => void;
+  /** HistoryMiniExplorer で選択した参照画像（元画像として表示） */
+  refImage?:         string | null;
+  /** 参照画像をクリア */
+  onClearRefImage?:  () => void;
 }
 
 function formatDateTime(ts: number): string {
@@ -121,56 +148,324 @@ function ElementSelector({
   );
 }
 
-// ── 1案ぶんのカード ───────────────────────────────────────────────────────────
+// ── 画像スロット（グリッド＋大ドロップゾーン版） ─────────────────────────────
 
-function ProposalCard({
-  proposal, index, onSaveFavorite, onReArrange,
+function ArrangeImageSlot({
+  images, onAppend, onReplaceAt, onRemoveAt,
+}: {
+  images: string[];
+  onAppend:    (url: string) => void;
+  onReplaceAt: (i: number, url: string) => void;
+  onRemoveAt:  (i: number) => void;
+}) {
+  const dropRef    = useRef<HTMLDivElement>(null);
+  const fileRef    = useRef<HTMLInputElement>(null);
+  const appendRef  = useRef(onAppend);
+  const replaceRef = useRef(onReplaceAt);
+  const [isDrag, setIsDrag]         = useState(false);
+  const [replaceIdx, setReplaceIdx] = useState<number | null>(null);
+
+  useEffect(() => { appendRef.current  = onAppend;    }, [onAppend]);
+  useEffect(() => { replaceRef.current = onReplaceAt; }, [onReplaceAt]);
+
+  const process = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const raw = await new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result as string);
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+    let final = raw;
+    try { final = await makeThumbnail(raw, 600, 0.83); } catch { /* noop */ }
+    if (replaceIdx !== null) { replaceRef.current(replaceIdx, final); setReplaceIdx(null); }
+    else appendRef.current(final);
+  }, [replaceIdx]);
+
+  // Ctrl+V ペースト（ドロップゾーンフォーカス時 or 常時）
+  useEffect(() => {
+    const h = (e: ClipboardEvent) => {
+      const f = Array.from(e.clipboardData?.items ?? []).find((it) => it.type.startsWith("image/"))?.getAsFile();
+      if (f && images.length < MAX_RESULT_IMAGES) { e.preventDefault(); void process(f); }
+    };
+    document.addEventListener("paste", h);
+    return () => document.removeEventListener("paste", h);
+  }, [process, images.length]);
+
+  const canAdd = images.length < MAX_RESULT_IMAGES;
+
+  const openReplace = (i: number) => { setReplaceIdx(i); fileRef.current?.click(); };
+  const openAppend  = () => { setReplaceIdx(null); fileRef.current?.click(); };
+
+  return (
+    <div className="space-y-1.5">
+      {/* ヘッダー：件数＋追加ボタン */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-text-muted/55 font-semibold">
+          🖼 生成結果画像 {images.length}/{MAX_RESULT_IMAGES}
+        </span>
+        {canAdd && images.length > 0 && (
+          <button type="button" onClick={openAppend}
+            className="text-[10px] px-1.5 py-0.5 rounded border border-emerald-400/45 bg-emerald-500/12 text-emerald-200 hover:bg-emerald-500/22 transition leading-none">
+            ＋ 追加
+          </button>
+        )}
+      </div>
+
+      {/* スロットグリッド（登録済み画像） */}
+      {images.length > 0 && (
+        <div className="grid grid-cols-3 gap-1.5">
+          {images.map((url, i) => (
+            <div key={i} className="relative group aspect-square">
+              <img
+                src={url}
+                alt={`生成 ${i+1}`}
+                title="クリックで差し替え"
+                onClick={() => openReplace(i)}
+                className="w-full h-full rounded-lg object-cover border border-emerald-400/50 cursor-pointer hover:border-accent/70 transition"
+              />
+              {/* 個別削除 */}
+              <button type="button" onClick={() => onRemoveAt(i)}
+                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500/85 hover:bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow">
+                ×
+              </button>
+              <span className="absolute bottom-0.5 left-0.5 px-1 rounded bg-black/65 text-emerald-100 text-[9px] font-bold pointer-events-none">
+                {i+1}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 大きいドロップゾーン（常時表示 or 追加エリア） */}
+      <div
+        ref={dropRef}
+        tabIndex={0}
+        onDragOver={(e) => { e.preventDefault(); if (canAdd) setIsDrag(true); }}
+        onDragLeave={() => setIsDrag(false)}
+        onDrop={(e) => {
+          e.preventDefault(); setIsDrag(false);
+          if (!canAdd) return;
+          const f = e.dataTransfer.files[0];
+          if (f) void process(f);
+        }}
+        onClick={() => { if (canAdd) openAppend(); }}
+        className={[
+          "rounded-lg border-2 border-dashed px-3 py-3 text-center cursor-pointer transition select-none outline-none",
+          !canAdd ? "opacity-35 cursor-not-allowed border-bg-border/30 text-text-muted/30"
+            : isDrag ? "border-accent bg-accent/12 text-white scale-[1.01]"
+              : "border-bg-border/50 text-text-muted/50 hover:border-accent/50 hover:bg-accent/5 hover:text-text-muted/70 focus:border-accent/55",
+        ].join(" ")}
+      >
+        <div className="text-[18px] mb-1">
+          {isDrag ? "⬇️" : canAdd ? "📎" : "✅"}
+        </div>
+        <div className="text-[11px] leading-snug">
+          {!canAdd
+            ? `上限 ${MAX_RESULT_IMAGES} 枚に達しました`
+            : isDrag
+              ? "ドロップして追加"
+              : `ここにドロップ・Ctrl+V・クリックで追加\n(最大${MAX_RESULT_IMAGES}枚)`}
+        </div>
+      </div>
+
+      <input ref={fileRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) void process(f); e.target.value = ""; }} />
+    </div>
+  );
+}
+
+// ── 評価バー（ArrangeProposalCard 専用） ─────────────────────────────────────
+
+function ratingBorderCls(r: number | null): string {
+  return r === 5 ? "border-emerald-400/75" : r === 3 ? "border-sky-400/65" : r === 2 ? "border-amber-400/65" : r === 1 ? "border-rose-400/75" : "border-emerald-400/40";
+}
+
+function ArrangeRatingRow({
+  imageIndex, ratings, bgRatings, outfitRatings, poseRatings, memos,
+  onSetRating, onSetAxisRating, onSetMemo,
+}: {
+  imageIndex: number;
+  ratings: (number | null)[];
+  bgRatings: (number | null)[];
+  outfitRatings: (number | null)[];
+  poseRatings: (number | null)[];
+  memos: (string | null)[];
+  onSetRating:     (idx: number, v: number | null) => void;
+  onSetAxisRating: (axis: RatingAxisKey, idx: number, v: number | null) => void;
+  onSetMemo:       (idx: number, memo: string) => void;
+}) {
+  const i = imageIndex;
+  const rating   = ratings[i] ?? null;
+  const memo     = memos[i] ?? "";
+  const [memoOpen, setMemoOpen] = useState(false);
+
+  return (
+    <div className="space-y-1">
+      {/* 全体評価 */}
+      <div className="flex items-center gap-1 flex-wrap">
+        <span className="text-[10px] text-text-muted/60 shrink-0 w-16">全体評価</span>
+        {([5, 3, 2, 1] as const).map((v) => {
+          const m = RATING_LABELS[v];
+          const active = rating === v;
+          const activeCls = v === 5 ? "border-emerald-400/80 bg-emerald-500/22 text-emerald-100"
+            : v === 3 ? "border-sky-400/75 bg-sky-500/20 text-sky-100"
+            : v === 2 ? "border-amber-400/75 bg-amber-500/20 text-amber-100"
+            :            "border-rose-400/80 bg-rose-500/22 text-rose-100";
+          return (
+            <button key={v} type="button"
+              onClick={() => onSetRating(i, active ? null : v)}
+              title={`${m.emoji} ${m.jp}`}
+              className={[
+                "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-semibold leading-none transition",
+                active ? activeCls : "border-bg-border/55 bg-bg-base/40 text-text-muted/70 hover:text-text-base hover:border-white/30",
+              ].join(" ")}>
+              <span className="text-[11px]">{m.emoji}</span><span>{m.jp}</span>
+            </button>
+          );
+        })}
+        <button type="button" onClick={() => setMemoOpen((v) => !v)}
+          title={memo ? `メモ: ${memo}` : "メモを追加"}
+          className={["inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-semibold leading-none transition",
+            memo ? "border-violet-400/60 bg-violet-500/16 text-violet-100" : "border-bg-border/55 bg-bg-base/40 text-text-muted/70 hover:text-text-base",
+          ].join(" ")}>
+          📝
+        </button>
+      </div>
+      {/* 軸別 */}
+      <div className="flex items-center gap-2 flex-wrap pl-16">
+        {(["bg", "outfit", "pose"] as RatingAxisKey[]).map((axis) => {
+          const axMeta = AXIS_RATING_META[axis];
+          const axMap = { bg: bgRatings, outfit: outfitRatings, pose: poseRatings };
+          const v = axMap[axis][i] ?? null;
+          return (
+            <span key={axis} className="inline-flex items-center gap-1">
+              <span className="text-[9px] text-text-muted/60 w-8">{axMeta.emoji} {axMeta.jp}</span>
+              {([5, 1] as const).map((val) => (
+                <button key={val} type="button" onClick={() => onSetAxisRating(axis, i, v === val ? null : val)}
+                  title={val === 5 ? "良い" : "悪い"}
+                  className={[
+                    "w-5 h-5 rounded border text-[11px] leading-none flex items-center justify-center transition",
+                    v === val
+                      ? val === 5 ? "border-emerald-400/75 bg-emerald-500/22 text-emerald-100" : "border-rose-400/75 bg-rose-500/22 text-rose-100"
+                      : "border-bg-border/45 bg-bg-base/30 text-text-muted/55 hover:text-text-base hover:border-white/25",
+                  ].join(" ")}>
+                  {val === 5 ? "👍" : "👎"}
+                </button>
+              ))}
+            </span>
+          );
+        })}
+      </div>
+      {/* メモ入力 */}
+      {memoOpen && (
+        <input type="text" value={memo} autoFocus maxLength={200}
+          onChange={(e) => onSetMemo(i, e.target.value)}
+          onBlur={() => setMemoOpen(false)}
+          placeholder="メモ（例：背景が良い / 衣装が微妙）"
+          className="w-full px-2 py-1 rounded border border-violet-400/45 bg-bg-base/90 text-[11px] text-text-base outline-none focus:border-violet-400/70" />
+      )}
+    </div>
+  );
+}
+
+// ── 1案ぶんのカード（再利用スタジオ版） ──────────────────────────────────────
+
+function ArrangeProposalCard({
+  proposal, index, localState, onLocalStateChange, onSaveFavorite, onReArrange,
 }: {
   proposal: GeneratedProposal;
   index: number;
-  onSaveFavorite: (p: GeneratedProposal) => void | Promise<void>;
+  localState: ProposalLocalState;
+  onLocalStateChange: (next: ProposalLocalState) => void;
+  onSaveFavorite: (p: GeneratedProposal, ls: ProposalLocalState) => void | Promise<void>;
   onReArrange: (p: GeneratedProposal) => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved,  setSaved]  = useState(false);
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(proposal.body);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1600);
-    } catch { /* ignore */ }
+    try { await navigator.clipboard.writeText(proposal.body); setCopied(true); setTimeout(() => setCopied(false), 1600); }
+    catch { /* noop */ }
   };
   const handleSave = async () => {
-    await onSaveFavorite(proposal);
+    await onSaveFavorite(proposal, localState);
     setSaved(true);
-    setTimeout(() => setSaved(false), 1600);
+    setTimeout(() => setSaved(false), 1800);
   };
 
+  // image helpers
+  const imgs = localState.images;
+  const setImages = (next: string[]) => onLocalStateChange({ ...localState, images: next.slice(0, MAX_RESULT_IMAGES) });
+  const appendImg   = (url: string) => setImages([...imgs, url]);
+  const replaceImg  = (i: number, url: string) => { const n = [...imgs]; n[i] = url; setImages(n); };
+  const removeImg   = (i: number) => setImages(imgs.filter((_, j) => j !== i));
+
+  // rating helpers (same shape as PromptCard)
+  const setRating = (idx: number, v: number | null) => {
+    const next = [...localState.ratings];
+    while (next.length <= idx) next.push(null);
+    next[idx] = v;
+    onLocalStateChange({ ...localState, ratings: next });
+  };
+  const setAxisRating = (axis: RatingAxisKey, idx: number, v: number | null) => {
+    const field: Record<RatingAxisKey, keyof ProposalLocalState> = { bg: "bgRatings", outfit: "outfitRatings", pose: "poseRatings" };
+    const arr = [...(localState[field[axis]] as (number | null)[])];
+    while (arr.length <= idx) arr.push(null);
+    arr[idx] = v;
+    onLocalStateChange({ ...localState, [field[axis]]: arr });
+  };
+  const setMemo = (idx: number, memo: string) => {
+    const next = [...localState.memos];
+    while (next.length <= idx) next.push(null);
+    next[idx] = memo.trim() || null;
+    onLocalStateChange({ ...localState, memos: next });
+  };
+
+  // 評価済み画像の枠色
+  const firstRating = localState.ratings[0] ?? null;
+  const borderCls = ratingBorderCls(firstRating);
+
   return (
-    <div className="rounded-xl border border-bg-border bg-bg-base/60 overflow-hidden">
+    <div className={["rounded-xl border-2 bg-bg-base/60 overflow-hidden transition", borderCls].join(" ")}>
+      {/* カードヘッダー */}
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-bg-border/60 bg-bg-panel/40">
         <span className="text-[12px] font-bold text-violet-200/90">案 {index + 1}</span>
-        {proposal.genreLabel && (
-          <span className="text-[10px] text-text-muted/50">{proposal.genreLabel}</span>
-        )}
+        {proposal.genreLabel && <span className="text-[10px] text-text-muted/50">{proposal.genreLabel}</span>}
       </div>
+
+      {/* プロンプト本文 */}
       <p className="px-3 py-2.5 text-[13px] leading-relaxed text-text-base/95 whitespace-pre-wrap break-words select-text">
         {proposal.body}
       </p>
-      <div className="px-3 pb-2.5 flex flex-wrap gap-1.5">
+
+      {/* 生成結果画像スロット */}
+      <div className="px-3 pb-2 space-y-1.5">
+        <p className="text-[10px] text-text-muted/55 font-semibold">🖼 生成結果画像（最大{MAX_RESULT_IMAGES}枚）</p>
+        <ArrangeImageSlot images={imgs} onAppend={appendImg} onReplaceAt={replaceImg} onRemoveAt={removeImg} />
+
+        {/* 画像ごとの評価 */}
+        {imgs.map((_, i) => (
+          <ArrangeRatingRow key={i} imageIndex={i}
+            ratings={localState.ratings} bgRatings={localState.bgRatings}
+            outfitRatings={localState.outfitRatings} poseRatings={localState.poseRatings}
+            memos={localState.memos}
+            onSetRating={setRating} onSetAxisRating={setAxisRating} onSetMemo={setMemo}
+          />
+        ))}
+      </div>
+
+      {/* アクションボタン */}
+      <div className="px-3 pb-3 flex flex-wrap gap-1.5 border-t border-bg-border/40 pt-2.5">
         <button type="button" onClick={handleCopy}
-          className={[
-            "rounded-lg px-2.5 py-1 text-[11px] font-semibold border transition",
-            copied ? "border-emerald-400/60 bg-emerald-400/20 text-emerald-100"
-                   : "border-sky-400/45 bg-sky-400/10 text-sky-200 hover:bg-sky-400/20",
+          className={["rounded-lg px-2.5 py-1 text-[11px] font-semibold border transition",
+            copied ? "border-emerald-400/60 bg-emerald-400/20 text-emerald-100" : "border-sky-400/45 bg-sky-400/10 text-sky-200 hover:bg-sky-400/20",
           ].join(" ")}>
           {copied ? "✓ コピーしました" : "📋 コピー"}
         </button>
         <button type="button" onClick={handleSave}
-          className={[
-            "rounded-lg px-2.5 py-1 text-[11px] font-semibold border transition",
-            saved ? "border-amber-400/60 bg-amber-400/20 text-amber-100"
+          className={["rounded-lg px-2.5 py-1 text-[11px] font-semibold border transition",
+            saved ? "border-emerald-400/60 bg-emerald-500/20 text-emerald-100"
                   : "border-amber-400/40 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20",
           ].join(" ")}>
           {saved ? "✓ 保存しました" : "♥ お気に入り保存"}
@@ -179,6 +474,11 @@ function ProposalCard({
           className="rounded-lg px-2.5 py-1 text-[11px] font-semibold border border-violet-400/45 bg-violet-400/10 text-violet-200 hover:bg-violet-400/20 transition">
           ✨ さらにアレンジ
         </button>
+        {imgs.length > 0 && (
+          <span className="text-[10px] text-text-muted/50 self-center ml-1">
+            画像 {imgs.length}/{MAX_RESULT_IMAGES} 枚登録
+          </span>
+        )}
       </div>
     </div>
   );
@@ -190,9 +490,18 @@ export function ArrangePreviewPanel({
   source, selectedScopes, onToggleScope, onSetScopes, onGenerate,
   result, busy, pinned, onTogglePin, onClose,
   onSaveFavorite, onReArrange, onSendToGenerator,
+  refImage, onClearRefImage,
 }: Props) {
   const usedAxes = result?.changedAxes.filter((a) => a.changed) ?? [];
   const excludedAxes = result?.changedAxes.filter((a) => !a.changed) ?? [];
+
+  // 案ごとのローカル state（画像・評価）。result が変わったらリセット。
+  const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
+  useEffect(() => {
+    if (result) {
+      setProposalStates(result.proposals.map(() => emptyProposalLocalState()));
+    }
+  }, [result]);
   const canGenerate = !!source && selectedScopes.length > 0 && !busy;
 
   return (
@@ -232,6 +541,23 @@ export function ArrangePreviewPanel({
               <br />
               左の履歴カードの「アレンジ」を押してください。
             </p>
+          </div>
+        )}
+
+        {/* Explorer からの参照画像バナー */}
+        {refImage && (
+          <div className="rounded-xl border border-sky-400/40 bg-sky-500/8 p-2 flex items-center gap-2.5">
+            <img src={refImage} alt="参照画像" className="w-12 h-12 rounded-lg object-cover border border-sky-400/55 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold text-sky-100">📁 Explorer 参照画像</p>
+              <p className="text-[10px] text-sky-200/65 leading-snug">各案の「＋ 追加」または画像スロットのドロップで登録できます</p>
+            </div>
+            {onClearRefImage && (
+              <button type="button" onClick={onClearRefImage} title="参照画像を解除"
+                className="shrink-0 text-[11px] text-text-muted/50 hover:text-text-muted/80 px-1.5 py-0.5 transition leading-none">
+                ✕
+              </button>
+            )}
           </div>
         )}
 
@@ -328,15 +654,34 @@ export function ArrangePreviewPanel({
                   </p>
                 </div>
 
-                {/* 案一覧 */}
-                <div className="space-y-2">
+                {/* 案一覧（再利用スタジオ版） */}
+                <div className="space-y-3">
                   <div className="text-[11px] font-semibold text-text-muted/60">
                     アレンジ後プロンプト（{result.proposals.length}案）
+                    <span className="ml-2 text-[10px] text-violet-300/65 font-normal">
+                      各案に生成結果を貼り付けて評価・保存できます
+                    </span>
                   </div>
-                  {result.proposals.map((p, i) => (
-                    <ProposalCard key={p.index ?? i} proposal={p} index={i}
-                      onSaveFavorite={onSaveFavorite} onReArrange={onReArrange} />
-                  ))}
+                  {result.proposals.map((p, i) => {
+                    const ls = proposalStates[i] ?? emptyProposalLocalState();
+                    return (
+                      <ArrangeProposalCard
+                        key={p.index ?? i}
+                        proposal={p}
+                        index={i}
+                        localState={ls}
+                        onLocalStateChange={(next) => {
+                          setProposalStates((prev) => {
+                            const cp = [...prev];
+                            cp[i] = next;
+                            return cp;
+                          });
+                        }}
+                        onSaveFavorite={onSaveFavorite}
+                        onReArrange={onReArrange}
+                      />
+                    );
+                  })}
                 </div>
               </>
             )}

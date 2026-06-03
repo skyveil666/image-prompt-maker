@@ -9,6 +9,10 @@
 import type { Scope, LockKey } from "../types";
 import type { FullHistoryAnalysis } from "./historyAnalyzer";
 import type { FavoriteProfile } from "./favoriteProfile";
+import type { ColorAnalysis } from "./colorAnalyzer";
+import { COLOR_GROUPS } from "./colorAnalyzer";
+import type { ImageAnalysisResult } from "./imageAnalyzer";
+import type { RatingAnalysis } from "./ratingAnalyzer";
 
 // ── 入力 ─────────────────────────────────────────────────────────────────────
 
@@ -28,6 +32,12 @@ export interface AgentInput {
   favoriteEnabled: boolean;
   /** 履歴分析（重複分析センターと同じソース） */
   historyAnalysis: FullHistoryAnalysis | null;
+  /** 色分析（重複分析センター「色分析」タブと同じソース） */
+  colorAnalysis: ColorAnalysis | null;
+  /** 画像分析（生成結果画像の重複・出現率） */
+  imageAnalysis: ImageAnalysisResult | null;
+  /** 画像評価分析（ユーザーが画像ごとに付けた👍/😐/👎/💀から集計） */
+  ratingAnalysis: RatingAnalysis | null;
   /** 重複分析の制御反映状態 */
   policyApplied: boolean;
   /** 風の強さ 0-5 */
@@ -88,7 +98,8 @@ const SCOPE_LABEL: Record<Scope, string> = {
 export function analyzeAgent(input: AgentInput): AgentAnalysis {
   const {
     scopes, faceLock, activeWorldPresets, activeGodModes, activeBoosts, viralMode,
-    favoriteProfile, favoriteEnabled, historyAnalysis, policyApplied, windLevel, hasImage,
+    favoriteProfile, favoriteEnabled, historyAnalysis, colorAnalysis, imageAnalysis, ratingAnalysis,
+    policyApplied, windLevel, hasImage,
   } = input;
 
   const ha = historyAnalysis;
@@ -182,6 +193,49 @@ export function analyzeAgent(input: AgentInput): AgentAnalysis {
     });
   }
 
+  // 9-pre. 画像分析（視覚的重複・カテゴリ偏り）
+  if (imageAnalysis) {
+    // 視覚クラスタが大きい：同じ見た目が繰り返されている
+    const biggestCluster = imageAnalysis.clusters[0];
+    if (biggestCluster && biggestCluster.size >= 3) {
+      problems.push({
+        severity: biggestCluster.size >= 5 ? "high" : "medium",
+        text: `📸 視覚的に酷似した画像が ${biggestCluster.size} 枚あります — プロンプトの文言を変えても画像が似たままです。`,
+      });
+    }
+    // カテゴリ偏り
+    const top1 = imageAnalysis.overusedCategories[0];
+    if (top1 && top1.ratio >= 0.50) {
+      problems.push({
+        severity: top1.ratio >= 0.70 ? "high" : "medium",
+        text: `また${top1.label}が続いています（${top1.axis} の ${Math.round(top1.ratio * 100)}%）。別方向を試しましょう。`,
+      });
+    } else if (top1 && top1.ratio >= 0.40) {
+      problems.push({
+        severity: "low",
+        text: `${top1.label}（${top1.axis}）の比率が高めです（${Math.round(top1.ratio * 100)}%）。`,
+      });
+    }
+  }
+
+  // 9. 色の偏り（色分析タブと同じ警告を吹き出しにも反映）
+  if (colorAnalysis && colorAnalysis.biasWarnings.length > 0) {
+    // global の警告を最優先
+    const globalWarn = colorAnalysis.biasWarnings.find((w) => w.axis === "global");
+    if (globalWarn) {
+      problems.push({
+        severity: globalWarn.severity,
+        text: globalWarn.message,
+      });
+    }
+    // 軸別の高severity警告
+    for (const w of colorAnalysis.biasWarnings) {
+      if (w.axis !== "global" && w.severity === "high") {
+        problems.push({ severity: "medium", text: w.message });
+      }
+    }
+  }
+
   // ── 次におすすめ（箇条書き）──
   const recommendations: string[] = [];
 
@@ -209,6 +263,71 @@ export function analyzeAgent(input: AgentInput): AgentAnalysis {
   if (viralMode && scopes.length >= 4) {
     recommendations.push("🔥 バズり ONかつ変更項目が多いため、Nano Bananaでは品質が落ちやすいです。3軸以下推奨");
   }
+
+  // 評価分析（ユーザー評価ベースの提案）— scope と一致する軸のみ採用
+  if (ratingAnalysis && ratingAnalysis.totalRatedImages >= 3) {
+    // 高評価が多い軸の推奨
+    const recInScope = ratingAnalysis.topRecommended.filter((r) => scopes.includes(r.axis as never));
+    if (recInScope.length > 0) {
+      const top = recInScope[0];
+      recommendations.push(
+        `${top.axisJp}：高評価が多い「${top.cat.jp}」方向に寄せると好結果が期待できます（評価データ ${top.cat.total}件）`,
+      );
+    }
+    // 低評価が多い軸の警告
+    const avoidInScope = ratingAnalysis.topAvoid.filter((r) => scopes.includes(r.axis as never));
+    if (avoidInScope.length > 0) {
+      const worst = avoidInScope[0];
+      problems.push({
+        severity: "medium",
+        text: `${worst.axisJp}：「${worst.cat.jp}」は微妙/失敗評価が多めです（${worst.cat.bad}件）。今回は避けると安全。`,
+      });
+    }
+  }
+
+  // 画像分析からの提案（未開拓カテゴリ・別方向）
+  if (imageAnalysis) {
+    const overusedAxes = new Set(imageAnalysis.overusedCategories.map((c) => c.axis));
+    // 頻出軸に対応する未開拓選択肢を1〜2件推す
+    const underByAxis = new Map<string, string[]>();
+    for (const u of imageAnalysis.underusedCategories) {
+      if (!overusedAxes.has(u.axis)) continue;
+      if (!underByAxis.has(u.axis)) underByAxis.set(u.axis, []);
+      underByAxis.get(u.axis)!.push(u.label);
+    }
+    for (const [axis, labels] of underByAxis.entries()) {
+      const picks = labels.slice(0, 2).join("・");
+      if (picks) {
+        recommendations.push(`${axis}：今回は未開拓の「${picks}」方向がおすすめです`);
+      }
+    }
+    // 視覚的重複が大きい場合の汎用提案
+    const big = imageAnalysis.clusters[0];
+    if (big && big.size >= 4) {
+      recommendations.push("視覚的な被りが大きいです。神引きカオス+バズ寄せで強制的に別方向へ");
+    }
+  }
+
+  // 色推奨（偏り警告がある時、具体的な代替色を箇条書きに追加）
+  if (colorAnalysis && colorAnalysis.biasWarnings.length > 0) {
+    const w = colorAnalysis.biasWarnings[0];
+    const recJp = w.recommendColorIds
+      .map((id) => COLOR_GROUPS.find((c) => c.id === id)?.jp ?? id)
+      .join("・");
+    if (recJp) {
+      recommendations.push(`色のバランスとして「${recJp}」のいずれかを取り入れる`);
+    }
+  } else if (colorAnalysis && colorAnalysis.unexploredColors.length >= 6) {
+    // 未開拓色が多い時は試しに使ってみる提案
+    const sampleIds = colorAnalysis.unexploredColors.slice(0, 3);
+    const sample = sampleIds
+      .map((id) => COLOR_GROUPS.find((c) => c.id === id)?.jp ?? id)
+      .join("・");
+    if (sample) {
+      recommendations.push(`まだ使っていない色：${sample} を試してみる`);
+    }
+  }
+
   if (recommendations.length === 0) {
     recommendations.push("現状の設定は安定しています。このまま生成して問題ありません。");
   }

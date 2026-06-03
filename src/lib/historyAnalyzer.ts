@@ -78,8 +78,10 @@ export interface UntappedGenre {
 
 export interface FullHistoryAnalysis {
   totalItems: number;
-  /** モチーフカウントを行った件数（最大500） */
+  /** モチーフカウントを行った件数（直近90日・最大1000） */
   windowSize: number;
+  /** 分析対象期間（日）。表示用。 */
+  windowDays: number;
   analyzedAt: number;
   /** 全20モチーフ、totalCount 降順 */
   motifCounts: MotifCount[];
@@ -119,7 +121,31 @@ export interface MotifCombo {
 
 // ── 定数 ────────────────────────────────────────────────────────────────────
 
-const ANALYSIS_WINDOW = 500;
+/**
+ * 偏り検出の対象期間（日）。古い好み・古い失敗の影響を避けるため直近のみを見る。
+ * お気に入り傾向・評価学習は別枠（全期間）で扱う。
+ */
+export const WINDOW_DAYS = 90;
+/** 直近90日でも件数が多い場合の上限（重い処理を避ける）。 */
+export const MAX_WINDOW = 1000;
+
+/**
+ * 「直近 days 日・最大 cap 件」に絞り込む（createdAt 降順）。
+ * 直近期間に履歴が無い場合は、空表示を避けるため最新 cap 件にフォールバックする。
+ */
+export function filterRecentWindow(
+  items: readonly PromptHistoryItem[],
+  days: number = WINDOW_DAYS,
+  cap: number = MAX_WINDOW,
+  nowMs: number = Date.now(),
+): PromptHistoryItem[] {
+  const sorted = [...items].sort((a, b) => b.createdAt - a.createdAt);
+  const cutoff = nowMs - days * 24 * 60 * 60 * 1000;
+  const recent = sorted.filter((it) => it.createdAt >= cutoff);
+  // 直近期間に1件も無ければ、最新 cap 件にフォールバック（全部が古いユーザー向け）
+  const base = recent.length > 0 ? recent : sorted;
+  return base.slice(0, cap);
+}
 
 /**
  * ペナルティ閾値（ユーザー仕様より）
@@ -416,9 +442,9 @@ export function analyzeFullHistory(
 ): FullHistoryAnalysis {
   const totalItems = allItems.length;
 
-  // 直近 N 件を対象にする（重い処理を避けるため）
-  const sorted = [...allItems].sort((a, b) => b.createdAt - a.createdAt);
-  const window = sorted.slice(0, ANALYSIS_WINDOW);
+  // 直近 WINDOW_DAYS 日（最大 MAX_WINDOW 件）を対象にする。
+  // 古い好み・失敗を引きずらないよう「今の偏り」だけを見る。
+  const window = filterRecentWindow(allItems);
   const windowSize = window.length;
 
   // ── 1. 各ヒストリーアイテムのモチーフを検出（後でループを減らすために先に計算）
@@ -552,6 +578,7 @@ export function analyzeFullHistory(
   return {
     totalItems,
     windowSize,
+    windowDays: WINDOW_DAYS,
     analyzedAt: Date.now(),
     motifCounts,
     topMotifs: topMotifsFiltered,

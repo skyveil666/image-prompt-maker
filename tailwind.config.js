@@ -17,8 +17,9 @@ export default {
           soft: "#2a224a",
         },
         text: {
-          base: "#e6e8ee",
-          muted: "#8b91a3",
+          base: "#eceef4",
+          // コントラスト改善：以前の #8b91a3 より明るくし、薄い不透明度でも読めるように
+          muted: "#a7adbe",
         },
       },
       boxShadow: {

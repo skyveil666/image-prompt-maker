@@ -162,26 +162,37 @@ function pickStyle(age: ZozoAge): string {
  */
 export function sampleZozoTrend(age: ZozoAge, category: ZozoCategory): ZozoTrend {
   const style = pickStyle(age);
-  const color = pickN(COLOR_POOL, 1)[0];
+  // 色は2トーン候補を渡す（案ごとに選択肢ができる）
+  const colors = pickN(COLOR_POOL, 2);
   let items: string[] = [];
 
   if (category === "auto" || category === "full") {
-    // 全身コーデ：トップス + ボトムス(パンツ/スカート/ワンピ) + シューズ + たまにアウター
-    const top = pickN(CATEGORY_POOL.tops, 1);
-    const bottomPool = shuffle([
-      ...CATEGORY_POOL.pants, ...CATEGORY_POOL.skirt, ...CATEGORY_POOL.onepiece,
-    ]);
-    const bottom = bottomPool.slice(0, 1);
-    const shoes = pickN(CATEGORY_POOL.shoes, 1);
+    // ── 全身コーデ：4案以上生成でも各案が差別化できるよう候補を多めに取得 ──
+    //
+    // トップス：2〜3種類を候補として渡す（各案が異なるトップスを選べる）
+    const tops = pickN(CATEGORY_POOL.tops, 3);
+    //
+    // ボトムス：パンツ・スカート・ワンピの中で2カテゴリを無作為に選んで1種ずつ
+    type BottomKey = "pants" | "skirt" | "onepiece";
+    const BOTTOM_KEYS: BottomKey[] = ["pants", "skirt", "onepiece"];
+    const bottomByCategory: string[] = [];
+    const bottomCategories = shuffle(BOTTOM_KEYS).slice(0, 2);
+    for (const cat of bottomCategories) {
+      const picked = pickN(CATEGORY_POOL[cat], 1);
+      bottomByCategory.push(...picked);
+    }
+    // アウター（50%の確率で1点追加）
     const outer = Math.random() < 0.5 ? pickN(CATEGORY_POOL.outer, 1) : [];
-    items = [...top, ...bottom, ...outer, ...shoes];
+    // シューズは1種で十分（ユーザーもそう言っている）
+    const shoes = pickN(CATEGORY_POOL.shoes, 1);
+    items = [...tops, ...bottomByCategory, ...outer, ...shoes];
   } else {
-    // 特定カテゴリ：そのカテゴリから2点（多めに見せる）
+    // 特定カテゴリ：そのカテゴリから3点（多めに渡して案ごとの差別化に使う）
     const pool = CATEGORY_POOL[category];
-    items = pickN(pool, 2);
+    items = pickN(pool, 3);
   }
 
-  const traits = Array.from(new Set([...items, color, style])).filter(Boolean);
+  const traits = Array.from(new Set([...items, ...colors, style])).filter(Boolean);
   return { ageLabel: ageLabelOf(age), categoryLabel: categoryLabelOf(category), traits };
 }
 

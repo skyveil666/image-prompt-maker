@@ -67,9 +67,29 @@ const STRENGTH_LABELS: Record<number, string> = {
 const GLOSS_LABELS: Record<number, string> = {
   1: "マット", 2: "控えめ", 3: "標準", 4: "光沢強め", 5: "高光沢",
 };
-const DIM_LABELS: Record<number, string> = {
-  1: "2D寄り", 2: "やや平面的", 3: "2.5D", 4: "立体感強め", 5: "3D寄り",
+const REALISM_LABELS: Record<number, string> = {
+  1: "イラスト", 2: "デジタルペイント", 3: "2.5D", 4: "リアル寄り", 5: "写真リアル",
 };
+const REALISM_HINT: Record<number, string> = {
+  1: "背景もアニメ/絵画的に",
+  2: "デジタルペイント/コンセプトアート風",
+  3: "人物と背景を2.5Dで統一",
+  4: "実写寄りだが人物と馴染ませる",
+  5: "実写写真風の背景を許可",
+};
+
+const REALISM_TYPES_BRIEF: { id: string; jp: string; emoji: string }[] = [
+  { id: "anime_bg",      jp: "アニメ背景",     emoji: "🎴" },
+  { id: "digital_paint", jp: "デジタルペイント", emoji: "🖌" },
+  { id: "oil_paint",     jp: "油絵",          emoji: "🎨" },
+  { id: "watercolor",    jp: "水彩",          emoji: "💧" },
+  { id: "cel",           jp: "セル画",        emoji: "📺" },
+  { id: "manga_bg",      jp: "漫画背景",      emoji: "📖" },
+  { id: "game_bg",       jp: "ゲーム背景",    emoji: "🎮" },
+  { id: "concept_art",   jp: "コンセプトアート", emoji: "🖼" },
+  { id: "photo_real",    jp: "写真リアル",    emoji: "📷" },
+  { id: "movie_bg",      jp: "映画背景",      emoji: "🎬" },
+];
 
 // ── Expression options ────────────────────────────────────────────────────────
 
@@ -88,7 +108,8 @@ const EXPRESSION_OPTIONS: { value: Expression; label: string }[] = [
 
 // ── Shared scope/count chip styles ────────────────────────────────────────────
 
-const CHIP_ACTIVE   = "border-accent bg-accent/20 text-text-base shadow-[0_0_0_1px_rgba(124,92,255,0.35)]";
+// 選択中はラベル前に ✓ を付け、accent 色のリング＋強いグローで判別性を最大化
+const CHIP_ACTIVE   = "border-accent bg-accent/22 text-white shadow-[0_0_0_2px_rgba(124,92,255,0.55),0_0_14px_-2px_rgba(124,92,255,0.55)] ring-1 ring-accent/45";
 const CHIP_INACTIVE = "border-[#252e44] bg-[#0f1015] text-text-muted/85 hover:text-text-base hover:border-accent/40";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -97,21 +118,27 @@ interface Props {
   // 変更範囲
   scopes: Scope[];
   onScopesChange: (v: Scope[]) => void;
-  /** 変更範囲エリア内に表示する「選択中チップ一覧＋リセット」（App から SelectionSummary を渡す） */
-  selectionSummary?: ReactNode;
+  /** 変更対象（scopes）だけリセット */
+  onScopesReset: () => void;
+  /** 変更範囲＋ブースト＋お気に入り＋ZOZO まですべてリセット（守るものは維持） */
+  onResetAll: () => void;
   /** 「生成ブースト」セクションの中身（お気に入り傾向・ZOZO 等。App から BoostControls を渡す） */
   boostArea?: ReactNode;
   /** プリセット押下時にインクリメント → スコープボタンをフラッシュ */
   scopeFlashKey?: number;
-  // 変更強度 / 光沢感 / 立体感
+  // 変更強度 / 光沢感 / 質感・リアル度
   strength: number;
   glossLevel: number;
-  dimensionLevel: number;
+  /** 質感・リアル度（1=完全2D ↔ 5=写真リアル）。dimensionLevel は廃止。 */
+  realismLevel: number;
+  /** 質感タイプ（"anime_bg" 等、null=指定なし） */
+  realismType: string | null;
   textureOriginal: boolean;
   textureDisabled: boolean;
   onStrengthChange: (v: number) => void;
   onGlossChange: (v: number) => void;
-  onDimensionChange: (v: number) => void;
+  onRealismLevelChange: (v: number) => void;
+  onRealismTypeChange: (v: string | null) => void;
   onTextureOriginalChange: (v: boolean) => void;
   onTextureDisabledChange: (v: boolean) => void;
   // 守るもの — 顔/同一性
@@ -119,31 +146,29 @@ interface Props {
   expression: Expression | null;
   onFaceLockChange: (v: boolean) => void;
   onExpressionChange: (v: Expression | null) => void;
-  // 守るもの — その他
+  // 守るもの — その他（量産回避は生成補助へ移動したのでここには無い）
   bodyPoseLock: boolean;
   colorMoodLock: boolean;
   compositionLock: boolean;
-  avoidCliche: boolean;
   onBodyPoseLockChange: (v: boolean) => void;
   onColorMoodLockChange: (v: boolean) => void;
   onCompositionLockChange: (v: boolean) => void;
-  onAvoidClicheChange: (v: boolean) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ControlPanel({
   scopes, onScopesChange,
-  selectionSummary,
+  onScopesReset, onResetAll,
   boostArea,
   scopeFlashKey = 0,
-  strength, glossLevel, dimensionLevel,
+  strength, glossLevel, realismLevel, realismType,
   textureOriginal, textureDisabled,
-  onStrengthChange, onGlossChange, onDimensionChange,
+  onStrengthChange, onGlossChange, onRealismLevelChange, onRealismTypeChange,
   onTextureOriginalChange, onTextureDisabledChange,
   faceLock, expression, onFaceLockChange, onExpressionChange,
-  bodyPoseLock, colorMoodLock, compositionLock, avoidCliche,
-  onBodyPoseLockChange, onColorMoodLockChange, onCompositionLockChange, onAvoidClicheChange,
+  bodyPoseLock, colorMoodLock, compositionLock,
+  onBodyPoseLockChange, onColorMoodLockChange, onCompositionLockChange,
 }: Props) {
   const poseConflict    = scopes.includes("pose");
   const compConflict    = scopes.includes("camera") || scopes.includes("aspect_ratio");
@@ -178,7 +203,8 @@ export function ControlPanel({
   function handleReset() {
     onStrengthChange(2);
     onGlossChange(3);
-    onDimensionChange(3);
+    onRealismLevelChange(3);
+    onRealismTypeChange(null);
     onTextureOriginalChange(false);
     onTextureDisabledChange(false);
   }
@@ -194,11 +220,38 @@ export function ControlPanel({
   return (
     <section className="card !p-2 space-y-1">
 
-      {/* ══════ A. 変更するもの ══════ */}
+      {/* ══════ A. 変更対象（唯一のソース：上段ボタン） ══════ */}
       <div>
-        <span className="text-[13px] font-semibold uppercase tracking-widest text-violet-200/90 select-none leading-none block mb-1">
-          変更するもの
-        </span>
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className="text-[13px] font-semibold uppercase tracking-widest text-violet-200/90 select-none leading-none">
+            変更対象
+            {scopes.length > 0 && (
+              <span className="ml-1.5 text-violet-100/90 font-bold normal-case tracking-normal">
+                （{scopes.length}件）
+              </span>
+            )}
+          </span>
+          {scopes.length > 0 && (
+            <span className="ml-auto shrink-0 flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={onScopesReset}
+                title="「変更対象」だけを解除する"
+                className="px-2.5 py-0.5 rounded border border-violet-400/30 bg-violet-400/8 text-violet-200/85 text-[12px] font-semibold hover:bg-violet-400/18 hover:border-violet-400/55 transition leading-snug"
+              >
+                ↺ 変更だけ
+              </button>
+              <button
+                type="button"
+                onClick={onResetAll}
+                title="変更範囲・生成ブースト・お気に入り傾向・ZOZOをすべて解除（守るものは維持）"
+                className="px-2.5 py-0.5 rounded border border-rose-400/30 bg-rose-400/8 text-rose-200/85 text-[12px] font-semibold hover:bg-rose-500/18 hover:border-rose-500/55 hover:text-rose-200 transition leading-snug"
+              >
+                ↺ 全リセット
+              </button>
+            </span>
+          )}
+        </div>
         <div className="flex flex-wrap gap-1.5">
           {SCOPE_OPTIONS.map((opt) => {
             const active   = scopes.includes(opt.id);
@@ -209,19 +262,21 @@ export function ControlPanel({
                 type="button"
                 onClick={() => toggleScope(opt.id)}
                 title={opt.hint}
+                aria-pressed={active}
                 className={[
-                  "px-3.5 py-1.5 text-[13px] rounded-lg border font-semibold leading-none transition select-none",
+                  "px-3.5 py-1.5 text-[13px] rounded-lg border font-semibold leading-none transition select-none inline-flex items-center gap-1",
                   active ? CHIP_ACTIVE : CHIP_INACTIVE,
                   flashing ? "scope-flash" : "",
                 ].join(" ")}
               >
+                {active && (
+                  <span className="text-[11px] leading-none text-accent/95" aria-hidden>✓</span>
+                )}
                 {opt.label}
               </button>
             );
           })}
         </div>
-        {/* 選択中チップ一覧＋リセット（唯一の選択中表示） */}
-        {selectionSummary}
       </div>
 
       {/* ── Divider ─────────────────────────────────────────── */}
@@ -284,12 +339,7 @@ export function ControlPanel({
             warn={compConflict}
             warnTitle="カメラ/アスペクト比変更範囲と競合します"
           />
-          <ProtectChip
-            label="量産回避"
-            value={avoidCliche}
-            onChange={onAvoidClicheChange}
-            amber
-          />
+          {/* 「量産回避」は生成補助（回避系）へ移動。守るものは純粋なロックのみに整理。 */}
         </div>
 
         {/* ── 表情エリア（解除時のみ表示） ── */}
@@ -386,8 +436,53 @@ export function ControlPanel({
               glossDimDisabled ? "opacity-30 pointer-events-none" : "",
             ].join(" ")}>
               <ButtonRow label="光沢感" value={glossLevel} labels={GLOSS_LABELS} onChange={onGlossChange} />
-              <ButtonRow label="立体感" value={dimensionLevel} labels={DIM_LABELS} onChange={onDimensionChange} />
+              <ButtonRow label="🎨 リアル度" value={realismLevel} labels={REALISM_LABELS} onChange={onRealismLevelChange} />
             </div>
+          </div>
+          {/* リアル度ヒント + 質感タイプ折りたたみ */}
+          <div className={glossDimDisabled ? "opacity-30 pointer-events-none" : ""}>
+            <p className="text-[11px] text-text-muted/60 leading-snug">
+              💡 {REALISM_HINT[realismLevel]}
+              {realismType && (
+                <span className="ml-2 text-violet-300/80">
+                  ・タイプ：{REALISM_TYPES_BRIEF.find((t) => t.id === realismType)?.jp}
+                </span>
+              )}
+            </p>
+            <details className="mt-0.5">
+              <summary className="text-[11px] text-text-muted/55 hover:text-text-base cursor-pointer leading-none inline-block py-0.5">
+                ▸ 質感タイプ（任意）{realismType && <span className="ml-1 text-violet-300/80">●</span>}
+              </summary>
+              <div className="flex flex-wrap gap-1 mt-1 pl-1">
+                <button
+                  type="button"
+                  onClick={() => onRealismTypeChange(null)}
+                  className={[
+                    "text-[11px] font-medium px-1.5 py-0.5 rounded border leading-none transition",
+                    realismType === null
+                      ? "border-violet-400/65 bg-violet-500/18 text-violet-100"
+                      : "border-bg-border/45 text-text-muted/55 hover:border-violet-400/40 hover:text-text-base",
+                  ].join(" ")}
+                >
+                  なし
+                </button>
+                {REALISM_TYPES_BRIEF.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => onRealismTypeChange(t.id)}
+                    className={[
+                      "text-[11px] font-medium px-1.5 py-0.5 rounded border leading-none transition whitespace-nowrap",
+                      realismType === t.id
+                        ? "border-violet-400/65 bg-violet-500/18 text-violet-100"
+                        : "border-bg-border/45 text-text-muted/55 hover:border-violet-400/40 hover:text-text-base",
+                    ].join(" ")}
+                  >
+                    {t.emoji} {t.jp}
+                  </button>
+                ))}
+              </div>
+            </details>
           </div>
 
           {/* 質感反映 / 元画像維持 / リセット */}

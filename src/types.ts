@@ -1137,8 +1137,21 @@ export interface PromptInputs {
   strength?: number;
   /** 光沢感 1-5（1=マット 2=ややマット 3=標準 4=光沢 5=強光沢）。3=標準はプロンプト非出力。 */
   glossLevel?: number;
-  /** 立体感 1-5（1=2D 2=やや2D 3=2.5D 4=やや3D 5=3D）。3=2.5Dはプロンプト非出力。 */
+  /** 立体感 1-5（1=2D 2=やや2D 3=2.5D 4=やや3D 5=3D）。3=2.5Dはプロンプト非出力。
+   * 互換のため残しているが、UIから露出はしない。代わりに realismLevel を使う。 */
   dimensionLevel?: number;
+  /**
+   * 質感・リアル度 1-5（1=完全2Dイラスト / 2=デジタルペイント / 3=2.5D（既定）/ 4=リアル寄り / 5=写真リアル）。
+   * 「背景だけリアルすぎる問題」を防ぐため、人物と背景の質感統一を最優先する。
+   * scope（背景/衣装/カメラ/ライティング）に応じて、各軸の質感プロンプトに反映される。
+   * 3（2.5D）はプロンプト非出力（既定値なので不要）。
+   */
+  realismLevel?: number;
+  /**
+   * 質感タイプ（任意）。realismLevel と組み合わせて、より具体的な絵柄を指定する。
+   * null/未指定 = タイプ指定なし（realismLevel のみで決定）。
+   */
+  realismType?: string | null;
   /** 元画像維持モード：true のとき両スライダーを無視して「元画像の質感と立体感を維持」 */
   textureOriginal?: boolean;
   /** プロンプトに反映しない：true のとき質感ブロックを出力しない */
@@ -1198,6 +1211,64 @@ export interface PromptInputs {
    * 髪・衣装・前景演出・ポーズ・カメラのいずれかが変更範囲ONの時のみ反映。
    */
   windLevel?: number;
+  /**
+   * 色ごとのポリシー（旧構造・互換のため残す）。
+   * @deprecated 新規実装は colorWeights を使う。
+   */
+  colorControls?: { colorId: string; jp: string; policy: "restrict" | "block" }[];
+  /**
+   * 色×軸の重み制御（髪/服/背景それぞれ 0〜5、3=普通は送らない）。
+   * 0 = 完全禁止 / 1 = 強抑制 / 2 = 抑制 / 4 = 推奨 / 5 = 強推奨
+   */
+  colorWeights?: {
+    colorId: string;
+    jp:      string;
+    axis:    "hair" | "outfit" | "background";
+    weight:  0 | 1 | 2 | 4 | 5;
+  }[];
+  /**
+   * 画像分析バイアス（生成結果画像由来）。
+   * 視覚的重複・カテゴリ偏りをサーバ側プロンプトに渡す。
+   */
+  imageBias?: {
+    overused?:  { axis: string; label: string; ratio: number }[];
+    underused?: { axis: string; label: string }[];
+    visualDupCount?: number;
+  };
+  /**
+   * 好みプロファイル（実 AI 分析結果）。
+   * Gemini Flash で実際に分析した「好む傾向 / 嫌う傾向 / 優先・回避キーワード」を渡す。
+   * 未分析時は undefined。
+   */
+  preferenceProfile?: {
+    generatedAt: number;
+    model: string;
+    sampleSize: number;
+    likes:    { bg: string; outfit: string; pose: string };
+    dislikes: { bg: string; outfit: string; pose: string };
+    preferKeywords: string[];
+    avoidKeywords:  string[];
+    summary: string;
+  };
+  /**
+   * ユーザー画像評価バイアス（👍/😐/👎/💀）から導いた方向性ヒント。
+   * 「変更範囲ONの軸のみ」フィルタ済みのものを送る。
+   * preference: 軸別👍👎レポート（30件以上で active=true）
+   */
+  ratingBias?: {
+    recommended?: { axis: string; label: string; score: number }[];
+    avoid?:       { axis: string; label: string; score: number }[];
+    preference?: {
+      active: boolean;
+      axes: {
+        axis: "bg" | "outfit" | "pose";
+        good: number;
+        bad: number;
+        goodRatio: number;
+        badRatio: number;
+      }[];
+    };
+  };
 }
 
 export interface GeneratedProposal {
@@ -1229,8 +1300,55 @@ export interface PromptHistoryItem {
   dateKey: string;          // YYYY-MM-DD（ローカル時刻）
 
   sourceImageThumbnail: string | null; // 圧縮サムネ
-  resultImageData: string | null;      // 生成結果画像（ChatGPT / Gemini 等で生成後に登録）
+  /**
+   * 生成結果画像（ChatGPT / Gemini 等で生成後に登録）。
+   * 旧フィールド：互換のため残す。新フィールド resultImageDataList の 1 枚目と必ず同期させる。
+   * （リスト形式に移行後もここを参照する箇所が多いため null/string で維持）
+   */
+  resultImageData: string | null;
+  /**
+   * 生成結果画像のリスト（最大3枚）。
+   * 1案あたり同じプロンプトで複数回生成した結果を並べて登録できる。
+   * 空配列または未定義 = まだ登録なし（resultImageData も null）。
+   */
+  resultImageDataList?: string[];
+  /**
+   * 生成結果画像ごとのユーザー評価（resultImageDataList と同じインデックス）。
+   *   5 = 良い(good)、3 = まあまあ(normal)、2 = 微妙(weak)、1 = 失敗(bad)、null = 未評価
+   *   ※ お気に入り（PromptHistoryItem.isFavorite）は案カード単位の最高評価。
+   *      評価=5 とは併用可能（評価は画像単位の独立シグナル）。
+   * length は resultImageDataList と一致させるが、保存時に同期する。
+   */
+  resultRatings?: (number | null)[];
+  /**
+   * 生成結果画像ごとの評価メモ（任意の短い文章）。
+   * resultImageDataList と同じインデックス。空文字や null は「メモなし」。
+   */
+  resultMemos?: (string | null)[];
+  /**
+   * 軸別評価（👍=5 / 👎=1 / null=未評価）。
+   * 全体評価（resultRatings）の補助として、画像単位で「背景・衣装・ポーズ」の
+   * どこが良かった/悪かったかを別々に記録する。
+   * 30件以上集まると「好み分析レポート」が有効化され、自動補正の根拠になる。
+   */
+  resultBgRatings?:     (number | null)[];
+  resultOutfitRatings?: (number | null)[];
+  resultPoseRatings?:   (number | null)[];
   generatedResultAddedAt?: number;     // 生成結果を登録した unix ms
+
+  /**
+   * 派生元情報（アレンジ結果から保存した場合に付与）。
+   * - derivedFromId: アレンジ元 PromptHistoryItem の ID
+   * - derivedFromDate: 元アイテムの createdAt（表示用）
+   * - arrangeCaseNumber: アレンジ案番号（1始まり）
+   * - arrangeUsedScopes: アレンジ時に「使用した」スコープ一覧
+   * - arrangeExcludedScopes: アレンジ時に「除外した」スコープ一覧
+   */
+  derivedFromId?:           string;
+  derivedFromDate?:         number;
+  arrangeCaseNumber?:       number;
+  arrangeUsedScopes?:       Scope[];
+  arrangeExcludedScopes?:   Scope[];
 
   outputType: OutputTarget;
   promptText: string;
@@ -1260,10 +1378,33 @@ export interface PromptHistoryItem {
   strength?: number;         // Prompt Strength (1〜5) 生成時の設定値
   glossLevel?: number;
   dimensionLevel?: number;
+  /** 質感・リアル度 1-5（1=完全2D / 5=写真リアル）。3=2.5D は標準なので非出力。 */
+  realismLevel?: number;
+  /** 質感タイプ（"anime_bg" など、null=指定なし） */
+  realismType?: string | null;
   textureOriginal?: boolean;
   textureDisabled?: boolean;
   presetName?: string;       // 生成時に使用したプリセット名
   promptTarget?: PromptTarget; // 生成時の出力先安全モード
+
+  /**
+   * 「同じ構成で再生成」用の追加スナップショット。
+   * PromptHistoryItem に直接載っていない設定値（風・ZOZO・ブースト等）を保存する。
+   * 古い履歴には存在しないため optional。
+   */
+  settingsSnapshot?: {
+    windLevel?: number;
+    /** 反映中の ZOZOトレンド（null = 未反映） */
+    zozoApplied?: import("./lib/zozoTrend").ZozoTrend | null;
+    /** 有効なブーストID一覧（"avoid_overlap" / "other_world" / "buzz" / "face_pop"） */
+    activeBoosts?: string[];
+    /** カラーストラテジー */
+    colorStrategy?: string | null;
+    /** 絵柄スタイル */
+    artStyle?: string | null;
+    /** スコープ以外の era（時代設定） */
+    era?: string | null;
+  };
 }
 
 export type AppView = "main" | "history";

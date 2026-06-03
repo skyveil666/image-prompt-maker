@@ -94,6 +94,30 @@ body {
 }
 
 @layer components {
+  /* ── 一覧の視認性ルール（全画面共通） ─────────────────────────────
+   * .ipm-list を一覧コンテナに付けると、直接の子要素（＝各行）に
+   *   ・ゼブラ表示（偶数行を薄く塗る・Excel方式）
+   *   ・hover 強調（背景発光＋枠発光）
+   * が自動適用される。行ごとに class を足す必要はない。 */
+  .ipm-list > * {
+    @apply transition-colors duration-150 rounded-md;
+  }
+  .ipm-list > *:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.030);
+  }
+  .ipm-list > *:hover {
+    background-color: rgba(124, 92, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.40);
+  }
+  /* 単体行に hover 強調だけ付けたい場合 */
+  .ipm-row {
+    @apply transition-colors duration-150 rounded-md;
+  }
+  .ipm-row:hover {
+    background-color: rgba(124, 92, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(124, 92, 255, 0.40);
+  }
+
   .card {
     @apply bg-bg-card border border-bg-border rounded-2xl p-5 shadow-card;
   }
