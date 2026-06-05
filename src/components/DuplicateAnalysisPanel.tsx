@@ -9,7 +9,7 @@
  * - 重複リセット / ジャンル分散 / 提案を反映 の3アクション
  */
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import type { BiasAnalysisResult } from "../lib/biasAnalyzer";
 import { biasRiskLabel, biasRiskTextClass, biasRiskBorderClass } from "../lib/biasAnalyzer";
 import type {
@@ -1475,10 +1475,16 @@ function DuplicateAnalysisPanelInner({
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<"dup" | "agent" | "color" | "image" | "pref">("dup");
 
-  // 画像分析タブを開いた時に解析を発火
+  // 画像分析タブを開いた時に解析を発火（BUG-18: 一度きりの発火）。
+  // onStartImageAnalysis は analysisLive の identity 変化で頻繁に作り直されるため、
+  // これを effect の dep に入れると「発火→analysisLive更新→onStartImageAnalysis再生成→再発火」の
+  // 無限ループになる。最新参照を ref に退避し、effect は tab/expanded のみに依存させる。
+  const startImageRef = useRef(onStartImageAnalysis);
+  useEffect(() => { startImageRef.current = onStartImageAnalysis; });
   useEffect(() => {
-    if (tab === "image" && expanded) onStartImageAnalysis();
-  }, [tab, expanded, onStartImageAnalysis]);
+    if (tab === "image" && expanded) startImageRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onStartImageAnalysis は ref 経由（ループ防止のため意図的に除外）
+  }, [tab, expanded]);
 
   // 反映時のサマリー（制御中 = 非4 件数 / NG件数）
   const { controlled: controlledCount, ng: ngCount } = countLevels(levels);

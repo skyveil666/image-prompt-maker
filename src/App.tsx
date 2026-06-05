@@ -44,6 +44,7 @@ import { buildChaosFusionInputs, formatChaosLabel } from "./lib/chaosEngine";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
 import { analyzeFullHistory, filterRecentWindow, WINDOW_DAYS, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
 import { DuplicateAnalysisPanel } from "./components/DuplicateAnalysisPanel";
+import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
 import {
   loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
   isApplied, setAppliedStorage,
@@ -177,6 +178,17 @@ export default function App() {
   const [activeWorldPresets, setActiveWorldPresets] = useState<WorldPreset[]>([]);
   /** 世界観プリセット由来の指示文（extraInstructions と分離して管理） */
   const [worldCombinedNote, setWorldCombinedNote] = useState("");
+  /** 参照画像から「適用」した軸タグ付き自由文（catKey → text）。生成時に extraInstructions へ統合。
+   *  ※ 詳細 enum には自動反映しない（docs/23）。worldCombinedNote と同じ追加マージ方式。 */
+  const [referenceNote, setReferenceNote] = useState<Record<string, string>>({});
+  /** referenceNote を軸タグ付きテキストに整形（生成時に extraInstructions へ統合） */
+  const referenceNoteText = useMemo(
+    () => REFERENCE_CATEGORIES
+      .filter((c) => (referenceNote[c.key] ?? "").trim())
+      .map((c) => `【${c.label}】${referenceNote[c.key].trim()}`)
+      .join("\n"),
+    [referenceNote],
+  );
   /** スコープボタンのフラッシュアニメーション用キー（インクリメントで発火） */
   const [scopeFlashKey, setScopeFlashKey] = useState(0);
   /** 多様性エンジン：直近の背景/衣装/ムード/前景エフェクトを記憶して連発を防ぐ */
@@ -534,8 +546,9 @@ export default function App() {
       },
       safety:   "fictional_ai",
       details,
-      // worldCombinedNote（世界観プリセット由来）と追加指示を結合（出現制御は motifControls で別途反映）
-      extraInstructions: [worldCombinedNote, extraInstructions].filter(Boolean).join("\n\n"),
+      // worldCombinedNote（世界観プリセット由来）・referenceNote（参照画像から適用）・追加指示を結合
+      // （出現制御は motifControls で別途反映）
+      extraInstructions: [worldCombinedNote, referenceNoteText, extraInstructions].filter(Boolean).join("\n\n"),
       faceLock,
       expression: faceLock ? undefined : (expression ?? undefined),
       ngList: (() => {
@@ -654,6 +667,7 @@ export default function App() {
       compositionLock,
       details,
       worldCombinedNote,
+      referenceNoteText,
       extraInstructions,
       ngList,
       forbiddenTokens,
@@ -1276,6 +1290,11 @@ export default function App() {
   // ── 📸 自動画像解析：結果画像を貼ったら（タブを開かなくても）自動で解析する ──
   // 直近90日に「結果画像はあるが未解析」のアイテムがあれば、デバウンス後に解析を走らせる。
   // runProgressiveAnalysis は未解析分のみ処理するので再実行は安全（解析済みは即終了）。
+  // BUG-18: startImageAnalysis は analysisLive の identity 変化で頻繁に作り直されるため、
+  // dep に入れると解析中にタイマーが連打リセットされ thrash する。最新参照を ref 経由にし、
+  // effect は recentItems / imageFeatureMap の実変化のみで発火させる。
+  const startImageAnalysisRef = useRef(startImageAnalysis);
+  useEffect(() => { startImageAnalysisRef.current = startImageAnalysis; });
   const autoImageAnalyzeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     let pending = 0;
@@ -1284,14 +1303,15 @@ export default function App() {
     }
     if (pending === 0) return;
     if (autoImageAnalyzeTimer.current) clearTimeout(autoImageAnalyzeTimer.current);
-    autoImageAnalyzeTimer.current = setTimeout(() => { startImageAnalysis(); }, 1500);
+    autoImageAnalyzeTimer.current = setTimeout(() => { startImageAnalysisRef.current(); }, 1500);
     return () => {
       if (autoImageAnalyzeTimer.current) {
         clearTimeout(autoImageAnalyzeTimer.current);
         autoImageAnalyzeTimer.current = null;
       }
     };
-  }, [recentItems, imageFeatureMap, startImageAnalysis]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- startImageAnalysis は ref 経由（thrash防止のため意図的に除外）
+  }, [recentItems, imageFeatureMap]);
 
   // ── 🤖 AI分析エージェント：useMemoで現状から提案を再計算 ──
   const agentAnalysis = useMemo(() => analyzeAgent({
@@ -1406,6 +1426,30 @@ export default function App() {
     setMassProductionResult(null);
     showPresetToast("🧹 偏り履歴をクリア", "ジャンル＋サブジャンルの履歴をリセットしました。");
   }, [showPresetToast]);
+
+  // ── 🖼 参照画像：要素を「適用」（保護ゲート内蔵・docs/23） ──────────────────
+  // [適用] = その軸の scope を ON + 軸タグ付き自由文を referenceNote へ。enum詳細は触らない。
+  // 顔/同一性/表情/体型カテゴリは存在しない。ロックON軸は適用不可（既存保護を最優先）。
+  const handleApplyReference = useCallback((catKey: string, text: string): boolean => {
+    const cat = REFERENCE_CATEGORIES.find((c) => c.key === catKey);
+    const body = (text ?? "").trim();
+    if (!cat || !body) return false;
+    // 保護ゲート（既存ロック最優先）
+    const blocked = referenceLockReason(cat, { bodyPoseLock, compositionLock, colorMoodLock });
+    if (blocked) { showPresetToast("適用できません", blocked); return false; }
+    // 対応 scope を ON（未選択軸のみ追加・他軸は触らない）
+    if (cat.scope) {
+      setScopes((prev) => (prev.includes(cat.scope!) ? prev : [...prev, cat.scope!]));
+    }
+    // 軸タグ付き自由文を referenceNote へ（生成時に extraInstructions へ統合）
+    setReferenceNote((prev) => ({ ...prev, [catKey]: body }));
+    showPresetToast(`🖼 「${cat.label}」を参照から反映しました`, "「プロンプトを生成」で効きます。");
+    return true;
+  }, [bodyPoseLock, compositionLock, colorMoodLock, showPresetToast]);
+
+  const handleClearReference = useCallback(() => {
+    setReferenceNote({});
+  }, []);
 
   // ── 🎨 色重み：自動調整（偏り減点・未使用加点）──
   const handleColorAutoAdjust = useCallback((preserveManual: boolean) => {
@@ -2950,6 +2994,17 @@ export default function App() {
           setFavPanelOpen(false);
         }}
       />
+
+      {/* 🖼 参照画像 / 要素抽出 右側固定パネル（fixed・新規要素・main view のみ） */}
+      {view === "main" && (
+        <ReferenceImportPanel
+          protections={{ bodyPoseLock, compositionLock, colorMoodLock }}
+          activeScopes={scopes}
+          appliedNote={referenceNote}
+          onApply={handleApplyReference}
+          onClearAll={handleClearReference}
+        />
+      )}
 
       {/* 🖌 選択範囲プロンプトモーダル */}
       {selectionModalOpen && imageDataUrl && (

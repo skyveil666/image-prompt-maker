@@ -205,6 +205,33 @@
 
 T1 cosplay衣装残る／T2 cyber衣装残る／T3 無選択は衣装削除（退行なし）／T4 cosplay時も背景削除（背景保護維持）／T5 顔削除（顔保護不変）／T6 hairのみ時は衣装削除（退行なし）。テストは一時ファイルで実施し検証後に削除。
 
+### 重複分析センター フリーズ対策（F1/F2/F4 + BUG-18）
+
+リリース前監査の延長で「重複分析センターのタブ押下でフリーズ」を実測調査。**2系統**を確認し対処した。
+
+**F1/F2/F4（解析中の再レンダー負荷削減・スケジューリング/描画のみ・分析結果不変）**:
+- F1: 画像解析の進捗 setState を10枚ごとに間引き（136回→14回・90%削減）。[App.tsx](../src/App.tsx) `startImageAnalysis` の onProgress。
+- F2: `DuplicateAnalysisPanel` を `React.memo` 化＋props安定化（インラインλを useCallback 化）。
+- F4: 解析中UI（`AnalyzingBar`＝進捗バー・キャンセル・タブ非ブロック）。`onCancelImageAnalysis`/`cancelImageAnalysis` 追加。
+
+**BUG-18: 画像分析タブの useEffect 無限ループ（フリーズの主因）**:
+- **症状**: 画像分析タブを開くとフリーズ。隣の評価集計も巻き添えで無反応（メインスレッド飽和の二次症状）。色分析等は正常。
+- **原因**: `useAnalysisLive` の戻り値が `useMemo([state, …])` で **state 更新ごとに identity が変化**（[useAnalysisLive.ts:189](../src/lib/useAnalysisLive.ts:189)）→ `startImageAnalysis`（dep に `analysisLive`）も不安定化 → 画像タブ effect が `onStartImageAnalysis` を dep に持つ（[DuplicateAnalysisPanel.tsx:1481]旧）→ effect が `analysisLive.start()` を呼ぶ→state更新→identity変化→**effect再発火**の無限ループ。
+- **修正（effect の発火条件のみ）**: latest-ref パターン。画像タブ effect の dep を `[tab, expanded]` に縮小し `onStartImageAnalysis` は ref 経由に。App の自動画像解析 effect も同様に `startImageAnalysis` を ref 経由化（dep を `[recentItems, imageFeatureMap]` に）。
+- **不変**: 分析ロジック・重複率・好み分析・神引き・学習エージェント・保存データ・`useAnalysisLive` 本体・`startImageAnalysis` 本体は一切変更なし。
+- **影響範囲**: [DuplicateAnalysisPanel.tsx](../src/components/DuplicateAnalysisPanel.tsx)（主）/ [App.tsx](../src/App.tsx)（補助）の effect 依存配列のみ。
+
+### 検証（F1/F2/F4 + BUG-18）
+
+| 検証 | 結果 |
+|---|---|
+| フロント `tsc -b --noEmit` / サーバ `tsc --noEmit` / `vite build` | ✅ すべて exit 0 |
+| F1 進捗 setState 回数（136枚・実測） | 136回 → **14回**（90%削減） |
+| BUG-18 ループ遮断（React依存比較セマンティクス・50回churnシミュレーション） | 修正前 **50回** → 修正後 **1回**（`loop_broken: true`） |
+| タブ切替（dup→image→pref→color→image） | image を開いた2回のみ発火・他タブは正常切替 |
+
+実機の最終確認（画像タブ→他タブ即切替）はユーザー環境（実データ）で実施。
+
 ---
 
 ## 5. 検証して「問題なし」だった主な誤検知（誤修正防止）
