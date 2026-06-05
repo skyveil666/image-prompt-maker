@@ -128,6 +128,36 @@ export async function listExplorerFavorites(): Promise<ExplorerFavorite[]> {
   });
 }
 
+/**
+ * バックアップ復元用：id が重複しないお気に入りだけ追加する（既存は上書き・削除しない）。
+ */
+export async function mergeExplorerFavorites(
+  items: ExplorerFavorite[]
+): Promise<{ added: number; skipped: number }> {
+  const incoming = items ?? [];
+  const existing = await listExplorerFavorites();
+  const existingIds = new Set(existing.map((f) => f.id));
+  const db = await openDb();
+  let added = 0;
+  let skipped = 0;
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE_FAVORITES, "readwrite");
+    const store = tx.objectStore(STORE_FAVORITES);
+    for (const it of incoming) {
+      if (!it || typeof it.id !== "string" || !it.fullDataUrl || existingIds.has(it.id)) {
+        skipped++;
+        continue;
+      }
+      store.put(it);
+      existingIds.add(it.id);
+      added++;
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  return { added, skipped };
+}
+
 // ── Image loading ──────────────────────────────────────────────────────────
 
 export interface ExplorerImage {

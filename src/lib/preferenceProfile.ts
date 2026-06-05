@@ -97,7 +97,11 @@ export function savePreferenceProfile(p: PreferenceProfile): void {
 }
 
 export function clearPreferenceProfile(): void {
-  try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    // 自動学習の基準カウントもリセット（削除後に再分析が正しく発火するように）
+    localStorage.removeItem(AUTO_LAST_COUNT_KEY);
+  } catch { /* noop */ }
 }
 
 /** 自動学習の ON/OFF（既定 ON） */
@@ -113,6 +117,28 @@ export function loadAutoLearn(): boolean {
 
 export function saveAutoLearn(enabled: boolean): void {
   try { localStorage.setItem(AUTOLEARN_KEY, enabled ? "1" : "0"); } catch { /* noop */ }
+}
+
+// ── 自動学習：最後に分析した時点の「クライアント側サンプル数」（BUG-3A ループ防止） ──
+// サーバ返却の preferenceProfile.sampleSize は 100 件で頭打ちになるため、それを基準に
+// 「前回分析以降の新規評価数」を計算すると 100 件超で永遠に閾値超になり自動分析が止まらない。
+// クライアントの無上限サンプル数を分析成功時に保存し、その差分で判定する。
+// ※これは自動分析の「発火タイミング」を正すだけで、分析ロジック（collectSamples / Gemini 分析）は不変。
+const AUTO_LAST_COUNT_KEY = "ipm_autolearn_last_count_v1";
+
+export function loadAutoLastCount(): number {
+  try {
+    const raw = localStorage.getItem(AUTO_LAST_COUNT_KEY);
+    if (raw === null) return 0;
+    const n = parseInt(raw, 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function saveAutoLastCount(n: number): void {
+  try { localStorage.setItem(AUTO_LAST_COUNT_KEY, String(Math.max(0, Math.floor(n)))); } catch { /* noop */ }
 }
 
 // ── サンプル収集 ──────────────────────────────────────────────────────────

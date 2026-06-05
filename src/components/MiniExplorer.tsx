@@ -805,7 +805,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
       }
     }
     return copy;
-  }, [images, hiddenIds, sort, favorites]);
+  }, [images, hiddenIds, sort, favorites, query, favOnly, favNames]);
 
   // ── Derived ──────────────────────────────────────────────────────────
   const sortLabel   = SORT_OPTIONS.find((s) => s.id === sort)?.label ?? "並替";

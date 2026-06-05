@@ -9,7 +9,7 @@
  * - 重複リセット / ジャンル分散 / 提案を反映 の3アクション
  */
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type { BiasAnalysisResult } from "../lib/biasAnalyzer";
 import { biasRiskLabel, biasRiskTextClass, biasRiskBorderClass } from "../lib/biasAnalyzer";
 import type {
@@ -22,7 +22,7 @@ import type { MotifCombo } from "../lib/historyAnalyzer";
 import type { AgentAnalysis, AgentActionId } from "../lib/aiAgent";
 import type { ImageAnalysisResult } from "../lib/imageAnalyzer";
 import type { RatingAnalysis } from "../lib/ratingAnalyzer";
-import { type PreferenceProfile, profileSummaryLines, MIN_SAMPLES } from "../lib/preferenceProfile";
+import { type PreferenceProfile } from "../lib/preferenceProfile";
 import type { ColorAnalysis, ColorAxis } from "../lib/colorAnalyzer";
 import { COLOR_GROUPS, COLOR_AXES } from "../lib/colorAnalyzer";
 import type { ColorWeight, ColorWeightMap, ColorAxisCtrl } from "../lib/colorPolicy";
@@ -93,25 +93,16 @@ interface Props {
   onStartImageAnalysis: () => void;
   /** 進捗（未解析件数の解析中表示） */
   imageAnalyzeProgress: { done: number; total: number } | null;
+  /** F4: 解析中にキャンセルボタンを押した時 */
+  onCancelImageAnalysis?: () => void;
 
-  // ── 💡 好み分析（軸別👍👎 + 実 AI 分析） ──
+  // ── 💡 評価集計（軸別👍👎）。skyveil好みの分析・反映操作は SkyveilBar に一本化（M-3） ──
   /** 評価分析（軸別👍👎の集計を含む） */
   ratingAnalysis:       RatingAnalysis | null;
-  /** 実 Gemini 分析の結果プロファイル（null=未分析） */
+  /** 実 Gemini 分析の結果プロファイル（誘導表示の「分析済み/未分析」判定にのみ使用） */
   preferenceProfile:    PreferenceProfile | null;
-  /** 分析実行中フラグ */
-  analyzingProfile:     boolean;
-  /** 直近の分析エラー */
-  profileError:         string | null;
   /** サンプル可能件数（評価が1つでも付いている画像数） */
   profileSampleCount:   number;
-  /** 分析実行ボタン */
-  onRunPreferenceAnalysis: () => void;
-  /** プロファイル削除（再分析準備） */
-  onClearPreferenceProfile: () => void;
-  /** 自動学習 ON/OFF */
-  autoLearnEnabled: boolean;
-  onToggleAutoLearn: (enabled: boolean) => void;
 
   // ── 🤖 AI分析エージェント ──
   agent:             AgentAnalysis | null;
@@ -277,87 +268,58 @@ function LevelControl({
   );
 }
 
-// ── セクション：💡 好み分析レポート（軸別👍👎） ─────────────────────────
+// ── セクション：💡 評価集計（軸別👍👎）─────────────────────────
+// skyveil好みの「分析・反映・自動学習・削除」は SkyveilBar に一本化（M-3）。
+// このタブは画像評価の実数集計の表示に役割特化する。
 
 function PreferenceReportSection({
-  ratingAnalysis, profile, analyzing, profileError, profileSampleCount,
-  onRunAnalysis, onClearProfile, autoLearnEnabled, onToggleAutoLearn,
+  ratingAnalysis, profile, profileSampleCount,
 }: {
   ratingAnalysis: RatingAnalysis | null;
+  /** 「分析済み/未分析」の誘導表示にのみ使用（操作は SkyveilBar へ） */
   profile: PreferenceProfile | null;
-  analyzing: boolean;
-  profileError: string | null;
   profileSampleCount: number;
-  onRunAnalysis: () => void;
-  onClearProfile: () => void;
-  autoLearnEnabled: boolean;
-  onToggleAutoLearn: (enabled: boolean) => void;
 }) {
   const rep = ratingAnalysis?.preferenceReport;
-  // 「実行可能か」= サンプル数 >= MIN_SAMPLES
-  const canRun = profileSampleCount >= MIN_SAMPLES && !analyzing;
-  // 経過時間表示
-  const lastAnalyzedText = profile
-    ? new Date(profile.generatedAt).toLocaleString("ja-JP")
-    : "未実行";
-
-  if (!ratingAnalysis && !profile) {
-    return (
-      <div className="px-2 py-3 space-y-3">
-        <p className="text-[12px] text-slate-400">
-          💡 まだ評価データがありません。各案カードで生成結果画像を登録し、
-          評価ボタン（👍/😐/👎/💀 と 背景/衣装/ポーズ × 👍👎）を付けると分析できるようになります。
-        </p>
-        <RealAnalysisCard
-          profile={null}
-          analyzing={analyzing}
-          profileError={profileError}
-          sampleCount={profileSampleCount}
-          canRun={false}
-          lastAnalyzedText={lastAnalyzedText}
-          onRun={onRunAnalysis}
-          onClear={onClearProfile}
-          autoLearnEnabled={autoLearnEnabled}
-          onToggleAutoLearn={onToggleAutoLearn}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-3 py-2">
-      {/* ── 実 AI 分析カード（最上部、最重要） ─────────────── */}
-      <RealAnalysisCard
-        profile={profile}
-        analyzing={analyzing}
-        profileError={profileError}
-        sampleCount={profileSampleCount}
-        canRun={canRun}
-        lastAnalyzedText={lastAnalyzedText}
-        onRun={onRunAnalysis}
-        onClear={onClearProfile}
-        autoLearnEnabled={autoLearnEnabled}
-        onToggleAutoLearn={onToggleAutoLearn}
-      />
-
-      {/* ── サンプル統計（ヒューリスティック・嘘なし） ─────── */}
-      {rep && rep.totalAxisRatings > 0 ? (
-      <div className="rounded-lg border border-white/12 bg-white/3 px-2.5 py-2 space-y-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[12px] font-bold text-slate-200">
-            📊 評価サンプル統計（実数値）
-          </span>
-          <span className="ml-auto text-[10px] text-slate-400">
-            合計 {rep.totalAxisRatings} 件（背景/衣装/ポーズの 👍👎）
-          </span>
-        </div>
+      {/* skyveil好みAI への誘導（分析・反映・自動学習・削除は SkyveilBar に集約） */}
+      <div className="rounded-lg border border-violet-400/30 bg-violet-500/8 px-2.5 py-2 space-y-1">
+        <p className="text-[11px] text-violet-100/90 leading-snug">
+          🧬 好み傾向の<span className="font-bold">分析・反映・自動学習・削除</span>は、上部の「skyveil好みAI」に集約しました。
+        </p>
+        <p className="text-[10px] text-slate-400 leading-snug">
+          現在：{profile
+            ? <span className="text-emerald-200">分析済み（{profile.sampleSize}件 / {new Date(profile.generatedAt).toLocaleDateString("ja-JP")}）</span>
+            : <span className="text-slate-300">未分析</span>}
+          {"　"}・ 評価サンプル {profileSampleCount} 件
+        </p>
         <p className="text-[10px] text-slate-400/85 leading-snug">
-          これはローカル集計です。実際の「ユーザーが好む傾向」分析は上の AI 分析ボタンを押してください。
+          このタブは「画像評価（👍👎）の実数集計」を表示します。
         </p>
       </div>
-      ) : null}
 
-      {/* ── 軸別の好評/不評率（数値のみ・嘘なし） ───────────── */}
+      {/* 評価サンプル統計（実数値） */}
+      {rep && rep.totalAxisRatings > 0 ? (
+        <div className="rounded-lg border border-white/12 bg-white/3 px-2.5 py-2 space-y-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[12px] font-bold text-slate-200">
+              📊 評価サンプル統計（実数値）
+            </span>
+            <span className="ml-auto text-[10px] text-slate-400">
+              合計 {rep.totalAxisRatings} 件（背景/衣装/ポーズの 👍👎）
+            </span>
+          </div>
+        </div>
+      ) : (
+        <p className="text-[12px] text-slate-400 px-1 leading-snug">
+          💡 まだ評価データがありません。各案カードで生成結果画像を登録し、
+          評価ボタン（👍/😐/👎/💀 と 背景/衣装/ポーズ × 👍👎）を付けると、ここに集計されます。
+        </p>
+      )}
+
+      {/* 軸別の好評/不評率（数値のみ・嘘なし） */}
       {rep && rep.totalAxisRatings > 0 && (
         <div>
           <SectionTitle icon="📊">軸別の評価集計</SectionTitle>
@@ -367,198 +329,13 @@ function PreferenceReportSection({
             ))}
           </div>
           <p className="text-[10px] text-slate-400 px-1 pt-1 leading-snug">
-            ※ これは画像評価ボタンの集計結果です。あくまで数値であり、傾向解釈は AI 分析を実行してください。
+            ※ これは画像評価ボタンの集計結果（実数値）です。傾向の分析・反映は「skyveil好みAI」で行えます。
           </p>
         </div>
       )}
 
       <p className="text-[10px] text-slate-400 px-1 leading-snug border-t border-white/5 pt-2">
         ※ 評価は画像単位で IndexedDB に保存されます。再クリックで評価を変えられます。
-      </p>
-    </div>
-  );
-}
-
-// ── 実 AI 分析カード（最重要）─────────────────────────────────────
-
-function RealAnalysisCard({
-  profile, analyzing, profileError, sampleCount, canRun, lastAnalyzedText,
-  onRun, onClear, autoLearnEnabled, onToggleAutoLearn,
-}: {
-  profile: PreferenceProfile | null;
-  analyzing: boolean;
-  profileError: string | null;
-  sampleCount: number;
-  canRun: boolean;
-  lastAnalyzedText: string;
-  onRun: () => void;
-  onClear: () => void;
-  autoLearnEnabled: boolean;
-  onToggleAutoLearn: (enabled: boolean) => void;
-}) {
-  const isFresh = profile && (Date.now() - profile.generatedAt) < 1000 * 60 * 60 * 24 * 7;  // 1週間以内
-  // 次回自動分析までに必要な新規評価数
-  const nextAutoNeed = profile
-    ? Math.max(0, (profile.sampleSize + 5) - sampleCount)  // +5 = AUTO_NEW_SAMPLE_THRESHOLD
-    : Math.max(0, MIN_SAMPLES - sampleCount);
-
-  return (
-    <div className="rounded-lg border border-violet-400/50 bg-violet-500/8 px-3 py-2.5 space-y-2">
-      {/* ヘッダ */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[13px] font-bold text-violet-100">
-          🤖 AI 好み分析（実 Gemini 呼び出し）
-        </span>
-        {profile ? (
-          <span className={[
-            "text-[10px] px-1.5 py-0.5 rounded border leading-none",
-            isFresh
-              ? "border-emerald-400/55 bg-emerald-500/15 text-emerald-100"
-              : "border-amber-400/55 bg-amber-500/15 text-amber-100",
-          ].join(" ")}>
-            {isFresh ? "✓ 分析済み・生成に反映中" : "⚠ 古い（再分析推奨）"}
-          </span>
-        ) : (
-          <span className="text-[10px] px-1.5 py-0.5 rounded border border-slate-400/35 bg-slate-500/10 text-slate-300 leading-none">
-            未分析
-          </span>
-        )}
-      </div>
-
-      {/* 🔁 自動学習トグル */}
-      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/3 px-2.5 py-1.5">
-        <button
-          type="button"
-          onClick={() => onToggleAutoLearn(!autoLearnEnabled)}
-          className="flex items-center gap-1.5 text-[12px] font-semibold leading-none"
-          title="評価が増えるたびに自動で再分析する"
-        >
-          <span className={[
-            "relative w-9 h-4 rounded-full transition-colors shrink-0",
-            autoLearnEnabled ? "bg-emerald-500/75" : "bg-white/15",
-          ].join(" ")}>
-            <span className={[
-              "absolute top-0.5 w-3 h-3 rounded-full bg-white shadow-sm transition-transform",
-              autoLearnEnabled ? "translate-x-5" : "translate-x-0.5",
-            ].join(" ")} />
-          </span>
-          <span className={autoLearnEnabled ? "text-emerald-200" : "text-slate-400"}>
-            🔁 自動学習 {autoLearnEnabled ? "ON" : "OFF"}
-          </span>
-        </button>
-        <span className="ml-auto text-[10px] text-slate-400 leading-snug text-right">
-          {autoLearnEnabled
-            ? (nextAutoNeed > 0
-                ? `あと ${nextAutoNeed} 件の評価で自動分析`
-                : "条件達成・まもなく自動分析")
-            : "手動分析のみ"}
-        </span>
-      </div>
-
-      {/* メタ情報 */}
-      <div className="grid grid-cols-2 gap-1 text-[10px] text-slate-300/85">
-        <div>📅 最終分析: <span className="text-slate-100">{lastAnalyzedText}</span></div>
-        <div>🤖 使用モデル: <span className="text-slate-100">{profile?.model ?? "—"}</span></div>
-        <div>📦 分析対象: <span className="text-slate-100">{profile?.sampleSize ?? 0} 件</span></div>
-        <div>💾 現サンプル数: <span className="text-slate-100">{sampleCount} 件</span></div>
-      </div>
-
-      {/* 分析結果（あれば） */}
-      {profile && (
-        <div className="rounded-md border border-violet-400/30 bg-bg-base/40 px-2.5 py-1.5 space-y-1.5">
-          <p className="text-[11px] font-bold text-violet-200">📝 分析結果サマリ</p>
-          <p className="text-[11px] text-text-base/90 leading-relaxed">{profile.summary}</p>
-
-          <div className="space-y-1 pt-1 border-t border-violet-400/15">
-            {profileSummaryLines(profile).map((row) => (
-              <div key={row.axis} className="text-[10px] leading-snug">
-                <span className="font-bold text-slate-100">{row.emoji} {row.jp}</span>
-                <div className="ml-3">
-                  <span className="text-emerald-300/85">好む傾向：</span>
-                  <span className="text-slate-200/90">{row.likes}</span>
-                </div>
-                <div className="ml-3">
-                  <span className="text-rose-300/85">嫌う傾向：</span>
-                  <span className="text-slate-200/90">{row.dislikes}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {(profile.preferKeywords.length > 0 || profile.avoidKeywords.length > 0) && (
-            <div className="space-y-0.5 pt-1 border-t border-violet-400/15">
-              {profile.preferKeywords.length > 0 && (
-                <div className="text-[10px]">
-                  <span className="font-bold text-emerald-300">優先：</span>
-                  {profile.preferKeywords.map((k, i) => (
-                    <span key={i} className="ml-1 px-1 rounded bg-emerald-500/15 text-emerald-100">
-                      {k}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {profile.avoidKeywords.length > 0 && (
-                <div className="text-[10px]">
-                  <span className="font-bold text-rose-300">回避：</span>
-                  {profile.avoidKeywords.map((k, i) => (
-                    <span key={i} className="ml-1 px-1 rounded bg-rose-500/15 text-rose-100">
-                      {k}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* エラー表示 */}
-      {profileError && (
-        <div className="rounded-md border border-rose-400/55 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100/95">
-          ⚠ 分析失敗: {profileError}
-        </div>
-      )}
-
-      {/* 実行ボタン */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          type="button"
-          onClick={onRun}
-          disabled={!canRun}
-          className={[
-            "rounded-lg px-3 py-1.5 text-[12px] font-bold border leading-none transition",
-            analyzing
-              ? "border-amber-400/65 bg-amber-500/20 text-amber-100 cursor-progress"
-              : canRun
-                ? "border-violet-400/70 bg-violet-500/25 text-violet-100 hover:bg-violet-500/35"
-                : "border-white/10 bg-white/4 text-text-muted/45 cursor-not-allowed",
-          ].join(" ")}
-        >
-          {analyzing
-            ? "⏳ AI分析中..."
-            : profile
-              ? "🔄 再分析を実行"
-              : "🤖 AI分析を実行"}
-        </button>
-        {!canRun && !analyzing && (
-          <span className="text-[10px] text-amber-300/85">
-            サンプル不足（{sampleCount} / 最低 {MIN_SAMPLES}件）— 画像評価を増やしてください
-          </span>
-        )}
-        {profile && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="text-[10px] px-2 py-1 rounded border border-rose-400/30 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition leading-none"
-          >
-            🗑 プロファイル削除
-          </button>
-        )}
-      </div>
-
-      <p className="text-[9px] text-slate-400 leading-snug">
-        ※ 評価データを Gemini Flash に送信して分析します（画像は送信せず、プロンプト本文と評価のみ）。
-        分析結果は localStorage に保存され、次回生成プロンプトに自動注入されます。
       </p>
     </div>
   );
@@ -602,15 +379,63 @@ function AxisPrefRow({ stat }: { stat: { jp: string; emoji: string; good: number
 
 // ── セクション：📸 画像分析（生成結果画像の重複・出現率） ───────────────
 
+/** F4: 解析進捗バー。タブをブロックせずに解析状況を表示。 */
+function AnalyzingBar({ done, total, pct, onCancel }: {
+  done: number; total: number; pct: number; onCancel?: () => void;
+}) {
+  return (
+    <div className="rounded-lg border border-emerald-400/30 bg-emerald-500/8 px-3 py-2 space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <span className="text-[12px] font-semibold text-emerald-100">
+            画像を解析中…
+          </span>
+          <span className="text-[11px] text-emerald-200/80 tabular-nums">
+            {done} / {total}件
+          </span>
+        </div>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-[10px] px-2 py-0.5 rounded border border-slate-400/30 bg-slate-500/10 text-slate-300 hover:bg-slate-500/20 hover:text-white transition leading-none"
+          >
+            キャンセル
+          </button>
+        )}
+      </div>
+      {/* 進捗バー */}
+      <div className="h-1 rounded-full bg-white/8 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-emerald-400 transition-[width] duration-300"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-[10px] text-emerald-200/55 leading-snug">
+        解析中も他のタブは使えます。完了後に自動で結果を更新します。
+      </p>
+    </div>
+  );
+}
+
 function ImageAnalysisSection({
-  analysis, progress,
+  analysis, progress, onCancel,
 }: {
   analysis: ImageAnalysisResult | null;
   progress: { done: number; total: number } | null;
+  onCancel?: () => void;
 }) {
+  // F4: 解析中かどうか（progress があり、かつ未完了）
+  const isAnalyzing = !!(progress && progress.total > 0 && progress.done < progress.total);
+  const pct = isAnalyzing ? Math.round((progress.done / progress.total) * 100) : null;
+
   if (!analysis || analysis.totalEligible === 0) {
     return (
       <div className="px-2 py-3 space-y-2">
+        {isAnalyzing && (
+          <AnalyzingBar done={progress.done} total={progress.total} pct={pct!} onCancel={onCancel} />
+        )}
         <p className="text-[12px] text-slate-400">
           📸 生成結果画像がまだありません。各案カードで「生成結果」を登録すると画像分析が始まります。
         </p>
@@ -622,7 +447,11 @@ function ImageAnalysisSection({
 
   return (
     <div className="space-y-3 py-2">
-      {/* ── ヘッダ：統計＋進捗 ─────────────────────────── */}
+      {/* F4: 解析中バー（目立つ位置・タブはブロックしない） */}
+      {isAnalyzing && (
+        <AnalyzingBar done={progress.done} total={progress.total} pct={pct!} onCancel={onCancel} />
+      )}
+      {/* ── ヘッダ：統計 ─────────────────────────── */}
       <div className="flex items-center justify-between px-1 flex-wrap gap-1">
         <p className="text-[11px] text-slate-400">
           対象：<span className="text-emerald-200 font-bold">{analysis.totalAnalyzed}</span> 件解析済
@@ -632,14 +461,6 @@ function ImageAnalysisSection({
           ・クラスタ <span className="text-emerald-200">{analysis.clusters.length}</span>
           ・単独 <span className="text-slate-300">{analysis.uniqueCount}</span>
         </p>
-        {progress && progress.total > 0 && progress.done < progress.total && (
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[10px] text-emerald-200">
-              解析中 {progress.done}/{progress.total}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* ── 視覚クラスタ TOP10 ──────────────────────────── */}
@@ -1631,7 +1452,10 @@ function FavoritesNote({ labels }: { labels: string[] }) {
 
 // ── メインコンポーネント ───────────────────────────────────────────────────────
 
-export function DuplicateAnalysisPanel({
+// F2: React.memo でラップ。画像解析中の進捗更新（F1）で App が再レンダーされても、
+// props が変わっていなければパネル全体の再描画をスキップする。
+// props 安定化（App 側の useCallback 化）と組み合わせて効果が出る。
+function DuplicateAnalysisPanelInner({
   biasResult, historyAnalysis, isAnalyzing,
   levels, policyApplied,
   onLevelChange, onApplyPolicies, onUnapplyPolicies, onResetPolicies, onBulkLevel, onClearNg,
@@ -1641,11 +1465,9 @@ export function DuplicateAnalysisPanel({
   colorWeights, onColorWeightChange, onColorWeightsReset,
   onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
   colorWindowSize, onColorWindowSizeChange,
-  imageAnalysis, onStartImageAnalysis, imageAnalyzeProgress,
+  imageAnalysis, onStartImageAnalysis, imageAnalyzeProgress, onCancelImageAnalysis,
   ratingAnalysis,
-  preferenceProfile, analyzingProfile, profileError, profileSampleCount,
-  onRunPreferenceAnalysis, onClearPreferenceProfile,
-  autoLearnEnabled, onToggleAutoLearn,
+  preferenceProfile, profileSampleCount,
   agent, onAgentAction,
   onAutoFix, onReroll, onResetBias, onDismiss,
   analysisStats, activeScopes, favoriteProfile, favoriteLearnEnabled,
@@ -1679,8 +1501,20 @@ export function DuplicateAnalysisPanel({
     background: "背景", outfit: "衣装", hair: "髪", camera: "カメラ",
     lighting: "ライティング", pose: "ポーズ", props: "小物", foreground: "前景",
   };
+  // BUG-5: imageAnalyzer の axis は日本語（背景/衣装/髪型/カメラ/ライティング）だが
+  // activeScopes(=scopeSet) は英語（background/outfit/...）。そのまま has() すると常に不一致になり
+  // 「反映中」バナーが誤って「未反映（変更対象外）」と表示される。日本語軸→英語scopeキーで揃える。
+  const IMG_AXIS_TO_SCOPE: Record<string, string> = {
+    "背景": "background", "衣装": "outfit", "髪型": "hair", "髪": "hair",
+    "カメラ": "camera", "ライティング": "lighting",
+    "ポーズ": "pose", "前景": "foreground", "小物": "props",
+  };
   const scopeSet = new Set(activeScopes ?? []);
-  const axisInScope = (axis: string) => scopeSet.size === 0 ? true : scopeSet.has(axis);
+  const axisInScope = (axis: string) => {
+    if (scopeSet.size === 0) return true;
+    const scopeKey = IMG_AXIS_TO_SCOPE[axis] ?? axis; // 既に英語キーならそのまま
+    return scopeSet.has(scopeKey);
+  };
 
   // 画像分析：頻出＝抑制／未開拓＝推奨。変更対象外はスキップ一覧へ。
   const imgSuppress: string[] = [];
@@ -1883,7 +1717,7 @@ export function DuplicateAnalysisPanel({
                   : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
               ].join(" ")}
             >
-              💡 好み分析
+              💡 評価集計
               {ratingAnalysis?.preferenceReport.active && (
                 <span className="text-[9px] text-pink-200/70 leading-none">
                   ({ratingAnalysis.preferenceReport.totalAxisRatings})
@@ -1902,21 +1736,16 @@ export function DuplicateAnalysisPanel({
               <ImageAnalysisSection
                 analysis={imageAnalysis}
                 progress={imageAnalyzeProgress}
+                onCancel={onCancelImageAnalysis}
               />
             )}
 
-            {/* === 好み分析タブ（軸別👍👎集計 + 実 AI 分析） === */}
+            {/* === 評価集計タブ（軸別👍👎集計）。skyveil好みの分析・反映は SkyveilBar に集約済み === */}
             {tab === "pref" && (
               <PreferenceReportSection
                 ratingAnalysis={ratingAnalysis}
                 profile={preferenceProfile}
-                analyzing={analyzingProfile}
-                profileError={profileError}
                 profileSampleCount={profileSampleCount}
-                onRunAnalysis={onRunPreferenceAnalysis}
-                onClearProfile={onClearPreferenceProfile}
-                autoLearnEnabled={autoLearnEnabled}
-                onToggleAutoLearn={onToggleAutoLearn}
               />
             )}
 
@@ -2089,3 +1918,7 @@ export function DuplicateAnalysisPanel({
     </div>
   );
 }
+
+/** F2: memo でラップ。画像解析の進捗更新（F1）で App が再レンダーされても
+ *  props 不変時はパネル全体の再描画をスキップする。 */
+export const DuplicateAnalysisPanel = memo(DuplicateAnalysisPanelInner);

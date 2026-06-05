@@ -62,13 +62,17 @@ export async function generateViaBackend(
   });
 
   if (!res.ok) {
+    // Body は1度しか読めないので text() で取ってから JSON 試行
     let detail = "";
     try {
-      const j = (await res.json()) as BackendError;
-      detail = j.error;
-    } catch {
-      detail = await res.text();
-    }
+      const raw = await res.text();
+      try {
+        const j = JSON.parse(raw) as BackendError;
+        detail = j.error || raw;
+      } catch {
+        detail = raw;
+      }
+    } catch { /* noop */ }
     throw new Error(`Backend error (${res.status}): ${detail || "unknown"}`);
   }
   return (await res.json()) as BackendResponse;

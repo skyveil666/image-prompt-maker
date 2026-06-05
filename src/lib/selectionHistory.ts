@@ -55,3 +55,19 @@ export async function listSelectionHistory(): Promise<SelectionHistoryItem[]> {
 export async function deleteSelectionItem(id: string): Promise<void> {
   await idb.remove(STORE_SELECTION, id);
 }
+
+/**
+ * バックアップ復元用：id が重複しないアイテムだけ追加する（既存は上書き・削除しない）。
+ */
+export async function mergeSelectionHistory(
+  items: SelectionHistoryItem[]
+): Promise<{ added: number; skipped: number }> {
+  const incoming = items ?? [];
+  const existing = await idb.getAll<SelectionHistoryItem>(STORE_SELECTION);
+  const existingIds = new Set(existing.map((it) => it.id));
+  const toAdd = incoming.filter(
+    (it) => it && typeof it.id === "string" && it.id.length > 0 && !existingIds.has(it.id)
+  );
+  if (toAdd.length > 0) await idb.putMany(STORE_SELECTION, toAdd);
+  return { added: toAdd.length, skipped: incoming.length - toAdd.length };
+}

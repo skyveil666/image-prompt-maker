@@ -587,6 +587,12 @@ export function HistoryView({
                 {(importResult.imagesAdded > 0 || importResult.imagesSkipped > 0) && (
                   <div>　画像 {importResult.imagesAdded}件追加、{importResult.imagesSkipped}件スキップ</div>
                 )}
+                {(importResult.selectionAdded > 0 || importResult.selectionSkipped > 0) && (
+                  <div>　選択履歴 {importResult.selectionAdded}件追加、{importResult.selectionSkipped}件スキップ</div>
+                )}
+                {(importResult.explorerFavAdded > 0 || importResult.explorerFavSkipped > 0) && (
+                  <div>　Explorer★ {importResult.explorerFavAdded}件追加、{importResult.explorerFavSkipped}件スキップ</div>
+                )}
               </div>
             )}
             {importError && (

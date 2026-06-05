@@ -124,6 +124,21 @@ const TOKEN_TO_COLOR: Map<string, string> = (() => {
 
 const COLOR_REGEX = buildColorRegex();
 
+/**
+ * BUG-4-C（ストップワード方式）：色トークンを部分一致で誤検出する「ホスト語」。
+ * 色マッチの直前にこれらを除去して誤検出を防ぐ。
+ *   rosemary → rose（桃）/ instant・important・constant・distant → tan（茶）
+ * ※ golden→gold, grayscale→gray, bluish→blue など正当な複合語マッチは温存する
+ *   （全面的な単語境界化は採用しない）。必要に応じてこの配列に語を追加するだけで拡張可能。
+ */
+const COLOR_FALSE_POSITIVE_WORDS = [
+  "rosemary", "instant", "important", "constant", "distant",
+];
+const COLOR_FP_REGEX = new RegExp(
+  "(?<![a-z])(?:" + COLOR_FALSE_POSITIVE_WORDS.join("|") + ")(?![a-z])",
+  "gi",
+);
+
 /** テキストを文単位に分割（日英の区切り混在に対応） */
 function splitSentences(text: string): string[] {
   // 。．！？.;\n を区切りに
@@ -147,9 +162,10 @@ function extractFromSentence(sentence: string): { axis: ColorAxis; colorId: stri
   }
   if (matchedAxes.length === 0) return [];
 
-  // 色トークンを全部拾う
+  // 色トークンを全部拾う（BUG-4-C: 誤検出元のホスト語を除去してからマッチ）
   const colorIds = new Set<string>();
-  const matches = lower.match(COLOR_REGEX);
+  const colorHaystack = lower.replace(COLOR_FP_REGEX, " ");
+  const matches = colorHaystack.match(COLOR_REGEX);
   if (matches) {
     for (const m of matches) {
       const id = TOKEN_TO_COLOR.get(m.toLowerCase());

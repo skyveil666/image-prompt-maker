@@ -61,11 +61,29 @@ function openDB(): Promise<IDBDatabase> {
         s.createIndex("type", "type", { unique: false });
       }
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // BUG-8: 別タブがこの DB のバージョンアップを要求したら、自タブの接続を閉じて
+      // ブロック源にならないようにする（次回操作で新バージョンを開き直す）。
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
     req.onerror = () => {
       // キャッシュを破棄しておくことで、次回呼び出し時にリトライできる
       dbPromise = null;
       reject(req.error);
+    };
+    // BUG-8: 別タブが旧バージョンの DB を開いたままだと open が blocked で保留し続ける。
+    // ここで reject して永久ハングを防ぐ（他タブを閉じれば次回リトライで開ける）。
+    req.onblocked = () => {
+      dbPromise = null;
+      reject(new Error(
+        "IndexedDB の更新がブロックされました（別タブが古いバージョンで開いています）。" +
+        "他のタブを閉じてから再読み込みしてください。"
+      ));
     };
   });
   return dbPromise;

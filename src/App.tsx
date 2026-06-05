@@ -87,6 +87,7 @@ import {
   type ArrangeResult,
   type GeneratedProposal,
 } from "./types";
+import { DEFAULT_DETAILS } from "./types";
 import { computeChangedAxes, arrangeCandidateScopes, buildElementFilterInstruction } from "./lib/arrange";
 import { buildFavoriteProfile, type FavoriteProfile } from "./lib/favoriteProfile";
 import { analyzeAgent, type AgentActionId } from "./lib/aiAgent";
@@ -108,9 +109,24 @@ import {
   type SkyveilStrength, type SkyveilProfile,
 } from "./lib/skyveilProfile";
 import { logOperation } from "./lib/operationLog";
+import { deriveLockState } from "./lib/promptLockCheck";
+import { analyzeIdentityRisk } from "./lib/identityRisk";
+import { GlobalProtectionBar } from "./components/GlobalProtectionBar";
+import { AnalysisStatusStrip, type AnalysisCategoryView } from "./components/AnalysisStatusStrip";
+import { RecoveryPanel } from "./components/RecoveryPanel";
+import { useAnalysisLive } from "./lib/useAnalysisLive";
+import { AnalysisLiveView } from "./components/AnalysisLiveView";
+import {
+  extractSuccessPromptPatterns, type SuccessPromptPattern,
+} from "./lib/successPatterns";
+import {
+  previewSuccessPattern, applyPreviewedScopes, type LearningApplyPreviewResult,
+} from "./lib/learningPreview";
+import { PostingCalendarModal } from "./components/PostingCalendarModal";
 import {
   loadPreferenceProfile, savePreferenceProfile, clearPreferenceProfile,
   loadAutoLearn, saveAutoLearn,
+  loadAutoLastCount, saveAutoLastCount,
   collectSamples, MIN_SAMPLES,
   AUTO_NEW_SAMPLE_THRESHOLD, AUTO_COOLDOWN_MS, AUTO_DEBOUNCE_MS,
   type PreferenceProfile,
@@ -348,6 +364,10 @@ export default function App() {
   const [arrangeSource, setArrangeSource] = useState<PromptHistoryItem | null>(null);
   /** 「同じ構成で再生成」復元後の確認バナー用 */
   const [restoredItem, setRestoredItem] = useState<PromptHistoryItem | null>(null);
+  /** 📅 投稿カレンダーモーダルの開閉 */
+  const [postCalendarOpen, setPostCalendarOpen] = useState(false);
+  /** 🤖 AI分析ライブビュー */
+  const analysisLive = useAnalysisLive();
   /** runGenerate 内で items の最新値を読むためのリファレンス */
   const itemsRef = useRef<PromptHistoryItem[]>(items);
   /** pendingRun の保証発火のためのカウンター（scopes/moods が変わらない場合の保険） */
@@ -392,15 +412,47 @@ export default function App() {
   /** お気に入りプロファイルを再構築する（お気に入り変更後に呼ぶ）。
    *  ついでに色分析・画像分析・評価分析の入力 historyItemsForColor も同期する
    *  （履歴削除や評価更新が反映されないバグを防ぐため）。 */
+  // 🛟 緊急復旧パネル：履歴/お気に入り表示の再読み込み用。
+  // dataVersion を key に渡して HistoryView / FavoritesPanel を再マウント＝IDB を再 getAll させる（リロードなし・非破壊）。
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [dataVersion, setDataVersion] = useState(0);
+  const reloadAllData = useCallback(() => {
+    setDataVersion((v) => v + 1);   // HistoryView / FavoritesPanel を再マウント → 再 getAll
+    void refreshFavoriteProfile();  // 分析・AI分析ストリップの件数も再読み込み
+  // refreshFavoriteProfile は後方宣言だが、呼び出し時点では定義済み（実行は onClick）
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const refreshFavoriteProfile = useCallback(async () => {
     try {
       const all = await getAll();
-      setFavoriteProfile(buildFavoriteProfile(all.filter((i) => i.isFavorite)));
+      const favs = all.filter((i) => i.isFavorite);
+      const imgs = all.filter((i) => i.resultImageData || (i.resultImageDataList?.length ?? 0) > 0);
+      const rated = all.filter((i) => (i.resultRatings?.some((r) => r != null)));
+      // ライブビューで読み込み状況を可視化
+      analysisLive.start("データ再読み込み + 分析更新", {
+        history: all.length,
+        images: imgs.length,
+        favorites: favs.length,
+        ratings: rated.length,
+      });
+      analysisLive.startStep("loadHistory", `${all.length}件の履歴を読み込み`, all.length);
+      analysisLive.completeStep("loadHistory");
+      analysisLive.startStep("loadImages", `生成画像 ${imgs.length}件を確認`, imgs.length);
+      analysisLive.completeStep("loadImages");
+      analysisLive.startStep("loadFavorites", `お気に入り ${favs.length}件を集計`, favs.length);
+      setFavoriteProfile(buildFavoriteProfile(favs));
+      analysisLive.completeStep("loadFavorites");
+      analysisLive.startStep("loadRatings", `評価データ ${rated.length}件を確認`, rated.length);
       setHistoryItemsForColor(all);
+      analysisLive.completeStep("loadRatings");
+      analysisLive.startStep("favoriteAnalysis", "お気に入り傾向を分析中");
+      analysisLive.completeStep("favoriteAnalysis", "お気に入り傾向の集計完了");
+      analysisLive.complete("データ同期完了");
     } catch {
-      // 無視
+      analysisLive.error("データ読み込みに失敗しました");
     }
-  }, []);
+  }, [analysisLive]);
 
   // 🔄 view が main に戻った時、items が空なら最後の生成結果を復元する。
   // 理由：履歴/お気に入り画面へ移動→戻った時や、エラー後に items が空になっていた場合の
@@ -458,6 +510,13 @@ export default function App() {
     zozoApplied, activeBoosts, windLevel,
   ]);
 
+  // stale closure 回避（BUG-1）：preferenceProfile / ratingAnalysis / imageAnalysis は
+  // buildInputs より後で宣言されるため依存配列に入れられない（TDZ）。
+  // skyveilProfileRef と同じく ref 経由で「最新値」を参照する（生成時には effect 同期済み）。
+  const preferenceProfileRef = useRef<PreferenceProfile | null>(null);
+  const ratingAnalysisRef = useRef<RatingAnalysis | null>(null);
+  const imageAnalysisRef = useRef<ImageAnalysisResult | null>(null);
+
   const buildInputs = useCallback(
     (override?: Partial<PromptInputs>): PromptInputs => ({
       scopes,
@@ -465,11 +524,9 @@ export default function App() {
       moods,
       autoMoodCategories,
       count,
-      // 顔・表情・同一性は常時保護。体型/色味/構図はUIトグルから。
+      // 顔・表情・同一性は faceLock + Identity Shield で保護（locks には含めない）。
+      // 体型/色味/構図はUIトグルから。参照: docs/09_face-lock統合.md
       locks: {
-        face:         true,
-        identity:     true,
-        expression:   true,
         body_shape:   bodyPoseLock,
         color:        colorMoodLock,
         camera:       compositionLock,
@@ -526,21 +583,26 @@ export default function App() {
         return ctrl.length > 0 ? ctrl : undefined;
       })(),
       // 好みプロファイル（実 Gemini 分析）：skyveil好みAI が ON（または今回だけ反映）の時のみ送信
-      preferenceProfile: (favoriteLearnEnabled || skyveilOneShot) ? (preferenceProfile ?? undefined) : undefined,
-      // ユーザー画像評価バイアス（👍/👎）：scope ON の軸のみフィルタして送信
+      // BUG-1: ref 経由で最新値を参照（buildInputs の依存に入れられないため）
+      preferenceProfile: (favoriteLearnEnabled || skyveilOneShot) ? (preferenceProfileRef.current ?? undefined) : undefined,
+      // ユーザー画像評価バイアス（👍/👎）：これも「学習結果」なので skyveil好みAI が
+      // ON（または今回だけ反映）の時のみ送る（分析結果を自動反映しないルール）。scope ON の軸のみ。
       ratingBias: (() => {
-        if (!ratingAnalysis) return undefined;
+        if (!(favoriteLearnEnabled || skyveilOneShot)) return undefined;
+        const ra = ratingAnalysisRef.current;
+        if (!ra) return undefined;
         const activeScopes = new Set<string>(scopes);
-        return buildRatingBiasPayload(ratingAnalysis, activeScopes) ?? undefined;
+        return buildRatingBiasPayload(ra, activeScopes) ?? undefined;
       })(),
       // 画像分析バイアス：頻出/未使用カテゴリと視覚的重複数をサーバへ送信。
       // 「提案を反映」(policyApplied) を押した時のみ生成に効かせる（勝手に反映しない）。
       imageBias: (() => {
         if (!policyApplied) return undefined;
-        if (!imageAnalysis) return undefined;
-        const overused = imageAnalysis.overusedCategories;
-        const underused = imageAnalysis.underusedCategories.slice(0, 8);
-        const visualDupCount = imageAnalysis.clusters[0]?.size ?? 0;
+        const ia = imageAnalysisRef.current;
+        if (!ia) return undefined;
+        const overused = ia.overusedCategories;
+        const underused = ia.underusedCategories.slice(0, 8);
+        const visualDupCount = ia.clusters[0]?.size ?? 0;
         if (overused.length === 0 && underused.length === 0 && visualDupCount < 3) return undefined;
         return {
           ...(overused.length > 0 && { overused }),
@@ -621,11 +683,9 @@ export default function App() {
       zozoApplied,
       activeBoosts,
       windLevel,
-      // クロージャ内で参照しているのに依存配列から漏れていた（stale closure 修正）。
-      // ここで参照できるのは buildInputs より前に宣言された値のみ。
-      // imageAnalysis / ratingAnalysis / preferenceProfile は buildInputs より後で
-      // 宣言されるため依存配列に入れると TDZ エラーになる。これらは history 変化時に
-      // 他の依存（scopes/moods/details 等）も併せて変わるため実質的に最新値で再生成される。
+      // imageAnalysis / ratingAnalysis / preferenceProfile は buildInputs より後で宣言され
+      // 依存配列に入れると TDZ エラーになるため、ref 経由で最新値を参照する（BUG-1 修正）。
+      // → preferenceProfileRef / ratingAnalysisRef / imageAnalysisRef（useEffect で同期）。
       colorWeights,
     ]
   );
@@ -637,34 +697,65 @@ export default function App() {
    */
   const runBiasAnalysis = useCallback(
     async (currentTexts: string[], excludeBatchId?: string) => {
+      // ── ライブビュー：重複・色・お気に入り分析の処理を可視化 ──────────────
+      analysisLive.start("生成後の分析（重複・色・履歴）");
       try {
+        analysisLive.startStep("loadHistory", "全履歴を読み込み中");
         const allHistory = await getAll();
         const historyEntries: HistoryEntry[] = allHistory
           .filter((i) => !excludeBatchId || i.batchId !== excludeBatchId)
           .sort((a, b) => b.createdAt - a.createdAt)
           .slice(0, 20)
           .map((i) => ({ text: i.promptText, dateKey: i.dateKey }));
+        analysisLive.completeStep("loadHistory", `${allHistory.length}件の履歴を確認`);
+
+        analysisLive.startStep("duplicateAnalysis", "重複構成を検出中");
         const result = analyzeBias(currentTexts, historyEntries);
         setMassProductionResult(result);
+        analysisLive.completeStep("duplicateAnalysis");
 
-        // 全履歴分析（重複分析センター用）
+        analysisLive.startStep("colorAnalysis", "色傾向を集計中");
         const fullAnalysis = analyzeFullHistory(allHistory.filter(
           (i) => !excludeBatchId || i.batchId !== excludeBatchId
         ), currentTexts);
         setHistoryAnalysis(fullAnalysis);
-        // 色分析用：履歴の生アイテムも同期
+        analysisLive.completeStep("colorAnalysis");
+
+        // 根拠：頻出モチーフを記録
+        if (fullAnalysis.topMotifs.length > 0) {
+          const top3 = fullAnalysis.topMotifs.slice(0, 3);
+          analysisLive.addEvidence({
+            title: "重複頻出モチーフ",
+            conclusion: `「${top3.map((m) => m.motif.label).join("・")}」が頻出しています`,
+            sources: top3.map((m) => ({
+              type: "history" as const,
+              label: m.motif.label,
+              count: m.totalCount,
+            })),
+          });
+        }
+
+        analysisLive.startStep("favoriteAnalysis", "お気に入り傾向を更新");
         setHistoryItemsForColor(allHistory);
+        analysisLive.completeStep("favoriteAnalysis");
+
+        analysisLive.complete(`分析完了（直近${fullAnalysis.windowSize}件）`);
         return result;
       } catch {
+        analysisLive.error("分析中にエラーが発生しました");
         return null;
       }
     },
-    []
+    [analysisLive]
   );
 
   /** API レスポンスの proposals を IndexedDB に保存しつつ state に格納する。 */
   const runGenerate = useCallback(
     async (inputs: PromptInputs) => {
+      // 「今回だけ反映」(skyveilOneShot) は全生成経路が通る単一の出口であるここで1回消費する。
+      // inputs は呼び出し側で buildInputs() により確定済みのため、ここで解除しても
+      // 今回の生成への適用は維持され、次回以降だけ OFF になる（P1-5 / BUG-16）。
+      setSkyveilOneShot(false);
       setGenerating(true);
       setError(null);
       // 現在の結果をアンドゥスタックに積む（空なら積まない）
@@ -768,10 +859,9 @@ export default function App() {
       skyveil: skyveilOn ? sStrength : "off",
       viral: inputs.viralMode,
     });
-    // 今回だけ反映は1回使ったら解除
-    if (skyveilOneShot) setSkyveilOneShot(false);
+    // 「今回だけ反映」の解除は runGenerate に集約（全生成経路で1回消費）
     void runGenerate(inputs);
-  }, [canGenerate, buildInputs, runGenerate, skyveilOneShot]);
+  }, [canGenerate, buildInputs, runGenerate]);
 
   /**
    * GenerationProgress の onComplete から呼ばれる完了ハンドラ。
@@ -896,6 +986,118 @@ export default function App() {
   // handleGenerate（前方宣言）から ref 経由で最新値を読むため同期
   useEffect(() => { skyveilProfileRef.current = skyveilProfile; }, [skyveilProfile]);
   useEffect(() => { skyveilStrengthRef.current = skyveilStrength; }, [skyveilStrength]);
+  // BUG-1: buildInputs（前方宣言）が最新の分析結果を ref 経由で参照するため同期
+  useEffect(() => { preferenceProfileRef.current = preferenceProfile; }, [preferenceProfile]);
+  useEffect(() => { ratingAnalysisRef.current = ratingAnalysis; }, [ratingAnalysis]);
+  useEffect(() => { imageAnalysisRef.current = imageAnalysis; }, [imageAnalysis]);
+
+  // 🛡 変更禁止チェック・スコア用のロック状態（現在の選択から導出）
+  const currentLock = useMemo(
+    () => deriveLockState({ scopes, faceLock, bodyPoseLock, colorMoodLock, compositionLock }),
+    [scopes, faceLock, bodyPoseLock, colorMoodLock, compositionLock],
+  );
+
+  // 🛡 GlobalProtectionBar 用：生成前のライブ Identity リスク採点（設定ベース）。
+  // analyzeIdentityRisk は本来「生成済みプロンプト」を採点するが、生成前は空文字を渡し
+  // 変更軸数・髪/ポーズ/カメラ・faceLock から設定ベースのスコアを得る。
+  const liveIdentityRisk = useMemo(
+    () => analyzeIdentityRisk("", currentLock),
+    [currentLock],
+  );
+
+  // 🤖 AnalysisStatusStrip 用：5分析の鮮度（最終実行時刻）。
+  // 重複(historyAnalysis.analyzedAt) / 画像(ImageFeature.analyzedAt) / skyveil(preferenceProfile.generatedAt)
+  // は既存データに実タイムスタンプがある。色・お気に入りはタイムスタンプを持たないため、
+  // 再計算（useMemo 更新）を検知して App 側でスタンプする（分析ロジックは無変更）。
+  const [analysisStamps, setAnalysisStamps] = useState<{ color: number | null; favorite: number | null }>({
+    color: null, favorite: null,
+  });
+  useEffect(() => {
+    if (colorAnalysis) setAnalysisStamps((s) => ({ ...s, color: Date.now() }));
+  }, [colorAnalysis]);
+  useEffect(() => {
+    if (favoriteProfile) setAnalysisStamps((s) => ({ ...s, favorite: Date.now() }));
+  }, [favoriteProfile]);
+  /** 画像分析の最終実行時刻 = 特徴キャッシュ内 analyzedAt の最大値（永続・既存フィールド） */
+  const imageAnalyzedAt = useMemo(() => {
+    let mx: number | null = null;
+    for (const f of imageFeatureMap.values()) {
+      if (f.analyzedAt != null && (mx === null || f.analyzedAt > mx)) mx = f.analyzedAt;
+    }
+    return mx;
+  }, [imageFeatureMap]);
+  /** 5分析サマリ（件数 + 鮮度）。すべて既存 state から算出（ロジック非変更）。 */
+  const analysisCategories = useMemo<AnalysisCategoryView[]>(() => [
+    {
+      key: "duplicate", icon: "📘", label: "重複分析",
+      count: historyAnalysis ? `${historyAnalysis.windowSize}` : null,
+      at: historyAnalysis?.analyzedAt ?? null,
+    },
+    {
+      key: "color", icon: "🎨", label: "色分析",
+      count: colorAnalysis ? `${colorAnalysis.windowSize}` : null,
+      at: analysisStamps.color,
+    },
+    {
+      key: "image", icon: "🖼", label: "画像分析",
+      count: imageAnalysis && imageAnalysis.totalEligible > 0
+        ? `${imageAnalysis.totalAnalyzed}/${imageAnalysis.totalEligible}` : null,
+      at: imageAnalyzedAt,
+    },
+    {
+      key: "favorite", icon: "⭐", label: "お気に入り",
+      count: favoriteProfile && favoriteProfile.favoriteCount > 0 ? `${favoriteProfile.favoriteCount}` : null,
+      at: favoriteProfile && favoriteProfile.favoriteCount > 0 ? analysisStamps.favorite : null,
+    },
+    {
+      key: "skyveil", icon: "🧬", label: "skyveil好み",
+      count: preferenceProfile ? `${preferenceProfile.sampleSize}` : null,
+      at: preferenceProfile?.generatedAt ?? null,
+    },
+  ], [historyAnalysis, colorAnalysis, imageAnalysis, imageAnalyzedAt, favoriteProfile, preferenceProfile, analysisStamps]);
+  /** AI分析詳細（AnalysisLiveView）の開閉。AnalysisStatusStrip の [詳細] で制御（M-2 統合）。 */
+  const analysisLiveRef = useRef<HTMLDivElement>(null);
+  const [analysisDetailOpen, setAnalysisDetailOpen] = useState(false);
+  const toggleAnalysisDetail = useCallback(() => setAnalysisDetailOpen((v) => !v), []);
+  // 詳細を開いた時、パネルを視界へスクロール（上部 sticky の直下に展開されるため）
+  useEffect(() => {
+    if (!analysisDetailOpen) return;
+    const id = setTimeout(
+      () => analysisLiveRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
+      50,
+    );
+    return () => clearTimeout(id);
+  }, [analysisDetailOpen]);
+
+  // 🏆 成功プロンプト抽出（お気に入り・高評価・失敗少なめから型を抽出）
+  const successPatterns = useMemo(
+    () => extractSuccessPromptPatterns(historyItemsForColor),
+    [historyItemsForColor],
+  );
+  /** 学習反映差分プレビュー（成功パターン）。反映ボタンを押すまで state は変えない。 */
+  const [patternPreview, setPatternPreview] = useState<{
+    pattern: SuccessPromptPattern;
+    preview: LearningApplyPreviewResult;
+  } | null>(null);
+
+  /** 成功パターン反映：まず差分プレビューを出す（即適用しない） */
+  const handleApplyPattern = useCallback((pattern: SuccessPromptPattern) => {
+    const preview = previewSuccessPattern({ currentScopes: scopes, pattern, lock: currentLock });
+    setPatternPreview({ pattern, preview });
+  }, [scopes, currentLock]);
+
+  /** プレビュー確定：ここで初めてスコープを更新（ブロック分は除外） */
+  const handleConfirmPattern = useCallback(() => {
+    if (!patternPreview) return;
+    const next = applyPreviewedScopes(scopes, patternPreview.preview);
+    setScopes(next);
+    setScopeFlashKey((k) => k + 1);
+    showPresetToast(
+      `🏆「${patternPreview.pattern.title}」を反映しました`,
+      "顔・同一性は保護。背景固定/衣装OFFのブロック分は反映していません。",
+    );
+    setPatternPreview(null);
+  }, [patternPreview, scopes, showPresetToast]);
 
   /**
    * 実 Gemini 呼び出しで好みプロファイルを更新。
@@ -913,23 +1115,47 @@ export default function App() {
     }
     setAnalyzingProfile(true);
     if (auto) lastAutoAnalyzeRef.current = Date.now();
+    // ── ライブビュー：skyveil好み分析の処理ステップを可視化 ──────────────
+    analysisLive.start(auto ? "skyveil自動学習" : "skyveil好み分析", {
+      history: historyItemsForColor.length,
+      ratings: samples.length,
+    });
+    analysisLive.startStep("loadRatings", `評価サンプル ${samples.length}件を収集`, samples.length);
+    analysisLive.completeStep("loadRatings");
+    analysisLive.startStep("skyveilPreferenceAnalysis", "Gemini Flash で好み傾向を分析中…");
     try {
       const profile = await analyzePreferencesViaBackend(samples);
+      analysisLive.completeStep("skyveilPreferenceAnalysis", `${profile.sampleSize}件から好み傾向を抽出`);
+      // 根拠を記録
+      analysisLive.addEvidence({
+        title: "skyveil好み傾向の更新",
+        conclusion: profile.summary || "好み傾向が更新されました",
+        sources: [
+          { type: "rating", label: "評価データ", count: profile.sampleSize },
+        ],
+      });
+      analysisLive.startStep("suggestionGeneration", "次回おすすめ案を整理");
+      analysisLive.completeStep("suggestionGeneration");
+      analysisLive.complete(`好み傾向を${profile.sampleSize}件から整理完了`);
       savePreferenceProfile(profile);
       setPreferenceProfile(profile);
+      // BUG-3A: 分析した時点の「クライアント側サンプル数」を基準として保存。
+      // 次回の自動学習はこの数からの増分（+AUTO_NEW_SAMPLE_THRESHOLD）で判定する。
+      saveAutoLastCount(samples.length);
       showPresetToast(
         auto ? "🔁 自動学習：好み傾向を更新しました" : "✓ AI分析完了",
         `${profile.sampleSize}件のデータから好み傾向を抽出し、次回プロンプト生成に反映します。`,
       );
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // 自動学習の失敗はエラーバナーを出さず静かにスキップ（ユーザー操作を邪魔しない）
+      analysisLive.errorStep("skyveilPreferenceAnalysis", msg);
+      analysisLive.error(msg);
       if (!auto) setProfileError(msg);
       else console.warn("[auto-learn] analysis failed:", msg);
     } finally {
       setAnalyzingProfile(false);
     }
-  }, [analyzingProfile, historyItemsForColor, showPresetToast]);
+  }, [analyzingProfile, historyItemsForColor, analysisLive, showPresetToast]);
 
   /** プロファイルを削除（再分析できるようにクリア） */
   const handleClearPreferenceProfile = useCallback(() => {
@@ -946,15 +1172,18 @@ export default function App() {
 
   // ── 🔁 自動学習トリガー ──
   // 評価サンプルが一定数増えるたびに、デバウンス＋クールダウン付きで自動再分析する。
-  // ループ防止：分析完了後は preferenceProfile.sampleSize が更新され「新規分」が 0 に戻るため再発火しない。
+  // BUG-3A ループ防止：基準は「前回分析時のクライアント側サンプル数」(localStorage 永続)。
+  //   サーバ返却の preferenceProfile.sampleSize は 100 件で頭打ちのため基準に使えない
+  //   （100 件超で newSamples が常に閾値超になり自動分析が止まらなくなる）。
+  //   分析成功時に saveAutoLastCount(samples.length) され、その差分で判定する。
   useEffect(() => {
     if (!autoLearnEnabled) return;
     if (analyzingProfile) return;
     if (profileSampleCount < MIN_SAMPLES) return;
 
-    const lastSize = preferenceProfile?.sampleSize ?? 0;
+    const lastCount = loadAutoLastCount();
     // 新規サンプル数。負になる場合（サンプルが減った等）は 0 扱い
-    const newSamples = Math.max(0, profileSampleCount - lastSize);
+    const newSamples = Math.max(0, profileSampleCount - lastCount);
     // 初回（プロファイル無し）は MIN_SAMPLES 到達で実行。以降は +AUTO_NEW_SAMPLE_THRESHOLD 毎。
     const need = preferenceProfile ? AUTO_NEW_SAMPLE_THRESHOLD : MIN_SAMPLES;
     if (newSamples < need) return;
@@ -995,20 +1224,35 @@ export default function App() {
     const ctrl = new AbortController();
     imageAnalyzeAbortRef.current = ctrl;
     void (async () => {
+      analysisLive.start("画像分析", { images: historyItemsForColor.length });
+      analysisLive.startStep("loadImages", "解析対象の画像を確認中");
       try {
+        // F1: 進捗 setState を間引く（10枚ごと or 完了時のみ）。
+        // 毎枚更新すると ~136 回の React コミット → パネル全体の再描画が連続し UI がジャンクする。
+        // 分析結果・重複率・保存データは不変（スケジューリングのみ変更）。
+        const PROGRESS_INTERVAL = 10;
+        let lastReportedDone = -1;
         const next = await runProgressiveAnalysis(
           historyItemsForColor,
           imageFeatureMap,
           (state) => {
-            // アボート後は setState を呼ばない（メモリリーク防止）
-            if (!ctrl.signal.aborted) {
-              setImageAnalyzeProgress({ done: state.done, total: state.total });
+            if (ctrl.signal.aborted) return;
+            const isDone = state.done >= state.total && state.total > 0;
+            const crossedInterval = state.done - lastReportedDone >= PROGRESS_INTERVAL;
+            if (!isDone && !crossedInterval) return;           // 間引き：完了でも閾値超えでもない
+            lastReportedDone = state.done;
+            setImageAnalyzeProgress({ done: state.done, total: state.total });
+            if (state.total > 0) {
+              const pct = Math.round((state.done / state.total) * 100);
+              analysisLive.setStepProgress("imageAnalysis", pct);
             }
           },
           ctrl.signal,
         );
         if (!ctrl.signal.aborted) {
           setImageFeatureMap(next);
+          analysisLive.completeStep("imageAnalysis", `${Object.keys(next).length}件の画像特徴を抽出`);
+          analysisLive.complete("画像分析完了");
         }
       } finally {
         // アボートされていない場合のみ進捗をクリア
@@ -1018,7 +1262,16 @@ export default function App() {
         if (imageAnalyzeAbortRef.current === ctrl) imageAnalyzeAbortRef.current = null;
       }
     })();
-  }, [historyItemsForColor, imageFeatureMap]);
+  }, [historyItemsForColor, imageFeatureMap, analysisLive]);
+
+  /** F4: ユーザーが「キャンセル」を押した時に進行中の画像分析を中断する */
+  const cancelImageAnalysis = useCallback(() => {
+    if (imageAnalyzeAbortRef.current) {
+      imageAnalyzeAbortRef.current.abort();
+      imageAnalyzeAbortRef.current = null;
+    }
+    setImageAnalyzeProgress(null);
+  }, []);
 
   // ── 📸 自動画像解析：結果画像を貼ったら（タブを開かなくても）自動で解析する ──
   // 直近90日に「結果画像はあるが未解析」のアイテムがあれば、デバウンス後に解析を走らせる。
@@ -1043,7 +1296,7 @@ export default function App() {
   // ── 🤖 AI分析エージェント：useMemoで現状から提案を再計算 ──
   const agentAnalysis = useMemo(() => analyzeAgent({
     scopes, locks: {
-      face: true, body_shape: bodyPoseLock, expression: true, identity: true,
+      body_shape: bodyPoseLock,
       color: colorMoodLock, camera: compositionLock, aspect_ratio: compositionLock,
     },
     faceLock,
@@ -1111,6 +1364,47 @@ export default function App() {
       showPresetToast("↶ 自動調整を元に戻しました", "");
       return rest;
     });
+  }, [showPresetToast]);
+
+  // F2: DuplicateAnalysisPanel へのコールバック props を安定化（memo との組み合わせ効果）。
+  // JSX でインラインラムダを渡すと毎レンダー新規生成になり memo を無効化するため、
+  // useCallback でここに移す（分析/生成/保護ロジックは不変・トーストのみ追加）。
+  const handleDupBulkLevel = useCallback((ids: string[], lv: MotifLevel) => {
+    handleBulkLevel(ids, lv);
+    showPresetToast("🎯 出現制御を一括設定しました", "「提案を反映」で生成に効きます。");
+  }, [handleBulkLevel, showPresetToast]);
+
+  const handleDupClearNg = useCallback(() => {
+    handleClearNg();
+    showPresetToast("完全NGを解除しました", "");
+  }, [handleClearNg, showPresetToast]);
+
+  const handleDupApplyPolicies = useCallback(() => {
+    handleApplyPolicies();
+    showPresetToast("✓ 出現制御を反映しました", "次回の生成から効きます。");
+  }, [handleApplyPolicies, showPresetToast]);
+
+  const handleDupUnapplyPolicies = useCallback(() => {
+    handleUnapplyPolicies();
+    showPresetToast("反映を解除しました", "");
+  }, [handleUnapplyPolicies, showPresetToast]);
+
+  const handleDupResetPolicies = useCallback(() => {
+    handleResetPolicies();
+    showPresetToast("🗑️ 出現制御を全リセット", "全モチーフを許可(4)に戻しました。");
+  }, [handleResetPolicies, showPresetToast]);
+
+  const handleDupDismiss = useCallback(() => {
+    setMassProductionResult(null);
+    setHistoryAnalysis(null);
+  }, []);
+
+  const handleDupResetBias = useCallback(() => {
+    clearRecentGenres();
+    clearRecentSubStyles();
+    setHistoryAnalysis(null);
+    setMassProductionResult(null);
+    showPresetToast("🧹 偏り履歴をクリア", "ジャンル＋サブジャンルの履歴をリセットしました。");
   }, [showPresetToast]);
 
   // ── 🎨 色重み：自動調整（偏り減点・未使用加点）──
@@ -1613,7 +1907,21 @@ export default function App() {
 
   // ─── リセット系 ────────────────────────────────────────────────────────────────
 
+  /**
+   * 全リセット（完全版）：変更対象・守るもの・プリセット・詳細設定・見た目・重複制御・
+   * 一時プレビューをすべて初期状態に戻す。
+   * 履歴・お気に入り・評価・学習データ（skyveil / preferenceProfile）は保持する。
+   * 確認ダイアログは呼び出し元で出すこと。
+   */
   const handleResetAll = useCallback(() => {
+    // ── 変更対象 ───────────────────────────────────────────────────────────────
+    setScopes([]);
+    // ── 守るもの ───────────────────────────────────────────────────────────────
+    setBodyPoseLock(false);
+    setColorMoodLock(false);
+    setCompositionLock(false);
+    // faceLock は顔・同一性最優先方針のため true を維持（リセット対象外）
+    // ── プリセット・モード ─────────────────────────────────────────────────────
     setActiveWorldPresets([]);
     setWorldCombinedNote("");
     setActiveGodModes([]);
@@ -1624,10 +1932,28 @@ export default function App() {
     setActiveAssistModes([]);
     setChaosLabel(null);
     setMoods([]);
+    setAutoMoodCategories([]);
     setExtraInstructions("");
+    setNgList("");
     setViralMode(false);
+    setAvoidCliche(false);
+    // ── 詳細設定 ───────────────────────────────────────────────────────────────
+    setDetails(DEFAULT_DETAILS);
+    // ── 好み反映 ───────────────────────────────────────────────────────────────
+    setZozoApplied(null);
+    setFavoriteLearnEnabled(false);
+    setSkyveilOneShot(false);
+    // ── 見た目 / 質感 ──────────────────────────────────────────────────────────
+    setRealismLevel(3);
+    setRealismType(null);
+    setGlossLevel(3);
+    setWindLevel(0);
+    // ── 一時プレビュー ─────────────────────────────────────────────────────────
+    setRestoredItem(null);
+    setPatternPreview(null);
+    setScopeFlashKey((k) => k + 1); // スコープボタンをフラッシュ
     void logOperation("reset");
-    showPresetToast("↺ プリセット設定を全リセットしました");
+    showPresetToast("↺ 全リセット完了", "変更対象・設定・プレビューをすべて初期化しました。履歴・学習データは保持。");
   }, [showPresetToast]);
 
   // handleResetGod / handleResetAssist は SelectionSummary（撤去済み）専用だったため削除。
@@ -1882,6 +2208,14 @@ export default function App() {
         .some((k) => Object.prototype.hasOwnProperty.call(patch, k))) {
         void logOperation("rate", { id });
       }
+      // 失敗理由メモ（skyveil学習材料・自動反映はしない）
+      if (Object.prototype.hasOwnProperty.call(patch, "failureMemo") && patch.failureMemo) {
+        void logOperation("fail_memo", {
+          id,
+          reasons: patch.failureMemo.selectedReasons,
+          severity: patch.failureMemo.severity,
+        });
+      }
     },
     [refreshFavoriteProfile]
   );
@@ -1908,11 +2242,22 @@ export default function App() {
     return scopes.map((s) => map[s]).join(" + ") || "—";
   }, [scopes]);
 
+  // P4: 出力先ラベル（表示のみ。promptTarget は安全フィルタモードで生成ロジックは不変）
+  const outputTargetLabel = useMemo(() => {
+    switch (promptTarget) {
+      case "chatgpt_safe": return "ChatGPT";
+      case "gemini_safe":  return "Gemini";
+      case "nano_safe":    return "Nano Banana";
+      default:             return "両対応";
+    }
+  }, [promptTarget]);
+
   return (
     <div className="min-h-screen">
       <main className="w-full px-2 py-2">
         {view === "history" ? (
           <HistoryView
+            key={`history-${dataVersion}`}
             onBack={() => {
               setView("main");
               // 履歴ビューで削除・評価変更があったかもしれないので分析入力を再ロード
@@ -1927,6 +2272,37 @@ export default function App() {
             favoriteLearnEnabled={favoriteLearnEnabled}
           />
         ) : (
+          <>
+          {/* 🛡🤖 保護状態＋AI分析を1段に統合した常時表示バー（P4・案B / sticky・読み取り専用） */}
+          <GlobalProtectionBar
+            faceLock={faceLock}
+            risk={liveIdentityRisk}
+            analysisSummary={
+              <AnalysisStatusStrip
+                variant="summary"
+                live={analysisLive.state}
+                categories={analysisCategories}
+              />
+            }
+            analysisDetail={
+              <AnalysisStatusStrip
+                variant="detail"
+                live={analysisLive.state}
+                categories={analysisCategories}
+                detailOpen={analysisDetailOpen}
+                onDetail={toggleAnalysisDetail}
+              />
+            }
+          />
+          {/* 🤖 AI分析ライブビュー：GPB 展開内の[ライブビュー]で開く（M-2 統合） */}
+          {analysisDetailOpen && (
+            <div ref={analysisLiveRef} className="mb-3">
+              <AnalysisLiveView
+                state={analysisLive.state}
+                onRetry={() => void refreshFavoriteProfile()}
+              />
+            </div>
+          )}
           <div
             className="lg:grid lg:gap-6"
             style={{
@@ -1968,6 +2344,28 @@ export default function App() {
 
             <div className="space-y-5 mt-5 lg:mt-0 min-w-0 pb-24">
 
+              {/* 🛟 履歴・お気に入り復旧（緊急対応・読み取り＋非破壊）。入口ボタン＋展開パネル */}
+              <div className="flex justify-between items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setRecoveryOpen((v) => !v)}
+                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-amber-400/45 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 transition leading-none"
+                  title="IndexedDB に残っている履歴・お気に入りを確認・再読み込み・書き出し/読み込み"
+                >
+                  🛟 履歴・お気に入り復旧 {recoveryOpen ? "▲" : "▼"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPostCalendarOpen(true)}
+                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-accent/40 bg-accent/8 text-accent/90 hover:bg-accent/15 hover:border-accent/60 transition leading-none"
+                >
+                  📅 1ヶ月投稿カレンダー
+                </button>
+              </div>
+              {recoveryOpen && (
+                <RecoveryPanel onReloadAll={reloadAllData} onClose={() => setRecoveryOpen(false)} />
+              )}
+
               {/* 🔁 復元確認バナー：「同じ構成で再生成」後に表示 */}
               {restoredItem && (
                 <div className="rounded-2xl border border-sky-400/45 bg-sky-500/10 px-4 py-3 flex items-center gap-3 flex-wrap shadow-[0_0_20px_-4px_rgba(56,189,248,0.35)]">
@@ -2006,6 +2404,53 @@ export default function App() {
                 </div>
               )}
 
+              {/* 🏆 学習反映差分プレビュー（成功パターン）：反映前に必ず差分確認 */}
+              {patternPreview && (
+                <div className="rounded-2xl border border-emerald-400/45 bg-emerald-500/8 px-4 py-3 space-y-2 shadow-[0_0_20px_-4px_rgba(52,211,153,0.3)]">
+                  <p className="text-[14px] font-bold text-emerald-100">
+                    学習反映プレビュー — {patternPreview.pattern.title}
+                  </p>
+                  {patternPreview.preview.diffs.length > 0 ? (
+                    <div className="space-y-0.5">
+                      <p className="text-[12px] text-emerald-200/80 font-semibold">変更予定（反映されます）：</p>
+                      {patternPreview.preview.diffs.map((d, i) => (
+                        <p key={i} className="text-[12px] text-text-base/90 leading-snug">
+                          ・{d.label}（{String(d.before)} → {String(d.after)}）<span className="text-text-muted/60 text-[10px]">Risk:{d.risk}</span>
+                        </p>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[12px] text-text-muted/75">追加される変更対象はありません（すべて現状維持またはブロック）。</p>
+                  )}
+                  {patternPreview.preview.blockedDiffs.length > 0 && (
+                    <div className="space-y-0.5">
+                      <p className="text-[12px] text-rose-200 font-semibold">ブロック（保護対象のため反映不可）：</p>
+                      {patternPreview.preview.blockedDiffs.map((d, i) => (
+                        <p key={i} className="text-[12px] text-rose-200/90 leading-snug">⚠️ {d.label} — {d.warning}</p>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleConfirmPattern}
+                      disabled={!patternPreview.preview.canApply}
+                      className="rounded-lg px-3 py-1.5 text-[13px] font-bold border border-emerald-400/60 bg-emerald-500/22 text-emerald-50 hover:bg-emerald-500/35 transition disabled:opacity-40 disabled:cursor-not-allowed leading-none"
+                    >
+                      ✓ この変更を反映
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPatternPreview(null)}
+                      className="rounded-lg px-3 py-1.5 text-[12px] border border-white/15 bg-white/5 text-text-muted hover:text-text-base transition leading-none"
+                    >
+                      キャンセル
+                    </button>
+                    <span className="text-[10px] text-text-muted/55 ml-1">※ 反映ボタンを押すまで設定は変わりません</span>
+                  </div>
+                </div>
+              )}
+
               {/* 📡 現在の反映状態バー：今プロンプトに効く設定を一目で（読み取り専用） */}
               <ReflectionStatusBar
                 scopes={scopes}
@@ -2032,7 +2477,9 @@ export default function App() {
                 motifControlledCount={countLevels(levels).controlled}
                 comboControlCount={countComboPolicies(comboPolicies).block + countComboPolicies(comboPolicies).alt}
                 colorWeights={colorWeights}
+                onResetAll={handleResetAll}
               />
+
 
               {/* 🧬 skyveil好みAI：既存の好み分析を束ねた単一の反映コントロール */}
               <SkyveilBar
@@ -2060,6 +2507,12 @@ export default function App() {
                   setSkyveilOneShot(false);
                   showPresetToast("skyveil好み反映をリセットしました", "");
                 }}
+                profileError={profileError}
+                autoLearnEnabled={autoLearnEnabled}
+                onToggleAutoLearn={handleToggleAutoLearn}
+                onClearProfile={handleClearPreferenceProfile}
+                successPatterns={successPatterns}
+                onApplyPattern={handleApplyPattern}
               />
 
               <QuickActions
@@ -2107,14 +2560,8 @@ export default function App() {
                   levels={levels}
                   policyApplied={policyApplied}
                   onLevelChange={handleLevelChange}
-                  onBulkLevel={(ids, lv) => {
-                    handleBulkLevel(ids, lv);
-                    showPresetToast("🎯 出現制御を一括設定しました", "「提案を反映」で生成に効きます。");
-                  }}
-                  onClearNg={() => {
-                    handleClearNg();
-                    showPresetToast("完全NGを解除しました", "");
-                  }}
+                  onBulkLevel={handleDupBulkLevel}
+                  onClearNg={handleDupClearNg}
                   onAutoAdjust={handleAutoAdjust}
                   onUndoAutoAdjust={handleUndoAutoAdjust}
                   canUndoAuto={levelsUndoStack.length > 0}
@@ -2134,29 +2581,15 @@ export default function App() {
                   imageAnalysis={imageAnalysis}
                   onStartImageAnalysis={startImageAnalysis}
                   imageAnalyzeProgress={imageAnalyzeProgress}
+                  onCancelImageAnalysis={cancelImageAnalysis}
                   ratingAnalysis={ratingAnalysis}
                   preferenceProfile={preferenceProfile}
-                  analyzingProfile={analyzingProfile}
-                  profileError={profileError}
                   profileSampleCount={profileSampleCount}
-                  onRunPreferenceAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
-                  onClearPreferenceProfile={handleClearPreferenceProfile}
-                  autoLearnEnabled={autoLearnEnabled}
-                  onToggleAutoLearn={handleToggleAutoLearn}
                   agent={agentAnalysis}
                   onAgentAction={handleAgentAction}
-                  onApplyPolicies={() => {
-                    handleApplyPolicies();
-                    showPresetToast("✓ 出現制御を反映しました", "次回の生成から効きます。");
-                  }}
-                  onUnapplyPolicies={() => {
-                    handleUnapplyPolicies();
-                    showPresetToast("反映を解除しました", "");
-                  }}
-                  onResetPolicies={() => {
-                    handleResetPolicies();
-                    showPresetToast("🗑️ 出現制御を全リセット", "全モチーフを許可(4)に戻しました。");
-                  }}
+                  onApplyPolicies={handleDupApplyPolicies}
+                  onUnapplyPolicies={handleDupUnapplyPolicies}
+                  onResetPolicies={handleDupResetPolicies}
                   onAutoFix={() => {
                     const antiInputs = buildAntiTemplateInputs(buildInputs(), variationMemory);
                     setScopes(antiInputs.scopes);
@@ -2179,17 +2612,8 @@ export default function App() {
                     setMassProductionResult(null);
                     void runGenerate(buildInputs());
                   }}
-                  onResetBias={() => {
-                    clearRecentGenres();
-                    clearRecentSubStyles();
-                    setHistoryAnalysis(null);
-                    setMassProductionResult(null);
-                    showPresetToast("🧹 偏り履歴をクリア", "ジャンル＋サブジャンルの履歴をリセットしました。");
-                  }}
-                  onDismiss={() => {
-                    setMassProductionResult(null);
-                    setHistoryAnalysis(null);
-                  }}
+                  onResetBias={handleDupResetBias}
+                  onDismiss={handleDupDismiss}
                   analysisStats={analysisStats}
                   activeScopes={scopes}
                   favoriteProfile={favoriteProfile}
@@ -2333,12 +2757,13 @@ export default function App() {
                 </div>
               )}
 
-              {/* 設定サマリー */}
+              {/* 設定サマリー（P4：出力先ラベルを追加・表示のみ） */}
               <div className="px-1 space-y-1.5">
                 <div className="text-sm text-text-muted flex flex-wrap items-center gap-2">
                   <span className="text-text-base font-semibold">{scopeLabel}</span>
                   <span>/</span>
                   <span>{count}案 ・ 統一プロンプト</span>
+                  <span className="text-text-muted/60">・ 出力先：{outputTargetLabel}</span>
                   {viralMode && (
                     <span className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-rose-500/15 text-rose-200 border border-rose-500/40">
                       🔥 一発バズりモード
@@ -2350,6 +2775,7 @@ export default function App() {
                   count={count}
                   onComplete={handleGenerationComplete}
                   animationEnabled={true}
+                  info={`${outputTargetLabel}向け / 統一プロンプト`}
                 />
               </div>
 
@@ -2498,6 +2924,8 @@ export default function App() {
                     items={items}
                     onUpdate={handleItemUpdate}
                     onArrange={handleArrange}
+                    lock={currentLock}
+                    skyveilProfile={skyveilProfile}
                   />
                 </section>
               )}
@@ -2507,11 +2935,13 @@ export default function App() {
               </footer>
             </div>
           </div>
+          </>
         )}
       </main>
 
       {/* ⭐ お気に入りプロンプト右スライドパネル（fixed） */}
       <FavoritesPanel
+        key={`favorites-${dataVersion}`}
         open={favPanelOpen}
         onClose={() => setFavPanelOpen(false)}
         onArrange={handleArrange}
@@ -2528,6 +2958,27 @@ export default function App() {
           onClose={() => setSelectionModalOpen(false)}
         />
       )}
+
+      {/* 📅 1ヶ月投稿カレンダー */}
+      {postCalendarOpen && (() => {
+        const now = new Date();
+        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        return (
+          <PostingCalendarModal
+            todayKey={todayKey}
+            initialYear={now.getFullYear()}
+            initialMonth={now.getMonth() + 1}
+            onClose={() => setPostCalendarOpen(false)}
+            onUseTheme={(hint) => {
+              // テーマヒントを追加指示に追記（変更対象・固定設定は触らない）
+              setExtraInstructions((prev) => prev ? `${prev}\n${hint}` : hint);
+              setPostCalendarOpen(false);
+              setView("main");
+              showPresetToast("📅 投稿テーマを反映しました", "追加指示にヒントを追記。スコープ・固定設定は変更していません。");
+            }}
+          />
+        );
+      })()}
 
       {/* 🎨 簡易画像編集モーダル */}
       {simpleEditorOpen && imageDataUrl && (
