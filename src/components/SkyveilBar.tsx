@@ -1,17 +1,21 @@
 /**
- * SkyveilBar — メイン画面の「skyveil好みAI」操作バー。
+ * SkyveilBar — メイン画面の「skyveil好みAI」操作バー（skyveil の唯一のハブ）。
  *
  * 既存の好み分析(実Gemini)・お気に入り傾向・評価・画像分析を1つに束ねた
  * 統合プロファイルを反映するための、単一の操作起点。
  *
- *  [skyveil好み反映 ON/OFF]  [弱 / 標準 / 強]
- *  [好み分析を更新] [プロファイルを見る] [今回だけ反映] [リセット]
- *  ▼ 好き / 出すぎ注意 / 避けたい / 未開拓おすすめ / 現在の反映
+ * 通常時（常時表示）: [反映 ON/OFF] [弱/標準/強] [今回だけ反映]
+ * 折りたたみ（▼設定・プロファイル）:
+ *   操作: [好み分析を更新] [自動学習 ON/OFF] [反映リセット] [プロファイル削除]
+ *   表示: 好き/出すぎ注意/避けたい/未開拓おすすめ / 成功プロンプト / 現在の反映
+ *
+ * ※ 反映ボタン方式を維持（自動反映はしない）。学習ロジックは変更しない（既存ハンドラ再利用のみ）。
  */
 
 import { useState } from "react";
 import type { SkyveilProfile, SkyveilStrength } from "../lib/skyveilProfile";
 import { STRENGTH_LABEL } from "../lib/skyveilProfile";
+import type { SuccessPromptPattern } from "../lib/successPatterns";
 
 interface Props {
   enabled: boolean;
@@ -29,6 +33,19 @@ interface Props {
   onUpdateAnalysis: () => void;
   onOneShot: () => void;
   onReset: () => void;
+
+  // ── M-3 で移設（DuplicateAnalysisPanel から集約・既存ハンドラ再利用） ──
+  /** 直近の分析エラー（成功時 null） */
+  profileError?: string | null;
+  /** 自動学習 ON/OFF */
+  autoLearnEnabled: boolean;
+  onToggleAutoLearn: (enabled: boolean) => void;
+  /** 好み分析プロファイルの削除（学習データ削除＝反映リセットとは別物） */
+  onClearProfile: () => void;
+
+  /** 成功プロンプト抽出（#9） */
+  successPatterns?: SuccessPromptPattern[];
+  onApplyPattern?: (pattern: SuccessPromptPattern) => void;
 }
 
 const STRENGTHS: SkyveilStrength[] = ["weak", "standard", "strong"];
@@ -36,8 +53,11 @@ const STRENGTHS: SkyveilStrength[] = ["weak", "standard", "strong"];
 export function SkyveilBar({
   enabled, strength, profile, analyzing, sampleCount, minSamples, oneShotArmed,
   onToggle, onStrength, onUpdateAnalysis, onOneShot, onReset,
+  profileError, autoLearnEnabled, onToggleAutoLearn, onClearProfile,
+  successPatterns, onApplyPattern,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [patternsOpen, setPatternsOpen] = useState(false);
   const active = enabled || oneShotArmed;
 
   return (
@@ -45,10 +65,10 @@ export function SkyveilBar({
       "rounded-2xl border transition-colors",
       active ? "border-violet-400/50 bg-violet-500/8" : "border-bg-border bg-bg-panel/40",
     ].join(" ")}>
-      {/* ── 上段：トグル＋強度 ── */}
-      <div className="px-3.5 py-2.5 flex items-center gap-2.5 flex-wrap">
-        <span className="text-[15px]">🧬</span>
-        <span className="text-[14px] font-bold text-text-base">skyveil好みAI</span>
+      {/* ── 上段（常時表示・P4微圧縮）：トグル＋強度＋今回だけ反映 ── */}
+      <div className="px-3 py-1.5 flex items-center gap-2 flex-wrap">
+        <span className="text-[14px] leading-none">🧬</span>
+        <span className="text-[13px] font-bold text-text-base leading-none">skyveil好みAI</span>
 
         {/* ON/OFF */}
         <button
@@ -89,9 +109,19 @@ export function SkyveilBar({
           })}
         </div>
 
+        {/* 今回だけ反映（OFF時のみ：通常利用の主操作） */}
+        {!enabled && !oneShotArmed && (
+          <button
+            type="button"
+            onClick={onOneShot}
+            className="px-2.5 py-1 rounded-full text-[12px] font-semibold border border-amber-400/45 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 transition leading-none"
+          >
+            ✨ 今回だけ反映
+          </button>
+        )}
         {oneShotArmed && !enabled && (
           <span className="text-[11px] px-1.5 py-0.5 rounded-full border border-amber-400/50 bg-amber-400/12 text-amber-200 leading-none">
-            今回だけ反映
+            ✨ 今回だけ反映 予約中
           </span>
         )}
 
@@ -100,42 +130,69 @@ export function SkyveilBar({
           onClick={() => setOpen((v) => !v)}
           className="ml-auto text-[12px] text-text-muted hover:text-text-base transition leading-none"
         >
-          {open ? "▲ 閉じる" : "▼ プロファイルを見る"}
+          {open ? "▲ 閉じる" : "▼ 設定"}
         </button>
       </div>
 
-      {/* ── 下段：操作ボタン ── */}
-      <div className="px-3.5 pb-2.5 flex flex-wrap gap-1.5">
-        <button
-          type="button"
-          onClick={onUpdateAnalysis}
-          disabled={analyzing || sampleCount < minSamples}
-          title={sampleCount < minSamples ? `評価が ${minSamples} 件以上たまると更新できます（現在 ${sampleCount} 件）` : "Geminiで好みプロファイルを再分析"}
-          className="px-2.5 py-1 rounded-lg text-[12px] font-semibold border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed leading-none"
-        >
-          {analyzing ? "分析中…" : "🔄 好み分析を更新"}
-        </button>
-        {!enabled && (
-          <button
-            type="button"
-            onClick={onOneShot}
-            className="px-2.5 py-1 rounded-lg text-[12px] font-semibold border border-amber-400/45 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 transition leading-none"
-          >
-            ✨ 今回だけ反映
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={onReset}
-          className="px-2.5 py-1 rounded-lg text-[12px] border border-bg-border bg-bg-panel text-text-muted hover:text-text-base hover:border-rose-400/40 transition leading-none"
-        >
-          反映リセット
-        </button>
-      </div>
-
-      {/* ── プロファイル表示 ── */}
+      {/* ── 折りたたみ（展開時のみ）：詳細操作＋プロファイル ── */}
       {open && (
-        <div className="px-3.5 pb-3 pt-1 border-t border-violet-400/15 space-y-2">
+        <div className="px-3.5 pb-3 pt-1 border-t border-violet-400/15 space-y-2.5">
+
+          {/* 詳細操作ボタン群（移設） */}
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={onUpdateAnalysis}
+              disabled={analyzing || sampleCount < minSamples}
+              title={sampleCount < minSamples ? `評価が ${minSamples} 件以上たまると更新できます（現在 ${sampleCount} 件）` : "Geminiで好みプロファイルを再分析"}
+              className="px-2.5 py-1 rounded-lg text-[12px] font-semibold border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed leading-none"
+            >
+              {analyzing ? "分析中…" : "🔄 好み分析を更新"}
+            </button>
+
+            {/* 自動学習トグル（移設） */}
+            <button
+              type="button"
+              onClick={() => onToggleAutoLearn(!autoLearnEnabled)}
+              aria-pressed={autoLearnEnabled}
+              title="評価が増えるたびに自動で好みプロファイルを再分析する（生成への反映は反映ボタン方式のまま）"
+              className={[
+                "px-2.5 py-1 rounded-lg text-[12px] font-semibold border transition leading-none",
+                autoLearnEnabled
+                  ? "border-emerald-400/55 bg-emerald-500/15 text-emerald-100"
+                  : "border-bg-border bg-bg-panel text-text-muted hover:text-text-base",
+              ].join(" ")}
+            >
+              🔁 自動学習 {autoLearnEnabled ? "ON" : "OFF"}
+            </button>
+
+            <button
+              type="button"
+              onClick={onReset}
+              title="反映状態（ON/今回だけ）を解除します。学習データは消えません。"
+              className="px-2.5 py-1 rounded-lg text-[12px] border border-bg-border bg-bg-panel text-text-muted hover:text-text-base hover:border-rose-400/40 transition leading-none"
+            >
+              反映リセット
+            </button>
+
+            <button
+              type="button"
+              onClick={onClearProfile}
+              title="好み分析プロファイル（学習データ）を削除します。反映リセットとは別。"
+              className="px-2.5 py-1 rounded-lg text-[12px] border border-rose-400/35 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition leading-none"
+            >
+              🗑 プロファイル削除
+            </button>
+          </div>
+
+          {/* エラー表示（移設） */}
+          {profileError && (
+            <div className="rounded-md border border-rose-400/55 bg-rose-500/10 px-2 py-1 text-[11px] text-rose-100/95">
+              ⚠ 分析失敗: {profileError}
+            </div>
+          )}
+
+          {/* プロファイル表示 */}
           {!profile.hasData ? (
             <p className="text-[12px] text-text-muted/80 leading-snug py-1">
               まだ好みデータが足りません。生成・お気に入り・評価を重ねるか「好み分析を更新」を押すと、
@@ -154,6 +211,57 @@ export function SkyveilBar({
               <ProfileRow color="rose"    label="避けたい"       items={profile.avoid} />
               <ProfileRow color="sky"     label="未開拓おすすめ" items={profile.underusedRecommended} />
             </>
+          )}
+
+          {/* 🏆 成功プロンプト抽出（#9） */}
+          {successPatterns && successPatterns.length > 0 && (
+            <div className="pt-1 border-t border-violet-400/10">
+              <button
+                type="button"
+                onClick={() => setPatternsOpen((v) => !v)}
+                className="w-full flex items-center gap-2 text-left"
+              >
+                <span className="text-[12px] font-bold text-emerald-200">🏆 成功プロンプト抽出</span>
+                <span className="text-[10px] text-text-muted/55">({successPatterns.length}型)</span>
+                <span className="ml-auto text-[10px] text-text-muted/45">{patternsOpen ? "▲" : "▼"}</span>
+              </button>
+              {patternsOpen && (
+                <div className="space-y-2 pt-1.5">
+                  {successPatterns.map((p) => (
+                    <div key={p.id} className="rounded-lg border border-emerald-400/25 bg-emerald-500/5 px-2.5 py-2 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] font-bold text-emerald-100">{p.title}</span>
+                        <span className="text-[10px] text-emerald-300/70">適性 {p.score}</span>
+                      </div>
+                      <p className="text-[11px] text-text-muted/85 leading-snug">
+                        変更対象：{p.changeTargetPattern.length > 0 ? p.changeTargetPattern.join("・") : "（なし）"}
+                      </p>
+                      <p className="text-[11px] text-text-muted/85 leading-snug">
+                        守るもの：{p.protectedTargetPattern.slice(0, 6).join("・")}
+                      </p>
+                      {p.stylePattern.length > 0 && (
+                        <p className="text-[11px] text-text-muted/75 leading-snug">傾向：{p.stylePattern.join("・")}</p>
+                      )}
+                      {p.successReasons.length > 0 && (
+                        <p className="text-[10px] text-emerald-200/75 leading-snug">成功理由：{p.successReasons.join("／")}</p>
+                      )}
+                      {onApplyPattern && (
+                        <button
+                          type="button"
+                          onClick={() => onApplyPattern(p)}
+                          className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-emerald-400/55 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25 transition leading-none"
+                        >
+                          ✓ この型を現在設定に反映
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <p className="text-[10px] text-text-muted/55 leading-snug">
+                    ※ 反映しても顔・同一性は保護。背景固定ON/衣装OFFの軸は反映されません。
+                  </p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* 現在の反映 */}

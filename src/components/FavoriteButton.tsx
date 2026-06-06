@@ -14,7 +14,7 @@ export function FavoriteButton({ active, onToggle }: Props) {
           ? "border-amber-300/70 bg-gradient-to-r from-amber-400/30 to-yellow-300/20 text-amber-100 shadow-[0_0_12px_rgba(251,191,36,0.3)] scale-[1.02]"
           : "border-amber-300/25 bg-amber-300/5 text-amber-200/65 hover:bg-amber-300/15 hover:border-amber-300/50 hover:text-amber-200",
       ].join(" ")}
-      title={active ? "お気に入りを解除" : "お気に入りに追加"}
+      title={active ? "お気に入り済み（クリックで解除）。skyveil好み学習の材料になります" : "お気に入りに追加（skyveil好み学習の材料になります）"}
     >
       <span className="text-sm leading-none">{active ? "⭐" : "☆"}</span>
       <span>{active ? "お気に入り済み" : "お気に入り"}</span>

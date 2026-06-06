@@ -55,6 +55,11 @@ export function BoostControls({
 
   return (
     <div className="space-y-1">
+      {/* ── 全体補助（選択中の変更対象すべてに効く）── */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-bold text-text-muted/60 leading-none select-none">全体補助</span>
+        <span className="text-[10px] text-text-muted/40 leading-none">お気に入り傾向・風（神引きは「神引き」ボタンから）</span>
+      </div>
       {/* ── お気に入り傾向 ── */}
       <div className="flex items-center gap-x-2.5 gap-y-0.5 flex-wrap">
         <button
@@ -158,8 +163,14 @@ export function BoostControls({
         </div>
       )}
 
-      {/* ── ZOZOトレンド（埋め込み折りたたみ）── */}
+      {/* ── 衣装補助（衣装ON時のみ有効）── */}
       <div className="border-t border-bg-border/30 pt-1">
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <span className="text-[10px] font-bold text-text-muted/60 leading-none select-none">衣装補助</span>
+          {!outfitScopeOn && (
+            <span className="text-[10px] text-amber-300/70 leading-none">衣装ONで使えます</span>
+          )}
+        </div>
         <ZozoTrendBar
           embedded
           outfitScopeOn={outfitScopeOn}

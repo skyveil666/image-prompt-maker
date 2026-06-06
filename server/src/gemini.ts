@@ -2,6 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import type { Part } from "@google/genai";
 import type { GenerateRequest, GeneratedProposal } from "./types.ts";
 import { buildSystemPrompt, buildUserPrompt, safetySanitizePrompt, nanoSanitizePrompt } from "./promptSystem.ts";
+import { applyIdentityShield, applyServerScopeFilter } from "./scopeFilter.ts";
 import { planBatch, shouldApplyVariety } from "./varietyEngine.ts";
 import { planSubStylesForBatch } from "./outfitSubStyles.ts";
 
@@ -297,7 +298,13 @@ export async function generate(req: GenerateRequest): Promise<GeneratedProposal[
   }
 
   const result: GeneratedProposal[] = proposals.map((body, idx) => {
-    const sanitized = safetySanitizePrompt(body);
+    // ── 最後の砦：①Identity Shield → ②サーバ側スコープフィルタ → ③安全サニタイズ ──
+    // 1) 同一性保護文を強化（リスクに応じて先頭に固定文を追加）
+    const shield = applyIdentityShield(req, body);
+    // 2) 変更対象外・保護対象に関する変更文を機械的に削除（背景固定ON→背景文削除 等）
+    const filtered = applyServerScopeFilter(req, shield.strengthenedPrompt);
+    // 3) 露骨表現サニタイズ（出力安全化）
+    const sanitized = safetySanitizePrompt(filtered.cleanedPrompt);
     const finalBody = req.promptTarget === "nano_safe"
       ? nanoSanitizePrompt(sanitized)
       : sanitized;
@@ -316,6 +323,19 @@ export async function generate(req: GenerateRequest): Promise<GeneratedProposal[
       }),
       ...(subItem && subItem.picks.length > 0 && {
         subStyles: subItem.picks.map((p) => p.id),
+      }),
+      // UI表示用：削除項目・Identity Shield 要約（空でも軽量なので付与）
+      ...(filtered.removedItems.length > 0 && {
+        scopeFilter: { removedItems: filtered.removedItems, warnings: filtered.warnings },
+      }),
+      ...(shield.addedIdentityClauses.length > 0 && {
+        identityShield: {
+          riskScore: shield.riskScore,
+          riskLevel: shield.riskLevel,
+          addedIdentityClauses: shield.addedIdentityClauses,
+          reasons: shield.reasons,
+          warnings: shield.warnings,
+        },
       }),
     };
   });

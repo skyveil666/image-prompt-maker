@@ -41,6 +41,11 @@ const SCOPE_OPTIONS: { id: Scope; label: string; hint: string }[] = [
   { id: "lighting",     label: "ライティング", hint: "光・影・色温度のみ変更" },
 ];
 
+// 衣装系グループ（衣装＝主役 / コスプレ・機械化＝派生）。変更対象ボタンの視覚グループ化に使用。
+const OUTFIT_GROUP: Scope[] = ["outfit", "cosplay", "cyber"];
+const OUTFIT_GROUP_BEFORE: Scope[] = ["background", "foreground", "pose", "hair"];
+const OUTFIT_GROUP_AFTER: Scope[] = ["camera", "props", "big_object", "vehicle", "myth", "lighting"];
+
 // ── Button colors (1→sky, 2→teal, 3→accent, 4→orange, 5→rose) ────────────────
 
 const STEP_COLORS = [
@@ -211,10 +216,39 @@ export function ControlPanel({
 
   const toggleScope = (id: Scope) => {
     if (scopes.includes(id)) {
+      // コスプレを外しても衣装は自動で外さない（衣装単独で使いたい場合があるため）
       onScopesChange(scopes.filter((v) => v !== id));
     } else {
-      onScopesChange([...scopes, id]);
+      // コスプレは衣装の派生：ONにしたら衣装scopeも自動ON（タグはコスプレで分離。
+      // BUG-17 で cosplay は衣装変更として扱う＝整合的）。
+      const add: Scope[] = id === "cosplay" && !scopes.includes("outfit") ? [id, "outfit"] : [id];
+      onScopesChange([...scopes, ...add]);
     }
+  };
+
+  // 衣装系（衣装＝主役 / コスプレ・機械化＝派生）を視覚的にまとめるためのグループ分け
+  const renderScopeBtn = (opt: { id: Scope; label: string; hint: string }) => {
+    const active   = scopes.includes(opt.id);
+    const flashing = flashScopes.has(opt.id);
+    return (
+      <button
+        key={opt.id}
+        type="button"
+        onClick={() => toggleScope(opt.id)}
+        title={opt.hint}
+        aria-pressed={active}
+        className={[
+          "px-3.5 py-1.5 text-[13px] rounded-lg border font-semibold leading-none transition select-none inline-flex items-center gap-1",
+          active ? CHIP_ACTIVE : CHIP_INACTIVE,
+          flashing ? "scope-flash" : "",
+        ].join(" ")}
+      >
+        {active && (
+          <span className="text-[11px] leading-none text-accent/95" aria-hidden>✓</span>
+        )}
+        {opt.label}
+      </button>
+    );
   };
 
   return (
@@ -247,35 +281,21 @@ export function ControlPanel({
                 title="変更範囲・生成ブースト・お気に入り傾向・ZOZOをすべて解除（守るものは維持）"
                 className="px-2.5 py-0.5 rounded border border-rose-400/30 bg-rose-400/8 text-rose-200/85 text-[12px] font-semibold hover:bg-rose-500/18 hover:border-rose-500/55 hover:text-rose-200 transition leading-snug"
               >
-                ↺ 全リセット
+                ↺ 選択解除
               </button>
             </span>
           )}
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {SCOPE_OPTIONS.map((opt) => {
-            const active   = scopes.includes(opt.id);
-            const flashing = flashScopes.has(opt.id);
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => toggleScope(opt.id)}
-                title={opt.hint}
-                aria-pressed={active}
-                className={[
-                  "px-3.5 py-1.5 text-[13px] rounded-lg border font-semibold leading-none transition select-none inline-flex items-center gap-1",
-                  active ? CHIP_ACTIVE : CHIP_INACTIVE,
-                  flashing ? "scope-flash" : "",
-                ].join(" ")}
-              >
-                {active && (
-                  <span className="text-[11px] leading-none text-accent/95" aria-hidden>✓</span>
-                )}
-                {opt.label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* 衣装より前の軸 */}
+          {SCOPE_OPTIONS.filter((o) => OUTFIT_GROUP_BEFORE.includes(o.id)).map(renderScopeBtn)}
+          {/* 衣装系グループ：衣装＝主役 / コスプレ・機械化＝派生（視覚的に1つにまとめる） */}
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-violet-400/25 bg-violet-400/5 px-1.5 py-1">
+            <span className="text-[10px] font-bold text-violet-200/70 leading-none select-none px-0.5">衣装系</span>
+            {SCOPE_OPTIONS.filter((o) => OUTFIT_GROUP.includes(o.id)).map(renderScopeBtn)}
+          </span>
+          {/* 衣装系より後の軸 */}
+          {SCOPE_OPTIONS.filter((o) => OUTFIT_GROUP_AFTER.includes(o.id)).map(renderScopeBtn)}
         </div>
       </div>
 

@@ -241,6 +241,9 @@ export function buildHistoryItems({
     sourceImageThumbnail: thumbnail,
     resultImageData: null,
     resultImageDataList: [],
+    // サーバ側スコープフィルタ / Identity Shield の結果を引き継ぐ（UI表示用）
+    ...(p.scopeFilter ? { serverScopeFilter: p.scopeFilter } : {}),
+    ...(p.identityShield ? { identityShield: p.identityShield } : {}),
     outputType: target,
     promptText: p.body,
     proposalIndex: p.index,

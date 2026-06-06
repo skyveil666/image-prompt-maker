@@ -7,6 +7,8 @@ interface Props {
   onComplete?: () => void;
   /** false にするとバッジ点滅・バーフラッシュを無効化 */
   animationEnabled?: boolean;
+  /** P4: 進捗行に表示する補足（例 "ChatGPT向け / 統一プロンプト"）。表示のみ・ロジック非関与 */
+  info?: string;
 }
 
 /**
@@ -42,6 +44,7 @@ export function GenerationProgress({
   count,
   onComplete,
   animationEnabled = true,
+  info,
 }: Props) {
   const [progress,        setProgress]        = useState(0);
   const [state,           setState]           = useState<RunState>("idle");
@@ -130,6 +133,7 @@ export function GenerationProgress({
           </>
         )}
         <span className="ml-auto inline-flex items-center gap-2 text-[13px] text-text-muted/85">
+          {info && <span className="hidden sm:inline text-[11px] text-text-muted/65">{info}</span>}
           <span>{count}案</span>
           <span className="tabular-nums font-mono text-text-base/80">
             {Math.round(progress)}%

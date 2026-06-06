@@ -20,6 +20,7 @@ export type OperationType =
   | "ng_add"          // 禁止タグ追加
   | "policy_apply"    // 重複分析の提案を反映
   | "preset"          // プリセット/神引き/世界観等のボタン
+  | "fail_memo"       // 失敗理由メモの保存（skyveil学習材料）
   | "reset";          // リセット操作
 
 export interface OperationLogEntry {

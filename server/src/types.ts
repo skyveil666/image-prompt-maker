@@ -69,11 +69,10 @@ export type Mood =
   | "air_fog" | "air_smoke" | "air_after_rain" | "air_dust" | "air_light_particles" | "air_humid" | "air_cold"
   | "grade_cinema" | "grade_ad" | "grade_low_sat" | "grade_high_sat" | "grade_blue" | "grade_red" | "grade_white" | "grade_black"
   | "venue_wide" | "venue_narrow" | "venue_gallery" | "venue_hotel" | "venue_greenhouse" | "venue_station" | "venue_rooftop" | "venue_glass" | "venue_abstract";
+// 顔・同一性・表情は faceLock（単一の真実）で一元管理するため LockKey に含めない。
+// フロント src/types.ts と同期。参照: docs/09_face-lock統合.md
 export type LockKey =
-  | "face"
   | "body_shape"
-  | "expression"
-  | "identity"
   | "color"
   | "camera"
   | "aspect_ratio";
@@ -663,6 +662,19 @@ export interface GeneratedProposal {
   surprise?: string;
   /** outfitSubStyles が割り当てた衣装サブジャンルID（recentSubStyles に往復）。 */
   subStyles?: string[];
+  /** サーバ側スコープフィルタで削除した項目の要約（UI表示用）。 */
+  scopeFilter?: {
+    removedItems: { category: string; text: string; reason: string; severity: string }[];
+    warnings: string[];
+  };
+  /** Identity Shield の結果要約（UI表示用）。 */
+  identityShield?: {
+    riskScore: number;
+    riskLevel: string;
+    addedIdentityClauses: string[];
+    reasons: string[];
+    warnings: string[];
+  };
 }
 
 export interface GenerateResponse {

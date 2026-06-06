@@ -1926,8 +1926,10 @@ export function DetailsCard({
 
   const allTabs: TabId[] = [...scopes, ...EXTRA_TAB_IDS];
 
-  // ── 折りたたみ開閉（初期：すべて閉じる）──
-  const [openTabs, setOpenTabs] = useState<Set<TabId>>(() => new Set());
+  // ── 折りたたみ開閉（P4：選択あり=初期展開 / 未選択=初期クローズ）──
+  const [openTabs, setOpenTabs] = useState<Set<TabId>>(
+    () => new Set(allTabs.filter((t) => countTab(t) > 0)),
+  );
   const toggleOpen = (t: TabId) =>
     setOpenTabs((prev) => {
       const n = new Set(prev);
@@ -2037,9 +2039,12 @@ export function DetailsCard({
         </div>
       </div>
 
-      {/* 折りたたみカテゴリ一覧（タブ廃止 → アコーディオン） */}
+      {/* 折りたたみカテゴリ一覧（タブ廃止 → アコーディオン）
+          P4: 選択あり（件数>0）のカテゴリを上に安定ソート（元の順序は保持） */}
       <div className="space-y-1.5">
-        {allTabs.map((t) => {
+        {[...allTabs]
+          .sort((a, b) => (countTab(b) > 0 ? 1 : 0) - (countTab(a) > 0 ? 1 : 0))
+          .map((t) => {
           const open     = openTabs.has(t);
           const count    = countTab(t);
           const scopeTab = isScopeTab(t);

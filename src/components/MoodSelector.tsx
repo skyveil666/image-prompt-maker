@@ -1,12 +1,9 @@
-import { useState } from "react";
 import type { Mood } from "../types";
 import { GridCell, CellSectionLabel, CellGrid } from "./GridCell";
 
-interface Props {
-  moods: Mood[];
-  autoMoodCategories: string[];
-  onChange: (moods: Mood[], autoCategories: string[]) => void;
-}
+// 注: 旧 `MoodSelector` コンポーネントは未使用のため削除（P4-P3）。
+// 本ファイルは定数 MOOD_GROUPS_*・型 MoodGroup・MoodGroupRow・hasDetailSelection を
+// DetailsCard / favoriteProfile が利用する共有モジュールとして存続する。
 
 // ─── Category definitions ─────────────────────────────────────────────────────
 
@@ -227,80 +224,5 @@ export function MoodGroupRow({
   );
 }
 
-// ─── Component ───────────────────────────────────────────────────────────────
-
-export function MoodSelector({ moods, autoMoodCategories, onChange }: Props) {
-  const [detailOpen, setDetailOpen] = useState(() =>
-    // 詳細カテゴリに選択済みの値があれば最初から開く
-    hasDetailSelection(moods, autoMoodCategories)
-  );
-
-  const handleSelect = (group: MoodGroup, selection: "skip" | "auto" | Mood) => {
-    const newMoods = moods.filter((m) => !group.moods.some((gm) => gm.id === m));
-    const newAuto = autoMoodCategories.filter((c) => c !== group.label);
-    if (selection === "skip") {
-      onChange(newMoods, newAuto);
-    } else if (selection === "auto") {
-      onChange(newMoods, [...newAuto, group.label]);
-    } else {
-      onChange([...newMoods, selection as Mood], newAuto);
-    }
-  };
-
-  const detailActive = hasDetailSelection(moods, autoMoodCategories);
-
-  return (
-    <div>
-      {/* ── 基本 6 カテゴリ（常時表示） ───────────────── */}
-      {MOOD_GROUPS_BASIC.map((group, i) => (
-        <MoodGroupRow
-          key={group.label}
-          group={group}
-          moods={moods}
-          autoMoodCategories={autoMoodCategories}
-          onSelect={handleSelect}
-          noTopMargin={i === 0}
-        />
-      ))}
-
-      {/* ── 詳細オプション トグル ──────────────────────── */}
-      <div className="mt-3 pt-2.5 border-t border-white/8">
-        <button
-          type="button"
-          onClick={() => setDetailOpen((v) => !v)}
-          className={[
-            "inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all leading-none",
-            detailOpen
-              ? "border-violet-400/60 bg-violet-500/12 text-violet-200"
-              : detailActive
-                ? "border-violet-400/50 bg-violet-500/10 text-violet-300 shadow-[0_0_8px_rgba(139,92,246,0.2)]"
-                : "border-bg-border/50 bg-transparent text-text-muted/60 hover:text-text-muted hover:border-bg-border/80",
-          ].join(" ")}
-        >
-          {detailOpen ? "▲" : "▼"}
-          &nbsp;詳細オプション（反射・空気感・色調・空間）
-          {detailActive && !detailOpen && (
-            <span className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-violet-500/50 text-[9px] font-black text-white leading-none">
-              ●
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* ── 詳細 4 カテゴリ（折りたたみ） ─────────────── */}
-      {detailOpen && (
-        <div className="mt-1 pl-1 border-l-2 border-violet-500/20 space-y-0">
-          {MOOD_GROUPS_DETAIL.map((group) => (
-            <MoodGroupRow
-              key={group.label}
-              group={group}
-              moods={moods}
-              autoMoodCategories={autoMoodCategories}
-              onSelect={handleSelect}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// 旧 `MoodSelector` コンポーネントは未使用のため削除（P4-P3）。
+// 雰囲気カテゴリの UI は DetailsCard 側が MoodGroupRow を直接使って描画する。

@@ -73,4 +73,86 @@
 ## 9. 検証
 tsc / vite build。実機（隔離オリジン）で「手入力→適用→scope ON・referenceNote に軸タグ付き・生成body統合・ロックON軸は適用不可」を確認。
 
+## 10. Phase2 抽出プロンプト設計（短句素材抽出・確定案）
+
+> 方針: **長文説明ではなく、プロンプト素材として再利用しやすい短句**を優先。
+> 例: 背景=「古い映画館構造美」／衣装=「黒レイヤードモード」／光=「寒色斜光」／雰囲気=「都会的退廃美」。
+
+- 各値 = **1〜3 の短句**（目安 4〜16字・名詞句/複合語）。複数は「・」区切り。説明文・句点・長文は禁止。転用要素が無ければ `""`。
+- 13キー固定（`REFERENCE_CATEGORIES` と一致）。順序固定・増減禁止。
+- 人物/顔/年齢/性別/同一性/特定キャラ/作品/ブランド/作者/ロゴ/透かし/画像内文字は出さない。髪/衣装/ポーズは「スタイル」としてのみ抽出可。
+
+### システムプロンプト（短句版・Gemini Vision へ送る本文）
+```text
+あなたは画像編集プロンプトツール「Image Prompt Maker」の素材抽出器です。
+画像のキャプションを書くAIではありません。参照画像から「別画像に転用できる
+スタイル要素」だけを抽出し、13カテゴリ固定の JSON で返します。
+
+# 絶対ルール
+- 人物そのもの・顔・目鼻立ち・肌・表情・年齢・性別・人種・体型・個人や特定
+  キャラクターの同一性は一切記述しない。
+- 実在人物名・キャラ名・作品名・ブランド名・作者名・ロゴ・透かし・画像内文字は出さない。
+- 各値は「プロンプト素材として再利用できる短句」にする：名詞句/複合語で 1〜3 個、
+  目安4〜16字、複数は「・」区切り。説明文（「〜です」「人物が〜」）や句点は禁止。
+  例) 背景:古い映画館構造美 / 衣装:黒レイヤードモード / 光:寒色斜光 / 雰囲気:都会的退廃美
+- 髪/衣装/ポーズはスタイルのみ（髪=長さ質感色傾向、衣装=素材シルエット色、
+  ポーズ=体の向き/重心の抽象）。個人特定につながる記述はしない。
+- 転用要素が無いカテゴリは "" にする。推測で埋めない。
+- 出力は JSON のみ。前後に文章・マークダウン・コメントを付けない。
+
+# 各カテゴリ（短句で）
+background 場所/空間/奥行き・環境 / outfit 素材シルエット色 / hair 長さ質感色傾向 /
+pose 体の向き重心の抽象 / composition 配置・余白・縦横傾向 / camera アングル距離レンズ感 /
+lighting 光源方向強さ逆光/リム / color 配色トーン彩度傾向 / props 小物/アクセサリー /
+foreground 前ボケ/粒子等の前景演出 / world 世界観時代文化の雰囲気 / texture 質感描画傾向 /
+mood 空気感・感情トーン
+
+# 出力フォーマット（このキー・順序で固定）
+{"background":"","outfit":"","hair":"","pose":"","composition":"","camera":"","lighting":"","color":"","props":"","foreground":"","world":"","texture":"","mood":""}
+```
+
+### レスポンス封筒（拡張前提・後方互換）
+```json
+{ "version": 2, "elements": { "background": "古い映画館構造美", "outfit": "黒レイヤードモード", "...": "" } }
+```
+- client は常に `elements`（13キー）を各欄へ流し込む。`version` で段階管理。
+
+### モデル/パラメータ
+- gemini-2.5-flash・structured output（responseMimeType=application/json ＋ 13 string プロパティの responseSchema）・temperature 0〜0.3。
+- 新 endpoint `/api/extract-reference` のみ。promptSystem/scopeFilter/gemini の既存ロジックは不変。
+- サーバ後処理: 13キー以外は破棄／`person`等のキーが来ても無視／極端に長い値は切り詰め。
+
+## 11. Phase3+ 拡張設計（confidence / 複数参照画像）
+
+**いずれも additive・後方互換で拡張できるよう Phase2 を設計しておく。**
+
+- **confidence（抽出信頼度）**: レスポンスに `confidence?: { 13キー: number(0-1) }` を**追加**（Phase2 consumer は `elements` のみ読むので非破壊）。低信頼は薄表示・「選択項目だけ適用」の自動選択から除外。
+- **複数参照画像**: endpoint が `images: string[]` を受け、`elements`（軸ごとに代表をマージ）＋ `candidates?: { 13キー: [{ text, confidence, sourceIndex }] }` を返す。UI は軸ごとに候補選択（画像A→背景／画像B→衣装／画像C→ポーズ／画像D→ライティング…）。
+- `version` で段階管理。Phase1 の `referenceNote`（catKey→string）モデルは不変のまま、抽出の入り口だけ拡張する。
+
+## 12. 重複分析 / 好み分析 との統合（将来・表示と提案のみ）
+- 抽出短句を正規化タグ化 → `biasAnalyzer.MONITORED_MOTIFS` と突合し「この要素は履歴で既に頻出（抑制中）」を**warning 表示**（重複分析連携）。
+- `preferenceProfile.preferKeywords/avoidKeywords` と突合し「好み傾向に合う/避けたい」**ヒント表示**（好み分析連携）。
+- **自動適用しない（P7厳守）**。短句フォーマットがこれら集計・比較の前提（長文では tokenize/集計が困難）。
+
+## 13. Phase2 実装（Gemini Vision 実連携・2026-06-06・実装済み）
+
+**「Reference Picker（参照ピッカー / 要素抽出）」に改名。仮抽出は廃止。**
+
+- 新規 `server/src/referenceExtract.ts`：`extractReference(imageDataUrl)` が Gemini Vision（gemini-2.5-flash・temperature 0.2・`responseMimeType: application/json`）で参照画像を解析し、13カテゴリ固定JSONを返す。**既存 gemini.ts/promptSystem.ts/scopeFilter.ts は不変**（独立ファイル）。
+- 抽出プロンプト：**画像に実際に見える要素だけ**を具体プロンプト素材として抽出。background/outfit/hair/pose/composition/camera/lighting/color は必ず具体化（outfit=色/素材/形/丈/重ね着/トップス/ボトムス/靴/アクセ/シルエット、pose=立ち座り/体の向き/手脚位置/重心/カメラ角度、background=場所/奥行き/壁床窓家具/明るさ/色味）。**画像に無い要素（黒ゴシック/サイバー/青ネオン等）を足さない・別物にしない**。顔/同一性/年齢/人物複製は禁止。サーバ sanitize で13キー固定・空欄許容（でっち上げない）・`missingRequired` 返却。
+- 新 endpoint `POST /api/extract-reference`（index.ts）。`backendClient.ts` に `extractReferenceViaBackend`（BUG-11方式のエラー処理）。
+- パネルの「✨ 画像から要素抽出」を**実 Gemini 呼び出し**に接続（解析中表示・エラー表示・結果で13欄上書き）。
+- 生成への強反映：`referenceNoteText` を **「[参照画像から適用]（以下の要素を最優先で反映する）」見出し＋軸別行**のブロックに整形（extraInstructions 経由・生成ロジック本体不変）。
+
+### 検証（Phase2）
+| 検証 | 結果 |
+|---|---|
+| サーバ `tsc --noEmit` / フロント `tsc -b` / `vite build` | ✅ exit 0 |
+| 実 `/api/extract-reference`（合成画像・実Gemini） | ✅ 13キーJSON返却。淡青画像→`background:単色のライトブルー…` `color:ペールブルー低彩度…` を正確抽出。人物無し画像では outfit/hair/pose を**空のまま（でっち上げない）**・missingRequired で通知 |
+| 実機 end-to-end（5173・実Gemini抽出） | ✅ 画像→抽出で11欄充填・**黒レイヤード等の捏造なし**→背景適用→scope ON→生成bodyの extraInstructions に **`[参照画像から適用]…背景：単色の明るい青灰色…`** 統合 |
+
+### Phase3+（未実装・docs §11/§12）
+confidence / 複数参照画像 / 履歴・好み学習への保存（サムネ・抽出/適用カテゴリ・適用文・生成画像/評価/お気に入りとの関連）・参照画像履歴UI。
+
 **End of Doc 23**

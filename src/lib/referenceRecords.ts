@@ -1,0 +1,125 @@
+/**
+ * referenceRecords — Reference Picker / Compare Mode の「参照レコード」を IndexedDB に蓄積する。
+ *
+ * 目的：参照画像から抽出・適用した要素と、その生成バッチ(batchId)を1件のレコードとして残し、
+ *       後段の Compare Mode（参照↔生成の並列比較・一致率評価）と学習エージェント連携の土台にする。
+ *
+ * 設計（docs/24）：
+ *   - 生成ロジック・抽出ロジック・既存の履歴/お気に入り保存には一切影響しない（本ファイルは追加のみ）。
+ *   - 保存はベストエフォート（失敗しても生成フローを止めない）。APIへは送らず端末ローカルのみ。
+ *
+ * ストア：STORE_REFERENCE_RECORDS（idb v6・加算的に追加。index: batchId / createdAt）。
+ */
+
+import {
+  put,
+  get,
+  getAll,
+  getByIndex,
+  remove,
+  STORE_REFERENCE_RECORDS,
+} from "./idb";
+
+export interface ReferenceRecord {
+  /** 一意ID（createdAt と連番から決定的に生成） */
+  id: string;
+  /** 記録時刻（ms） */
+  createdAt: number;
+  /** 参照画像サムネ（dataURL・makeThumbnail で圧縮済み） */
+  refThumb: string;
+  /** Gemini 抽出の13カテゴリ（cat -> テキスト） */
+  extracted: Record<string, string>;
+  /** 実際に適用した軸（referenceNote：cat -> テキスト） */
+  applied: Record<string, string>;
+  /** 紐付く生成バッチ（history の batchId と一致） */
+  batchId: string;
+  /** Phase C：生成結果画像を再抽出した13カテゴリ（任意） */
+  resultExtracted?: Record<string, string>;
+  /** Phase C：項目別一致率 0-100（cat -> score。任意） */
+  matchScores?: Record<string, number>;
+  /** 任意：評価（学習連携用） */
+  rating?: number;
+  /** 任意：お気に入り（学習連携用） */
+  favorite?: boolean;
+}
+
+/** 参照レコード保持上限（古いものから間引く。サムネ込みなので控えめ） */
+const MAX_RECORDS = 500;
+/** ID 重複防止用の連番（同一 ms に複数記録されても衝突しない） */
+let seq = 0;
+
+/** 保存時に渡す入力（id / createdAt は自動採番） */
+export type ReferenceRecordInput = Omit<ReferenceRecord, "id" | "createdAt">;
+
+/**
+ * 参照レコードを1件保存する。失敗しても生成フローを止めないため握りつぶす。
+ * 戻り値：保存できた id（失敗時 null）。
+ */
+export async function saveReferenceRecord(
+  rec: ReferenceRecordInput,
+  createdAt: number = Date.now(),
+): Promise<string | null> {
+  try {
+    seq = (seq + 1) % 1_000_000;
+    const id = `ref_${createdAt}_${seq.toString().padStart(6, "0")}`;
+    const entry: ReferenceRecord = { ...rec, id, createdAt };
+    await put(STORE_REFERENCE_RECORDS, entry);
+    // 上限超過時のみ間引く（毎回は走らせない：16件に1回程度）
+    if ((seq & 0x0f) === 0) await pruneIfNeeded();
+    return id;
+  } catch {
+    /* ローカル保存失敗は無視（生成を妨げない） */
+    return null;
+  }
+}
+
+async function pruneIfNeeded(): Promise<void> {
+  try {
+    const all = await getAll<ReferenceRecord>(STORE_REFERENCE_RECORDS);
+    if (all.length <= MAX_RECORDS) return;
+    const sorted = all.sort((a, b) => b.createdAt - a.createdAt);
+    const toRemove = sorted.slice(MAX_RECORDS);
+    for (const e of toRemove) await remove(STORE_REFERENCE_RECORDS, e.id);
+  } catch {
+    /* noop */
+  }
+}
+
+/** 全参照レコードを新しい順で取得。 */
+export async function getReferenceRecords(): Promise<ReferenceRecord[]> {
+  const all = await getAll<ReferenceRecord>(STORE_REFERENCE_RECORDS);
+  return all.sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** id 指定で1件取得。 */
+export async function getReferenceRecord(id: string): Promise<ReferenceRecord | null> {
+  return get<ReferenceRecord>(STORE_REFERENCE_RECORDS, id);
+}
+
+/** batchId に紐付く参照レコードを取得（通常0〜1件）。 */
+export async function getReferenceRecordsByBatch(batchId: string): Promise<ReferenceRecord[]> {
+  return getByIndex<ReferenceRecord>(STORE_REFERENCE_RECORDS, "batchId", batchId);
+}
+
+/**
+ * 既存レコードに部分更新をマージして保存（Phase C の一致率・評価・お気に入り追記用）。
+ * 対象が無ければ false。既存フィールドは保持（破壊しない）。
+ */
+export async function updateReferenceRecord(
+  id: string,
+  patch: Partial<Omit<ReferenceRecord, "id" | "createdAt">>,
+): Promise<boolean> {
+  try {
+    const cur = await get<ReferenceRecord>(STORE_REFERENCE_RECORDS, id);
+    if (!cur) return false;
+    await put(STORE_REFERENCE_RECORDS, { ...cur, ...patch });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** id 指定で1件削除（手動整理用）。 */
+export async function removeReferenceRecord(id: string): Promise<void> {
+  await remove(STORE_REFERENCE_RECORDS, id);
+}

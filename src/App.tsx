@@ -45,6 +45,7 @@ import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/b
 import { analyzeFullHistory, filterRecentWindow, WINDOW_DAYS, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
 import { DuplicateAnalysisPanel } from "./components/DuplicateAnalysisPanel";
 import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
+import { CompareModeView } from "./components/CompareModeView";
 import {
   loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
   isApplied, setAppliedStorage,
@@ -76,6 +77,7 @@ import { getRecentGenres, pushRecentGenres, clearRecentGenres } from "./lib/genr
 import { getRecentSubStyles, pushRecentSubStyles, clearRecentSubStyles } from "./lib/subStyleHistory";
 import { runAutoCleanup, getAutoCleanupEnabled } from "./lib/cleanup";
 import { makeThumbnail } from "./lib/imageThumb";
+import { saveReferenceRecord } from "./lib/referenceRecords";
 import {
   type AppView,
   type Count,
@@ -181,14 +183,36 @@ export default function App() {
   /** 参照画像から「適用」した軸タグ付き自由文（catKey → text）。生成時に extraInstructions へ統合。
    *  ※ 詳細 enum には自動反映しない（docs/23）。worldCombinedNote と同じ追加マージ方式。 */
   const [referenceNote, setReferenceNote] = useState<Record<string, string>>({});
-  /** referenceNote を軸タグ付きテキストに整形（生成時に extraInstructions へ統合） */
-  const referenceNoteText = useMemo(
-    () => REFERENCE_CATEGORIES
+  /** referenceNote を「【参照画像から強制適用】」独立ブロックに整形（生成時に extraInstructions へ統合）。
+   *  生成ロジック本体は不変。参照要素を最優先で反映させるため、強い宣言付きブロックにする。 */
+  const referenceNoteText = useMemo(() => {
+    const lines = REFERENCE_CATEGORIES
       .filter((c) => (referenceNote[c.key] ?? "").trim())
-      .map((c) => `【${c.label}】${referenceNote[c.key].trim()}`)
-      .join("\n"),
-    [referenceNote],
+      .map((c) => `${c.label}：${referenceNote[c.key].trim()}`);
+    if (lines.length === 0) return "";
+    return [
+      "【参照画像から強制適用】",
+      ...lines,
+      "上記の参照要素は優先度最高で必ず反映する。自動生成のジャンル・世界観・他の変更指示よりも優先する。",
+      "参照画像の雰囲気・構図・色味・空気感を保つこと。参照画像に無い要素を勝手に足さないこと。",
+    ].join("\n");
+  }, [referenceNote]);
+  /** Compare Mode 用：参照画像＋抽出13カテゴリを生成時に参照レコードへ残すための ref（再描画不要）。
+   *  パネルから image / extracted が変わるたびに最新を受け取る。生成・抽出ロジックには影響しない。 */
+  const referenceContextRef = useRef<{ image: string; extracted: Record<string, string> } | null>(null);
+  const handleReferenceContextChange = useCallback(
+    (ctx: { image: string; extracted: Record<string, string> } | null) => {
+      referenceContextRef.current = ctx;
+    },
+    [],
   );
+  /** referenceNote を runGenerate（deps非依存）から最新参照するための ref。 */
+  const referenceNoteRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    referenceNoteRef.current = referenceNote;
+  }, [referenceNote]);
+  /** Compare Mode（参照↔生成 比較ビュー）の開閉。Reference Picker の「🆚 比較」から開く。 */
+  const [compareOpen, setCompareOpen] = useState(false);
   /** スコープボタンのフラッシュアニメーション用キー（インクリメントで発火） */
   const [scopeFlashKey, setScopeFlashKey] = useState(0);
   /** 多様性エンジン：直近の背景/衣装/ムード/前景エフェクトを記憶して連発を防ぐ */
@@ -812,6 +836,24 @@ export default function App() {
         setItems(built);
         // 正常生成できたらバックアップに保存（履歴画面から戻った時の復元用）
         lastItemsRef.current = built;
+
+        // ── Compare Mode 用：参照レコードを保存（追加のみ・既存保存に影響しない）──
+        // 参照画像があり、かつ「適用」した軸が1つ以上ある場合のみ。失敗しても生成は妨げない。
+        void (async () => {
+          try {
+            const refCtx = referenceContextRef.current;
+            const applied = referenceNoteRef.current;
+            const hasApplied = !!applied && Object.keys(applied).some((k) => (applied[k] ?? "").trim());
+            if (!refCtx?.image || !hasApplied) return;
+            const refThumb = await makeThumbnail(refCtx.image);
+            await saveReferenceRecord({
+              refThumb,
+              extracted: refCtx.extracted,
+              applied,
+              batchId,
+            });
+          } catch { /* 参照レコード保存失敗は無視（生成を妨げない） */ }
+        })();
 
         // 生成後に自動で偏り分析を実行（ノンブロッキング）
         const currentTexts = built.map((i) => i.promptText);
@@ -3003,8 +3045,13 @@ export default function App() {
           appliedNote={referenceNote}
           onApply={handleApplyReference}
           onClearAll={handleClearReference}
+          onContextChange={handleReferenceContextChange}
+          onOpenCompare={() => setCompareOpen(true)}
         />
       )}
+
+      {/* 🆚 Compare Mode（参照↔生成 比較・全幅ビュー） */}
+      <CompareModeView open={compareOpen} onClose={() => setCompareOpen(false)} />
 
       {/* 🖌 選択範囲プロンプトモーダル */}
       {selectionModalOpen && imageDataUrl && (

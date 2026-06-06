@@ -1,30 +1,35 @@
 /**
  * Minimal promisified IndexedDB wrapper.
  *
- * DB layout (v4):
+ * DB layout (v6):
  *  - `history`          : 生成案 1 件＝1 レコード（id, dateKey, createdAt, batchId 等）
  *  - `recentImages`     : 直近で使った画像（id=ハッシュ, thumbnailDataUrl, imageDataUrl, addedAt 等）
  *  - `selectionHistory` : 選択範囲プロンプト履歴（id, createdAt, maskDataUrl, generatedPrompt 等）
  *  - `imageFeatures`    : 画像特徴DB（id=履歴アイテムID, hash=dHash16進, dominantColors, analyzedAt 等）
+ *  - `operationLog`     : skyveil好み学習の操作ログ（id, ts, type, detail）
+ *  - `referenceRecords` : Reference Picker / Compare Mode の参照レコード（id, createdAt, refThumb, extracted, applied, batchId）
  *
  * 既存ユーザーは onupgradeneeded 内で oldVersion を見て段階マイグレーション。
+ * ※ 各 if(oldVersion < N) は「ストア追加のみ」の加算的migration。既存ストア・既存データは破壊しない。
  */
 
 const DB_NAME = "image-prompt-maker";
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 export const STORE_HISTORY   = "history";
 export const STORE_RECENT    = "recentImages";
 export const STORE_SELECTION = "selectionHistory";
 export const STORE_IMAGE_FEATURES = "imageFeatures";
 export const STORE_OPERATION_LOG = "operationLog";
+export const STORE_REFERENCE_RECORDS = "referenceRecords";
 
 type StoreName =
   | typeof STORE_HISTORY
   | typeof STORE_RECENT
   | typeof STORE_SELECTION
   | typeof STORE_IMAGE_FEATURES
-  | typeof STORE_OPERATION_LOG;
+  | typeof STORE_OPERATION_LOG
+  | typeof STORE_REFERENCE_RECORDS;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -59,6 +64,12 @@ function openDB(): Promise<IDBDatabase> {
         const s = db.createObjectStore(STORE_OPERATION_LOG, { keyPath: "id" });
         s.createIndex("ts", "ts", { unique: false });
         s.createIndex("type", "type", { unique: false });
+      }
+      if (oldVersion < 6) {
+        // Reference Picker / Compare Mode：参照レコード（参照サムネ＋抽出＋適用→batchIdで生成へ紐付）
+        const s = db.createObjectStore(STORE_REFERENCE_RECORDS, { keyPath: "id" });
+        s.createIndex("batchId", "batchId", { unique: false });
+        s.createIndex("createdAt", "createdAt", { unique: false });
       }
     };
     req.onsuccess = () => {

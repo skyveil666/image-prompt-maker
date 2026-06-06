@@ -112,11 +112,13 @@ export type Mood =
   | "venue_glass"
   | "venue_abstract";
 
+/**
+ * 軸別ロック。顔・同一性・表情は faceLock（単一の真実）で一元管理するため、
+ * ここには含めない。これらの保護は faceLock + Identity Shield が担う。
+ * 参照: docs/09_face-lock統合.md
+ */
 export type LockKey =
-  | "face"
   | "body_shape"
-  | "expression"
-  | "identity"
   | "color"
   | "camera"
   | "aspect_ratio";
@@ -1283,6 +1285,25 @@ export interface GeneratedProposal {
   surprise?: string;
   /** 衣装サブジャンルID（outfitSubStyles → recentSubStyles に往復）。 */
   subStyles?: string[];
+  /** サーバ側スコープフィルタで削除した項目（UI表示用）。 */
+  scopeFilter?: ServerScopeFilterSummary;
+  /** Identity Shield の結果（UI表示用）。 */
+  identityShield?: IdentityShieldSummary;
+}
+
+/** サーバ側スコープフィルタの要約（最終出力前に削除したもの） */
+export interface ServerScopeFilterSummary {
+  removedItems: { category: string; text: string; reason: string; severity: string }[];
+  warnings: string[];
+}
+
+/** Identity Shield の要約（追加した同一性保護文・リスク） */
+export interface IdentityShieldSummary {
+  riskScore: number;
+  riskLevel: string;
+  addedIdentityClauses: string[];
+  reasons: string[];
+  warnings: string[];
 }
 
 export interface GenerationResult {
@@ -1405,7 +1426,52 @@ export interface PromptHistoryItem {
     /** スコープ以外の era（時代設定） */
     era?: string | null;
   };
+
+  /**
+   * 失敗理由メモ（なぜ失敗したかをワンタップ＋自由入力で記録）。
+   * skyveil好み学習・重複分析・禁止タグの材料としてのみ保存する。
+   * 自動でプロンプトに反映しない（反映はユーザーが学習反映ボタンを押した時だけ）。
+   */
+  failureMemo?: FailureMemo;
+
+  /**
+   * プロンプトの版履歴（差分表示・この版に戻す用）。
+   * promptText を上書きする操作（禁止ワード除去・改善案反映・逆プロンプト反映・版復元）の
+   * 直前の内容を push する。古い順。
+   */
+  versions?: import("./lib/promptDiff").PromptVersion[];
+
+  /** 生成時のサーバ側スコープフィルタ結果（最後の砦で削除した項目）。 */
+  serverScopeFilter?: ServerScopeFilterSummary;
+  /** 生成時の Identity Shield 結果（追加した同一性保護文・リスク）。 */
+  identityShield?: IdentityShieldSummary;
 }
+
+/** 失敗理由メモ */
+export interface FailureMemo {
+  id: string;
+  /** 記録時刻（unix ms） */
+  createdAt: number;
+  /** 対象プロンプト案ID（= PromptHistoryItem.id） */
+  promptId: string;
+  /** 対象画像ID（任意） */
+  imageId?: string;
+  /** ワンタップで選んだ理由 */
+  selectedReasons: string[];
+  /** 自由入力メモ */
+  customMemo: string;
+  /** 深刻度 1（軽微）〜5（致命的） */
+  severity: 1 | 2 | 3 | 4 | 5;
+}
+
+/** 失敗理由ワンタップ候補（顔・同一性系を先頭に） */
+export const FAILURE_REASONS: string[] = [
+  "顔が変わった", "同一性が弱い", "背景が変わった", "衣装が違う", "髪型が違う",
+  "ポーズが違う", "カメラが違う", "小物が反映されない", "前景が邪魔", "AIっぽい",
+  "黒ゴシックに寄りすぎ", "青ネオンに寄りすぎ", "ドレスに寄りすぎ", "サイバー背景に寄りすぎ",
+  "クリスタルが出すぎ", "色が好みじゃない", "構図が弱い", "バズり感が弱い",
+  "変化が少ない", "変化しすぎ",
+];
 
 export type AppView = "main" | "history";
 

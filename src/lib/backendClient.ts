@@ -78,6 +78,44 @@ export async function generateViaBackend(
   return (await res.json()) as BackendResponse;
 }
 
+// ── 参照ピッカー：画像から要素抽出（Gemini Vision・13カテゴリ）───────────────
+
+export interface ReferenceExtractResponse {
+  version: number;
+  elements: Record<string, string>;
+  model: string;
+  missingRequired?: string[];
+}
+
+/**
+ * 参照画像を Gemini Vision で解析し、13カテゴリの要素を抽出する。失敗時は例外。
+ */
+export async function extractReferenceViaBackend(
+  imageDataUrl: string,
+): Promise<{ elements: Record<string, string>; missingRequired: string[] }> {
+  const res = await fetch("/api/extract-reference", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imageDataUrl }),
+  });
+  if (!res.ok) {
+    // Body は1度しか読めないので text() で取ってから JSON 試行（BUG-11 と同方式）
+    let detail = "";
+    try {
+      const rawText = await res.text();
+      try {
+        const j = JSON.parse(rawText) as BackendError;
+        detail = j.error || rawText;
+      } catch {
+        detail = rawText;
+      }
+    } catch { /* noop */ }
+    throw new Error(`抽出に失敗しました (${res.status}): ${detail || "unknown"}`);
+  }
+  const data = (await res.json()) as ReferenceExtractResponse;
+  return { elements: data.elements ?? {}, missingRequired: data.missingRequired ?? [] };
+}
+
 export async function checkBackendHealth(): Promise<{ ok: boolean; model?: string }> {
   try {
     const res = await fetch("/api/health");

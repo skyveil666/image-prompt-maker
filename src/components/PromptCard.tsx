@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PromptHistoryItem } from "../types";
+import type { PromptHistoryItem, FailureMemo } from "../types";
 import { makeThumbnail } from "../lib/imageThumb";
 import { FavoriteButton } from "./FavoriteButton";
 import {
@@ -7,11 +7,19 @@ import {
   getRatingAt, getMemoAt, buildRatingPatch, buildMemoPatch, RATING_LABELS,
   getAxisRatingAt, buildAxisRatingPatch, AXIS_RATING_META, type RatingAxisKey,
 } from "../lib/history";
+import { PromptGuardSection } from "./PromptGuardSection";
+import type { LockState } from "../lib/promptLockCheck";
+import { buildLockHeader } from "../lib/promptLockCheck";
+import type { SkyveilProfile } from "../lib/skyveilProfile";
 
 interface Props {
   item: PromptHistoryItem;
   onUpdate: (id: string, patch: Partial<PromptHistoryItem>) => void;
   onArrange?: (item: PromptHistoryItem) => void;
+  /** 変更禁止チェック・スコア用のロック状態（メイン生成画面でのみ渡る） */
+  lock?: LockState;
+  /** skyveil好みスコア用プロファイル */
+  skyveilProfile?: SkyveilProfile | null;
 }
 
 // ─── Per-proposal accent palette (index 0 = 案1) ─────────────────────────────
@@ -353,11 +361,11 @@ function GeneratedResultSlot({
                             onClick={() => onSetRating(i, active ? null : v)}
                             title={`${m.emoji} ${m.jp}${active ? "（クリックで解除）" : ""}`}
                             className={[
-                              "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-semibold leading-none transition select-none",
+                              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] font-semibold leading-none transition select-none",
                               active ? activeCls : idleCls,
                             ].join(" ")}
                           >
-                            <span className="text-[12px]">{m.emoji}</span>
+                            <span className="text-[14px]">{m.emoji}</span>
                             <span>{m.jp}</span>
                           </button>
                         );
@@ -367,7 +375,7 @@ function GeneratedResultSlot({
                         onClick={() => setMemoOpenIdx(isMemoOpen ? null : i)}
                         title={memo ? `メモ：${memo}` : "メモを追加"}
                         className={[
-                          "inline-flex items-center gap-1 px-2 py-1 rounded-md border text-[11px] font-semibold leading-none transition",
+                          "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[13px] font-semibold leading-none transition",
                           memo
                             ? "border-violet-400/65 bg-violet-500/18 text-violet-100"
                             : "border-bg-border/55 bg-bg-base/40 text-text-muted/75 hover:text-text-base hover:border-violet-400/45",
@@ -377,12 +385,12 @@ function GeneratedResultSlot({
                         <span>{memo ? "メモ" : "メモ"}</span>
                       </button>
                     </div>
-                    {/* 軸別 👍👎 行（背景/衣装/ポーズ）— 30件以上で内部分析が走る */}
+                    {/* 軸別評価（背景/衣装/ポーズ）— 30件以上で内部分析が走る */}
                     <div className="flex items-center gap-2 pl-7 flex-wrap">
                       {(["bg", "outfit", "pose"] as RatingAxisKey[]).map((axis) => {
                         const meta = AXIS_RATING_META[axis];
                         const v = axisRatings[axis][i] ?? null;
-                        const Btn = (val: 5 | 1, emoji: string, lbl: string, onCls: string) => {
+                        const mkBtn = (val: 5 | 1, emoji: string, lbl: string, onCls: string) => {
                           const on = v === val;
                           return (
                             <button
@@ -391,23 +399,24 @@ function GeneratedResultSlot({
                               onClick={() => onSetAxisRating(axis, i, on ? null : val)}
                               title={`${meta.jp}：${lbl}${on ? "（クリックで解除）" : ""}`}
                               className={[
-                                "inline-flex items-center justify-center w-6 h-6 rounded border text-[12px] leading-none transition select-none",
+                                "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[13px] font-semibold leading-none transition select-none",
                                 on
                                   ? onCls
-                                  : "border-bg-border/45 bg-bg-base/30 text-text-muted/60 hover:text-text-base hover:border-white/30",
+                                  : "border-bg-border/50 bg-bg-base/40 text-text-muted/70 hover:text-text-base hover:border-white/35",
                               ].join(" ")}
                             >
-                              {emoji}
+                              <span className="text-[14px]">{emoji}</span>
+                              <span className="text-[12px]">{lbl}</span>
                             </button>
                           );
                         };
                         return (
-                          <span key={axis} className="inline-flex items-center gap-1">
-                            <span className="text-[10px] text-text-muted/65 leading-none w-8 shrink-0">
-                              {meta.emoji} {meta.jp}
+                          <span key={axis} className="inline-flex items-center gap-1.5 rounded-xl border border-bg-border/35 bg-bg-panel/40 px-2 py-1">
+                            <span className="text-[12px] font-semibold text-text-muted/85 leading-none shrink-0 select-none">
+                              {meta.emoji}{meta.jp}
                             </span>
-                            {Btn(5, "👍", "良い", "border-emerald-400/75 bg-emerald-500/22 text-emerald-100")}
-                            {Btn(1, "👎", "悪い", "border-rose-400/75 bg-rose-500/22 text-rose-100")}
+                            {mkBtn(5, "👍", "良い", "border-emerald-400/75 bg-emerald-500/22 text-emerald-100")}
+                            {mkBtn(1, "👎", "悪い", "border-rose-400/75    bg-rose-500/22    text-rose-100")}
                           </span>
                         );
                       })}
@@ -473,8 +482,10 @@ function GeneratedResultSlot({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function PromptCard({ item, onUpdate, onArrange }: Props) {
+export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: Props) {
   const [expanded, setExpanded] = useState(false);
+  /** ロック一覧をコピーに含めるか */
+  const [includeLockHeader, setIncludeLockHeader] = useState(false);
 
   /** 通常コピー済み：IndexedDB に永続保存（item.copied を直接使用） */
   const isCopied = item.copied === true;
@@ -482,16 +493,42 @@ export function PromptCard({ item, onUpdate, onArrange }: Props) {
   const pal  = paletteFor(item.proposalIndex);
   const isLocked  = item.locked === true;
 
+  /** コピーするテキスト（ロック一覧を含める設定なら先頭に付与） */
+  const copyText = (includeLockHeader && lock)
+    ? buildLockHeader(lock) + item.promptText
+    : item.promptText;
+
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(item.promptText);
+      await navigator.clipboard.writeText(copyText);
       // DB に永続保存
       if (!isCopied) onUpdate(item.id, { copied: true });
     } catch {
       // clipboard API 失敗時のフォールバック
-      window.prompt("コピーできませんでした。手動でコピーしてください：", item.promptText);
+      window.prompt("コピーできませんでした。手動でコピーしてください：", copyText);
     }
   };
+
+  /** 禁止ワード除去/改善案反映/版復元：promptText を上書き。
+   *  上書き前の内容を versions に push して「前回との差分・この版に戻す」を可能にする。 */
+  const applyCleanedPrompt = useCallback((next: string) => {
+    if (next === item.promptText) return;
+    const prevVersions = item.versions ?? [];
+    const newVersion = {
+      id: `v-${Date.now()}`,
+      createdAt: Date.now(),
+      prompt: item.promptText,
+      source: "improvement" as const,
+    };
+    // 直近20版まで保持
+    const versions = [...prevVersions, newVersion].slice(-20);
+    onUpdate(item.id, { promptText: next, versions });
+  }, [item.id, item.promptText, item.versions, onUpdate]);
+
+  /** 失敗理由メモを保存（promptId を補完） */
+  const saveFailureMemo = useCallback((memo: FailureMemo) => {
+    onUpdate(item.id, { failureMemo: { ...memo, promptId: item.id } });
+  }, [item.id, onUpdate]);
 
   const isLong =
     item.promptText.split(/\n/).length > LONG_THRESHOLD_LINES ||
@@ -629,11 +666,24 @@ export function PromptCard({ item, onUpdate, onArrange }: Props) {
             onToggle={() => onUpdate(item.id, { isFavorite: !item.isFavorite })}
           />
 
+          {/* ロック一覧もコピーに含める */}
+          {lock && (
+            <label className="flex items-center gap-1 text-[11px] text-text-muted/80 cursor-pointer select-none" title="コピー時、先頭に【変更する】【変更しない】【固定ルール】を付ける">
+              <input
+                type="checkbox"
+                checked={includeLockHeader}
+                onChange={(e) => setIncludeLockHeader(e.target.checked)}
+                className="accent-violet-500"
+              />
+              ロック一覧も含める
+            </label>
+          )}
+
           {/* 📋 コピー */}
           <button
             type="button"
             onClick={copy}
-            title={isCopied ? "再コピー" : undefined}
+            title={isCopied ? "コピー済み（クリックで再コピー）" : "プロンプトをクリップボードにコピー"}
             className={[
               "group inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold border transition-all duration-200",
               isCopied
@@ -670,6 +720,23 @@ export function PromptCard({ item, onUpdate, onArrange }: Props) {
         axisRatings={axisRatings}
         onSetAxisRating={handleSetAxisRating}
       />
+
+      {/* ── 🛡 ガードパネル（変更禁止チェック / ロック一覧 / スコア / 失敗メモ） ── */}
+      {lock && (
+        <div className="px-5 pb-1">
+          <PromptGuardSection
+            promptText={item.promptText}
+            lock={lock}
+            profile={skyveilProfile}
+            existingMemo={item.failureMemo}
+            serverScopeFilter={item.serverScopeFilter}
+            serverIdentityShield={item.identityShield}
+            versions={item.versions}
+            onApplyCleanedPrompt={applyCleanedPrompt}
+            onSaveFailureMemo={saveFailureMemo}
+          />
+        </div>
+      )}
 
       {/* ── 本文 ───────────────────────────────────────────────────────────── */}
       <div className="relative">

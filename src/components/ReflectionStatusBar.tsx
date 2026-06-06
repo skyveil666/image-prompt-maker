@@ -9,7 +9,7 @@
  * 重要：このコンポーネントは状態を一切変更しない（唯一のソースは上段ボタン＝App の state）。
  *       表示専用なので、生成ロジックと食い違わないよう「効く条件」を厳密に揃えている。
  */
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import type { Scope } from "../types";
 import type { ZozoTrend } from "../lib/zozoTrend";
 import type { ColorWeightMap } from "../lib/colorPolicy";
@@ -55,6 +55,8 @@ interface Props {
   scopes: Scope[];
   // 守るもの
   faceLock: boolean;
+  /** 全リセット（確認ダイアログ表示後に呼ばれる） — オプション：渡さない場合はボタン非表示 */
+  onResetAll?: () => void;
   bodyPoseLock: boolean;
   colorMoodLock: boolean;
   compositionLock: boolean;
@@ -135,7 +137,15 @@ function Row({ icon, label, children }: { icon: string; label: string; children:
 
 // ── 本体 ────────────────────────────────────────────────────────────────────
 export function ReflectionStatusBar(p: Props) {
-  const [open, setOpen] = useState(true);
+  // P4: 初期は折りたたみ（1行サマリ）。生成作業の縦スペースを優先。
+  const [open, setOpen] = useState(false);
+  const [confirmingReset, setConfirmingReset] = useState(false);
+
+  const handleResetClick = useCallback(() => setConfirmingReset(true), []);
+  const handleResetConfirm = useCallback(() => {
+    setConfirmingReset(false);
+    p.onResetAll?.();
+  }, [p]);
 
   const hasOutfit = p.scopes.includes("outfit");
   const windApplicable  = p.scopes.some((s) => WIND_SCOPES.includes(s));
@@ -160,13 +170,21 @@ export function ReflectionStatusBar(p: Props) {
     m === "chaos" && p.chaosLabel ? `🎲 ${p.chaosLabel}` : (GOD_JP[m] ?? m)
   );
 
-  // 折りたたみヘッダ：1行サマリ
-  const summaryParts: string[] = [];
-  summaryParts.push(`変更 ${p.scopes.length}`);
-  if (favActive) summaryParts.push("好み");
-  if (zozoActive) summaryParts.push("ZOZO");
-  if (p.activeGodModes.length) summaryParts.push("神引き");
-  if (realismActive) summaryParts.push(REALISM_JP[p.realismLevel]);
+  // 折りたたみヘッダ：1行サマリ（P4：🎯変更N 🔒守るN ✨補助N 🧬好みON/OFF）
+  const guardCount =
+    1 /* 顔/同一性は常時保護 */ +
+    (p.bodyPoseLock ? 1 : 0) + (p.colorMoodLock ? 1 : 0) + (p.compositionLock ? 1 : 0);
+  const assistCount =
+    godChips.length + (p.viralMode ? 1 : 0) + p.activeWorldPresets.length +
+    (p.avoidCliche ? 1 : 0) + p.activeBoosts.length +
+    p.activeSnsLabels.length + p.activeCultureLabels.length;
+  const prefOn = favActive || zozoActive;
+  const summaryParts: string[] = [
+    `🎯変更${p.scopes.length}`,
+    `🔒守る${guardCount}`,
+    `✨補助${assistCount}`,
+    `🧬好み${prefOn ? "ON" : "OFF"}`,
+  ];
 
   return (
     <section className="rounded-lg border border-violet-400/25 bg-violet-500/5 overflow-hidden">
@@ -184,8 +202,45 @@ export function ReflectionStatusBar(p: Props) {
             {summaryParts.join(" ・ ")}
           </span>
         )}
+        {/* 全リセットボタン（ReflectionStatusBar に1つだけ集約） */}
+        {p.onResetAll && !confirmingReset && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleResetClick(); }}
+            className="shrink-0 ml-2 text-[11px] font-semibold px-2 py-0.5 rounded border border-rose-400/40 bg-rose-400/8 text-rose-300/90 hover:bg-rose-400/18 hover:border-rose-400/65 transition leading-none"
+            title="変更対象・設定・プレビューをすべて初期化（履歴・学習データは保持）"
+          >
+            ↺ 全リセット
+          </button>
+        )}
         <span className="ml-auto text-[10px] text-slate-400 shrink-0">{open ? "▲ 閉じる" : "▼ 開く"}</span>
       </button>
+
+      {/* ── 確認ダイアログ（インライン）────────────────────────────── */}
+      {confirmingReset && (
+        <div className="px-3 py-2.5 bg-rose-500/12 border-t border-rose-400/25 space-y-2">
+          <p className="text-[12px] text-rose-100 leading-snug">
+            現在の選択状態と反映中の設定をすべて初期化します。<br />
+            <span className="text-rose-300/80">履歴・お気に入り・学習データは削除されません。</span>
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleResetConfirm}
+              className="text-[12px] font-bold px-3 py-1 rounded-lg border border-rose-400/65 bg-rose-500/25 text-rose-100 hover:bg-rose-500/40 transition leading-none"
+            >
+              リセットする
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingReset(false)}
+              className="text-[12px] px-3 py-1 rounded-lg border border-white/15 bg-white/5 text-text-muted hover:text-text-base transition leading-none"
+            >
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div className="px-2.5 pb-2 pt-0.5 space-y-0.5 border-t border-white/8">

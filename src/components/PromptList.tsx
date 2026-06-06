@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 import type { PromptHistoryItem } from "../types";
 import { PromptCard } from "./PromptCard";
+import type { LockState } from "../lib/promptLockCheck";
+import type { SkyveilProfile } from "../lib/skyveilProfile";
 
 interface Props {
   title: string;
@@ -8,7 +10,13 @@ interface Props {
   items: PromptHistoryItem[];
   onUpdate: (id: string, patch: Partial<PromptHistoryItem>) => void;
   onArrange?: (item: PromptHistoryItem) => void;
+  /** ガードパネル用：変更禁止チェック・スコアのロック状態 */
+  lock?: LockState;
+  skyveilProfile?: SkyveilProfile | null;
 }
+
+/** PromptCard へ渡すガード関連 props をまとめた型（prop-drilling 簡略化） */
+type GuardProps = { lock?: LockState; skyveilProfile?: SkyveilProfile | null };
 
 type ViewMode = "normal" | "tab" | "split";
 
@@ -49,10 +57,12 @@ function SplitView({
   items,
   onUpdate,
   onArrange,
+  guard,
 }: {
   items: PromptHistoryItem[];
   onUpdate: (id: string, patch: Partial<PromptHistoryItem>) => void;
   onArrange?: (item: PromptHistoryItem) => void;
+  guard: GuardProps;
 }) {
   const [leftIdx, setLeftIdx] = useState(0);
   const [rightIdx, setRightIdx] = useState(Math.min(1, items.length - 1));
@@ -150,7 +160,7 @@ function SplitView({
             ← 案{leftItem?.proposalIndex}
           </div>
           {leftItem && (
-            <PromptCard item={leftItem} onUpdate={onUpdate} onArrange={onArrange} />
+            <PromptCard item={leftItem} onUpdate={onUpdate} onArrange={onArrange} {...guard} />
           )}
         </div>
         <div className="space-y-1">
@@ -158,7 +168,7 @@ function SplitView({
             → 案{rightItem?.proposalIndex}
           </div>
           {rightItem && (
-            <PromptCard item={rightItem} onUpdate={onUpdate} onArrange={onArrange} />
+            <PromptCard item={rightItem} onUpdate={onUpdate} onArrange={onArrange} {...guard} />
           )}
         </div>
       </div>
@@ -172,10 +182,12 @@ function TabView({
   items,
   onUpdate,
   onArrange,
+  guard,
 }: {
   items: PromptHistoryItem[];
   onUpdate: (id: string, patch: Partial<PromptHistoryItem>) => void;
   onArrange?: (item: PromptHistoryItem) => void;
+  guard: GuardProps;
 }) {
   const [activeIdx, setActiveIdx] = useState(0);
   const active = items[activeIdx];
@@ -205,7 +217,7 @@ function TabView({
 
       {/* 選択中カード */}
       {active && (
-        <PromptCard item={active} onUpdate={onUpdate} onArrange={onArrange} />
+        <PromptCard item={active} onUpdate={onUpdate} onArrange={onArrange} {...guard} />
       )}
     </div>
   );
@@ -216,8 +228,9 @@ function TabView({
 /** localStorage キー：全案コピー済み（batchId ごと） */
 const allCopiedKey = (batchId: string) => `all_copied_${batchId}`;
 
-export function PromptList({ title, subtitle, items, onUpdate, onArrange }: Props) {
+export function PromptList({ title, subtitle, items, onUpdate, onArrange, lock, skyveilProfile }: Props) {
   const batchId = items[0]?.batchId ?? "";
+  const guard: GuardProps = { lock, skyveilProfile };
 
   /** 全案コピー済み：localStorage に永続保存 */
   const [copiedAll, setCopiedAll] = useState(() => {
@@ -314,17 +327,17 @@ export function PromptList({ title, subtitle, items, onUpdate, onArrange }: Prop
       {viewMode === "normal" && (
         <div className="flex flex-col gap-6">
           {items.map((item) => (
-            <PromptCard key={item.id} item={item} onUpdate={onUpdate} onArrange={onArrange} />
+            <PromptCard key={item.id} item={item} onUpdate={onUpdate} onArrange={onArrange} {...guard} />
           ))}
         </div>
       )}
 
       {viewMode === "tab" && (
-        <TabView items={items} onUpdate={onUpdate} onArrange={onArrange} />
+        <TabView items={items} onUpdate={onUpdate} onArrange={onArrange} guard={guard} />
       )}
 
       {viewMode === "split" && (
-        <SplitView items={items} onUpdate={onUpdate} onArrange={onArrange} />
+        <SplitView items={items} onUpdate={onUpdate} onArrange={onArrange} guard={guard} />
       )}
     </section>
   );

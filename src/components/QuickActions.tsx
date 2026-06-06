@@ -324,8 +324,8 @@ export function QuickActions({
         <TagBtn label="↩ 戻る"        title={canUndo ? "1つ前の生成結果に戻す" : "戻れる履歴がありません"}                  onClick={onUndo}                variant="default" disabled={disabled || !canUndo} />
         <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
         <TagBtn
-          label="↺ 全リセット"
-          title="適用した世界観・神引き・SNS・生成補助をリセット（変更範囲・顔固定は維持）"
+          label="↺ プリセット解除"
+          title="神引き・バズり・SNS・生成補助などのプリセットを解除（全リセットは「現在の反映状態」パネルから）"
           onClick={onResetAll}
           variant="default"
         />

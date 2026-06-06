@@ -76,11 +76,10 @@ const SCOPE_JA: Record<Scope, string> = {
   aspect_ratio: "アスペクト比",
 };
 
+// 顔・表情・同一性は faceLockBlock + Identity Shield が保護するため LOCK_JA に含めない。
+// 参照: docs/09_face-lock統合.md
 const LOCK_JA: Record<LockKey, string> = {
-  face: "顔",
   body_shape: "体型",
-  expression: "表情",
-  identity: "人物の同一性",
   color: "色味",
   camera: "カメラ位置",
   aspect_ratio: "アスペクト比",
@@ -196,30 +195,34 @@ const MOOD_GROUPS_SERVER: Record<string, string[]> = {
   "空間":       ["広い空間", "狭い空間", "展示空間", "ホテル", "温室", "駅", "屋上", "ガラス空間", "抽象空間"],
 };
 
+// 顔・表情・人物同一性は faceLockBlock + Identity Shield（applyIdentityShield）が
+// 常時保護するため、SCOPE_TO_LOCKS には含めない（lockLineJa との二重表現を排除）。
+// ここに残すのは「ユーザートグルで追加固定しうる軸」= body_shape / color / camera / aspect_ratio のみ。
+// 参照: docs/09_face-lock統合.md
 const SCOPE_TO_LOCKS: Record<Scope, LockKey[]> = {
-  background: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  // 前景演出は人物の手前にエフェクトを重ねるだけ。顔・体型・表情・人物同一性・カメラ・比率は固定。
-  foreground: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  pose: ["face", "expression", "identity", "color", "camera", "aspect_ratio"],
-  hair: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  outfit: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  // コスプレは衣装・装飾のみ変更。顔・体型・表情・人物同一性・カメラは固定。
-  cosplay: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  // 機械化は一部分だけ変化。顔・体型・表情・人物同一性・ポーズ・カメラは固定。
-  cyber: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  camera: ["face", "body_shape", "expression", "identity", "color", "aspect_ratio"],
-  props: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  // 大物は演出要素。人物が主役で大型オブジェは脇役。顔・体型・表情・人物同一性・カメラは固定。
-  big_object: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
+  background: ["body_shape", "camera", "aspect_ratio"],
+  // 前景演出は人物の手前にエフェクトを重ねるだけ。体型・カメラ・比率は固定。
+  foreground: ["body_shape", "camera", "aspect_ratio"],
+  pose: ["color", "camera", "aspect_ratio"],
+  hair: ["body_shape", "camera", "aspect_ratio"],
+  outfit: ["body_shape", "camera", "aspect_ratio"],
+  // コスプレは衣装・装飾のみ変更。体型・カメラは固定。
+  cosplay: ["body_shape", "camera", "aspect_ratio"],
+  // 機械化は一部分だけ変化。体型・ポーズ・カメラは固定。
+  cyber: ["body_shape", "camera", "aspect_ratio"],
+  camera: ["body_shape", "color", "aspect_ratio"],
+  props: ["body_shape", "camera", "aspect_ratio"],
+  // 大物は演出要素。人物が主役で大型オブジェは脇役。体型・カメラは固定。
+  big_object: ["body_shape", "camera", "aspect_ratio"],
   // 乗り物は人物・ポーズ・カメラ・背景に影響しないよう、固定できるものはすべてロック。
-  vehicle: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  // 神話/幻獣は演出要素。人物・ポーズ・カメラ・衣装・同一性は固定し、幻獣のみ追加する。
-  myth: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
+  vehicle: ["body_shape", "camera", "aspect_ratio"],
+  // 神話/幻獣は演出要素。人物・ポーズ・カメラ・衣装は固定し、幻獣のみ追加する。
+  myth: ["body_shape", "camera", "aspect_ratio"],
   // ライティングは色温度・影を意図的に変えるため、color は SCOPE_TO_LOCKS に含めない。
-  // ユーザーが LockToggles の color を ON にしていればその意思に従って lockLine に出る。
-  lighting: ["face", "body_shape", "expression", "identity", "camera", "aspect_ratio"],
-  // アスペクト比変更時は比率のみ変更。顔・体型・表情・人物同一性・色味・カメラ位置は固定。
-  aspect_ratio: ["face", "body_shape", "expression", "identity", "color", "camera"],
+  // ユーザーが「色味ロック」(ControlPanel) を ON にしていればその意思に従って lockLine に出る。
+  lighting: ["body_shape", "camera", "aspect_ratio"],
+  // アスペクト比変更時は比率のみ変更。体型・色味・カメラ位置は固定。
+  aspect_ratio: ["body_shape", "color", "camera"],
 };
 
 const HAIR_LABELS = {
@@ -2309,6 +2312,8 @@ function boostBlock(req: GenerateRequest): string {
     "【神引き補助モディファイア】",
     "以下の補助方針を反映する。ただし顔・人物の同一性・表情の固定、変更範囲（スコープ）、" +
     "固定軸、アスペクト比維持は常に最優先で守ること（補助よりも固定ルールが優先）。",
+    "※ 補助方針が変更対象に含まれない軸（背景・衣装・髪・カメラ・ポーズ等）の見た目を" +
+    "変える内容を含む場合、その軸は変更しない。保護対象と矛盾する場合は必ず保護対象を優先する。",
     "",
     ...sections,
   ].join("\n");
@@ -3192,9 +3197,11 @@ function userStyleBlock(): string {
  */
 function bgDiversityBlock(req: GenerateRequest): string {
   // background scope で場所が具体的に指定済みなら制御不要
+  // BUG-2: details / details.background が欠落していてもクラッシュしないよう optional chaining。
+  // 未指定時は早期 return せず、通常の背景多様性ガイドへ進む（安全側の既定）。
   if (req.scopes.includes("background")) {
-    const b = req.details.background;
-    if (b.place !== "auto" && b.place !== "skip") return "";
+    const b = req.details?.background;
+    if (b && b.place !== "auto" && b.place !== "skip") return "";
   }
 
   // 世界観全振りモード（背景を思い切り展開してよい条件）

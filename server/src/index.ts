@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import type { GenerateRequest, GenerateResponse } from "./types.ts";
 import { MODEL_NAME, generate, analyzePreferences, type AnalyzePreferenceSample } from "./gemini.ts";
+import { extractReference } from "./referenceExtract.ts";
 
 const PORT = Number(process.env.PORT || 3001);
 
@@ -52,11 +53,10 @@ app.post("/api/generate", async (req, res) => {
     scopes: raw.scopes,
     moods: raw.moods ?? [],
     count: raw.count,
+    // 顔・表情・同一性は faceLock で管理（locks には含めない）。旧クライアントが
+    // face/identity/expression を送ってきても実行時は無視される。参照: docs/09_face-lock統合.md
     locks: raw.locks ?? {
-      face: true,
       body_shape: true,
-      expression: true,
-      identity: true,
       color: true,
       camera: true,
       aspect_ratio: true,
@@ -272,7 +272,13 @@ app.post("/api/analyze-preferences", async (req, res) => {
       bg:        s.bg     === 5 || s.bg     === 1 ? s.bg     : null,
       outfit:    s.outfit === 5 || s.outfit === 1 ? s.outfit : null,
       pose:      s.pose   === 5 || s.pose   === 1 ? s.pose   : null,
-      createdAt: typeof s.createdAt === "number" ? s.createdAt : Date.now(),
+      // BUG-7: new Date(x).toISOString() は有効範囲外（|x|>8.64e15ms）や非有限値で RangeError を投げる。
+      // 有限かつ有効な Date 範囲の数値のみ採用し、それ以外は現在時刻にフォールバック。
+      createdAt:
+        typeof s.createdAt === "number" && Number.isFinite(s.createdAt) &&
+        s.createdAt >= 0 && s.createdAt <= 8.64e15
+          ? s.createdAt
+          : Date.now(),
     }))
     .filter((s) => s.prompt.length > 0);
 
@@ -293,6 +299,25 @@ app.post("/api/analyze-preferences", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[/api/analyze-preferences] failed:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+// ── 参照ピッカー：画像から要素抽出（Gemini Vision・13カテゴリJSON）─────────────
+app.post("/api/extract-reference", async (req, res) => {
+  const raw = req.body as { imageDataUrl?: unknown } | undefined;
+  const url = raw?.imageDataUrl;
+  if (typeof url !== "string" || !url.startsWith("data:image/")) {
+    res.status(400).json({ error: "imageDataUrl (data:image/...;base64) is required" });
+    return;
+  }
+  console.log("[/api/extract-reference] start");
+  try {
+    const out = await extractReference(url);
+    res.json(out);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[/api/extract-reference] failed:", message);
     res.status(500).json({ error: message });
   }
 });

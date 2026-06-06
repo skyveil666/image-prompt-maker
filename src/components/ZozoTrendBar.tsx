@@ -49,6 +49,7 @@ export function ZozoTrendBar({
   const effective  = isApplied && outfitScopeOn;            // 実効反映中
   const stalled    = isApplied && !outfitScopeOn;           // 未反映（衣装OFF）
   const conflictWarn = effective && outfitConflict && !isPriority; // 補助＋衝突
+  const disabled   = !outfitScopeOn;                        // 衣装OFF＝衣装補助は無効（グレーアウト）
 
   const handleFetch = () => {
     if (mode === "paste") {
@@ -111,8 +112,13 @@ export function ZozoTrendBar({
             ⚠ 未反映（衣装変更OFF）
           </span>
         )}
-        {!isApplied && (
+        {!isApplied && !disabled && (
           <span className="text-[11px] text-text-muted/45 leading-none">未反映</span>
+        )}
+        {disabled && !stalled && (
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full border border-amber-400/45 bg-amber-400/10 text-amber-200/90 leading-none">
+            🔒 衣装OFF（補助）
+          </span>
         )}
         {conflictWarn && (
           <span className="text-[11px] text-amber-200/80 leading-none">
@@ -133,20 +139,29 @@ export function ZozoTrendBar({
       {open && (
         <div className={["border-t border-bg-border/60 py-2.5 space-y-2.5", embedded ? "px-0 mt-1" : "px-3.5"].join(" ")}>
 
+          {/* 衣装補助：衣装OFF時はグレーアウト＋案内（ZOZOは衣装スコープONのときだけ反映） */}
+          {disabled && (
+            <div className="rounded-lg border border-amber-400/40 bg-amber-400/8 px-2.5 py-1.5 text-[12px] text-amber-100 leading-snug">
+              🔒 ZOZOトレンドは<strong>衣装の補助</strong>です。上の「変更対象」で<strong>衣装</strong>をONにすると使えます。
+            </div>
+          )}
+
+          <div className={disabled ? "opacity-50 pointer-events-none select-none" : ""}>
+
           {/* 年代 */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] text-text-muted/50 w-10 shrink-0">年代</span>
-            <div className="flex flex-wrap gap-1">
+            <span className="text-[13px] font-semibold text-text-muted/80 w-14 shrink-0">年代</span>
+            <div className="flex flex-wrap gap-1.5">
               {ZOZO_AGE_OPTIONS.map((o) => (
                 <button
                   key={o.value}
                   type="button"
                   onClick={() => setAge(o.value)}
                   className={[
-                    "text-[11px] px-2 py-0.5 rounded-md border leading-none transition",
+                    "text-[13px] font-semibold px-2.5 py-1 rounded-lg border leading-none transition",
                     age === o.value
-                      ? "border-pink-400/60 bg-pink-400/20 text-pink-100 font-semibold"
-                      : "border-bg-border text-text-muted/55 hover:border-pink-400/35",
+                      ? "border-pink-400/70 bg-pink-400/22 text-pink-100"
+                      : "border-bg-border/70 text-text-muted/80 hover:text-text-base hover:border-pink-400/45",
                   ].join(" ")}
                 >
                   {o.label}
@@ -157,18 +172,18 @@ export function ZozoTrendBar({
 
           {/* カテゴリ */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] text-text-muted/50 w-10 shrink-0">カテゴリ</span>
-            <div className="flex flex-wrap gap-1">
+            <span className="text-[13px] font-semibold text-text-muted/80 w-14 shrink-0">カテゴリ</span>
+            <div className="flex flex-wrap gap-1.5">
               {ZOZO_CATEGORY_OPTIONS.map((o) => (
                 <button
                   key={o.value}
                   type="button"
                   onClick={() => setCategory(o.value)}
                   className={[
-                    "text-[11px] px-2 py-0.5 rounded-md border leading-none transition",
+                    "text-[13px] font-semibold px-2.5 py-1 rounded-lg border leading-none transition",
                     category === o.value
-                      ? "border-pink-400/60 bg-pink-400/20 text-pink-100 font-semibold"
-                      : "border-bg-border text-text-muted/55 hover:border-pink-400/35",
+                      ? "border-pink-400/70 bg-pink-400/22 text-pink-100"
+                      : "border-bg-border/70 text-text-muted/80 hover:text-text-base hover:border-pink-400/45",
                   ].join(" ")}
                 >
                   {o.label}
@@ -178,15 +193,15 @@ export function ZozoTrendBar({
           </div>
 
           {/* モード切替 */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setMode("auto")}
               className={[
-                "text-[11px] px-2 py-0.5 rounded-md border leading-none transition",
+                "text-[13px] font-semibold px-3 py-1 rounded-lg border leading-none transition",
                 mode === "auto"
-                  ? "border-sky-400/60 bg-sky-400/15 text-sky-100"
-                  : "border-bg-border text-text-muted/50 hover:border-sky-400/35",
+                  ? "border-sky-400/70 bg-sky-400/18 text-sky-100"
+                  : "border-bg-border/70 text-text-muted/80 hover:text-text-base hover:border-sky-400/45",
               ].join(" ")}
             >
               自動（トレンド参照）
@@ -195,10 +210,10 @@ export function ZozoTrendBar({
               type="button"
               onClick={() => setMode("paste")}
               className={[
-                "text-[11px] px-2 py-0.5 rounded-md border leading-none transition",
+                "text-[13px] font-semibold px-3 py-1 rounded-lg border leading-none transition",
                 mode === "paste"
-                  ? "border-sky-400/60 bg-sky-400/15 text-sky-100"
-                  : "border-bg-border text-text-muted/50 hover:border-sky-400/35",
+                  ? "border-sky-400/70 bg-sky-400/18 text-sky-100"
+                  : "border-bg-border/70 text-text-muted/80 hover:text-text-base hover:border-sky-400/45",
               ].join(" ")}
             >
               手動貼り付け
@@ -227,21 +242,21 @@ export function ZozoTrendBar({
 
           {/* プレビュー結果 */}
           {preview && (
-            <div className="rounded-lg border border-pink-400/25 bg-pink-400/5 p-2.5 space-y-2">
-              <div className="text-[12px] font-bold text-pink-100">
+            <div className="rounded-xl border border-pink-400/30 bg-pink-400/6 p-3 space-y-2.5">
+              <div className="text-[14px] font-bold text-pink-100">
                 👗 ZOZOトレンド {preview.ageLabel}・{preview.categoryLabel}
               </div>
               {preview.traits.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1.5">
                   {preview.traits.map((t) => (
                     <span key={t}
-                      className="text-[11px] px-1.5 py-0.5 rounded-full border border-pink-400/30 bg-pink-400/10 text-pink-100/85 leading-none">
+                      className="text-[13px] font-medium px-2.5 py-1 rounded-full border border-pink-400/45 bg-pink-400/14 text-pink-100 leading-none">
                       {t}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-[11px] text-text-muted/50 leading-snug">
+                <p className="text-[13px] text-text-muted/75 leading-snug">
                   傾向を抽出できませんでした。別の文を貼るか、自動モードをお試しください。
                 </p>
               )}
@@ -301,8 +316,8 @@ export function ZozoTrendBar({
               {/* ステータス補足説明 */}
               {effective && (
                 <p className={[
-                  "text-[11px] leading-snug pt-1",
-                  isPriority ? "text-amber-200" : "text-emerald-200/85",
+                  "text-[13px] leading-snug pt-0.5",
+                  isPriority ? "text-amber-200" : "text-emerald-200",
                 ].join(" ")}>
                   {isPriority
                     ? "⭐ 衣装方針の主軸として最優先で反映中。他の衣装指定はZOZOの方向性に合わせて調整されます。"
@@ -310,13 +325,13 @@ export function ZozoTrendBar({
                 </p>
               )}
               {stalled && (
-                <p className="text-[11px] text-amber-200 leading-snug pt-1">
+                <p className="text-[13px] text-amber-200 leading-snug pt-0.5">
                   ⚠ ZOZOトレンドは取得済みですが、現在は<span className="font-bold">「衣装」が変更対象に入っていない</span>ため反映されていません。
                   上の「変更するもの」で衣装をONにしてください。
                 </p>
               )}
               {conflictWarn && (
-                <p className="text-[11px] text-amber-200/85 leading-snug pt-1">
+                <p className="text-[13px] text-amber-200 leading-snug pt-0.5">
                   ⚠ 他の衣装指定（神引き・世界観など）が併用中です。
                   ZOZOを主軸にしたい場合は <span className="font-bold">「優先にする」</span> を押してください。
                 </p>
@@ -325,10 +340,10 @@ export function ZozoTrendBar({
           )}
 
           {/* 注記 */}
-          <p className="text-[11px] text-text-muted/35 leading-snug">
-            ブランド名・商品名は使わず、服の種類・色・素材・シルエット・系統の傾向だけを衣装に反映します。
-            反映は「衣装」スコープがONのときのみ有効です。
+          <p className="text-[12px] text-text-muted/65 leading-snug">
+            ブランド名・商品名は使わず、服の種類・色・素材・シルエット・系統の傾向だけを衣装に反映します。反映は「衣装」スコープがONのときのみ有効です。
           </p>
+          </div>{/* /グレーアウトラッパ */}
         </div>
       )}
     </div>
