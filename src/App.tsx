@@ -79,6 +79,7 @@ import { getRecentSubStyles, pushRecentSubStyles, clearRecentSubStyles } from ".
 import { runAutoCleanup, getAutoCleanupEnabled } from "./lib/cleanup";
 import { makeThumbnail } from "./lib/imageThumb";
 import { saveReferenceRecord } from "./lib/referenceRecords";
+import { loadReferenceLearning, type ReferenceLearning } from "./lib/referenceLearning";
 import {
   type AppView,
   type Count,
@@ -216,6 +217,11 @@ export default function App() {
   const [compareOpen, setCompareOpen] = useState(false);
   /** 分析ラボ（重複分析の詳細探索・全幅ビュー）の開閉。ダッシュボードの「🔬 分析ラボ」から開く。 */
   const [analysisLabOpen, setAnalysisLabOpen] = useState(false);
+  /** Phase D: Compare評価(referenceRecords)を集計した好み素材。マウント＋Compareクローズ（評価後）に再読込。 */
+  const [referenceLearning, setReferenceLearning] = useState<ReferenceLearning | null>(null);
+  useEffect(() => {
+    if (!compareOpen) void loadReferenceLearning().then(setReferenceLearning);
+  }, [compareOpen]);
   /** スコープボタンのフラッシュアニメーション用キー（インクリメントで発火） */
   const [scopeFlashKey, setScopeFlashKey] = useState(0);
   /** 多様性エンジン：直近の背景/衣装/ムード/前景エフェクトを記憶して連発を防ぐ */
@@ -556,6 +562,14 @@ export default function App() {
   const ratingAnalysisRef = useRef<RatingAnalysis | null>(null);
   const imageAnalysisRef = useRef<ImageAnalysisResult | null>(null);
 
+  /** Phase D: 好みAIへ送る方向性タグ＝お気に入り傾向 ＋ Compare評価 likes（限定重み slice(0,4)・後置）。
+   *  コピーではなく方向性。多様性は既存機構（未開拓提案・被り回避・avoidCliche 等）が優先する。 */
+  const skyveilFavoriteTraits = useMemo(() => {
+    const base = favoriteProfile?.traitPhrases ?? [];
+    const extra = (referenceLearning?.likes ?? []).slice(0, 4);
+    return Array.from(new Set([...base, ...extra])).slice(0, 12);
+  }, [favoriteProfile, referenceLearning]);
+
   const buildInputs = useCallback(
     (override?: Partial<PromptInputs>): PromptInputs => ({
       scopes,
@@ -664,13 +678,14 @@ export default function App() {
       era: era ?? undefined,
       colorStrategy: colorStrategy ?? undefined,
       artStyle: artStyle ?? undefined,
-      // skyveil好みAI：ON（または今回だけ反映）かつ傾向が抽出できている場合のみ反映（コピーではなく方向性）
+      // skyveil好みAI：ON（または今回だけ反映）かつ傾向がある場合のみ反映（コピーではなく方向性）。
+      // Phase D: お気に入り傾向 ＋ Compare評価likes（限定重み）を統合した skyveilFavoriteTraits を送る。
       favoriteTraits:
-        (favoriteLearnEnabled || skyveilOneShot) && favoriteProfile && favoriteProfile.traitPhrases.length > 0
-          ? favoriteProfile.traitPhrases
+        (favoriteLearnEnabled || skyveilOneShot) && skyveilFavoriteTraits.length > 0
+          ? skyveilFavoriteTraits
           : undefined,
       favoriteStrength:
-        (favoriteLearnEnabled || skyveilOneShot) && favoriteProfile && favoriteProfile.traitPhrases.length > 0
+        (favoriteLearnEnabled || skyveilOneShot) && skyveilFavoriteTraits.length > 0
           ? favoriteStrength
           : undefined,
       // ZOZOトレンド：衣装スコープON かつ 反映中の場合のみ送信（最重要：衣装ON時のみ）
@@ -720,6 +735,7 @@ export default function App() {
       favoriteLearnEnabled,
       favoriteProfile,
       favoriteStrength,
+      skyveilFavoriteTraits,
       skyveilOneShot,
       zozoApplied,
       activeBoosts,
@@ -1038,9 +1054,9 @@ export default function App() {
   const skyveilStrength: SkyveilStrength = favoriteToStrength(favoriteStrength);
   const skyveilProfile = useMemo(
     () => buildSkyveilProfile({
-      preferenceProfile, favoriteProfile, ratingAnalysis, imageAnalysis, historyAnalysis,
+      preferenceProfile, favoriteProfile, ratingAnalysis, imageAnalysis, historyAnalysis, referenceLearning,
     }),
-    [preferenceProfile, favoriteProfile, ratingAnalysis, imageAnalysis, historyAnalysis],
+    [preferenceProfile, favoriteProfile, ratingAnalysis, imageAnalysis, historyAnalysis, referenceLearning],
   );
   // handleGenerate（前方宣言）から ref 経由で最新値を読むため同期
   useEffect(() => { skyveilProfileRef.current = skyveilProfile; }, [skyveilProfile]);

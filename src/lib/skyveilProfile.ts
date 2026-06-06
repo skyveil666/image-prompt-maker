@@ -17,6 +17,7 @@ import type { FavoriteProfile } from "./favoriteProfile";
 import type { RatingAnalysis } from "./ratingAnalyzer";
 import type { ImageAnalysisResult } from "./imageAnalyzer";
 import type { FullHistoryAnalysis } from "./historyAnalyzer";
+import type { ReferenceLearning } from "./referenceLearning";
 
 // ── 反映強度（既存 favoriteStrength と相互変換） ─────────────────────────────
 export type SkyveilStrength = "weak" | "standard" | "strong";
@@ -79,14 +80,16 @@ export function buildSkyveilProfile(inputs: {
   ratingAnalysis?:    RatingAnalysis | null;
   imageAnalysis?:     ImageAnalysisResult | null;
   historyAnalysis?:   FullHistoryAnalysis | null;
+  referenceLearning?: ReferenceLearning | null;
 }): SkyveilProfile {
-  const { preferenceProfile: pp, favoriteProfile: fp, ratingAnalysis: ra, imageAnalysis: ia, historyAnalysis: ha } = inputs;
+  const { preferenceProfile: pp, favoriteProfile: fp, ratingAnalysis: ra, imageAnalysis: ia, historyAnalysis: ha, referenceLearning: rl } = inputs;
 
-  // 好き：お気に入り傾向 ＋ 実Gemini の好みキーワード/軸説明
+  // 好き：お気に入り傾向 ＋ 実Gemini の好みキーワード/軸説明 ＋ Compare評価(referenceLearning)
   const likes = dedupe([
     ...(fp?.traitPhrases ?? []),
     ...(pp?.preferKeywords ?? []),
     ...axisPhrases(pp?.likes),
+    ...(rl?.likes ?? []),
   ], 10);
 
   // 好きだが出すぎ：お気に入りに多いモチーフ ∩ 直近で頻出
@@ -98,11 +101,12 @@ export function buildSkyveilProfile(inputs: {
     8,
   );
 
-  // 避けたい：実Gemini の回避キーワード/軸説明 ＋ 評価が低い軸カテゴリ
+  // 避けたい：実Gemini の回避キーワード/軸説明 ＋ 評価が低い軸カテゴリ ＋ Compare評価(referenceLearning)
   const avoid = dedupe([
     ...(pp?.avoidKeywords ?? []),
     ...axisPhrases(pp?.dislikes),
     ...(ra?.topAvoid ?? []).map((a) => `${a.axisJp}:${a.cat.jp}`),
+    ...(rl?.avoid ?? []),
   ], 10);
 
   // 未開拓おすすめ：画像分析の未開拓カテゴリ ＋ 未開拓ジャンル
