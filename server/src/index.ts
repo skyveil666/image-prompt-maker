@@ -4,6 +4,7 @@ import cors from "cors";
 import type { GenerateRequest, GenerateResponse } from "./types.ts";
 import { MODEL_NAME, generate, analyzePreferences, type AnalyzePreferenceSample } from "./gemini.ts";
 import { extractReference } from "./referenceExtract.ts";
+import { compareReference } from "./referenceCompare.ts";
 
 const PORT = Number(process.env.PORT || 3001);
 
@@ -318,6 +319,34 @@ app.post("/api/extract-reference", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[/api/extract-reference] failed:", message);
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/api/compare-reference", async (req, res) => {
+  const raw = req.body as { resultImageDataUrl?: unknown; referenceItems?: unknown } | undefined;
+  const url = raw?.resultImageDataUrl;
+  const items = raw?.referenceItems;
+  if (typeof url !== "string" || !url.startsWith("data:image/")) {
+    res.status(400).json({ error: "resultImageDataUrl (data:image/...;base64) is required" });
+    return;
+  }
+  if (!items || typeof items !== "object" || Array.isArray(items)) {
+    res.status(400).json({ error: "referenceItems (object) is required" });
+    return;
+  }
+  // 値は文字列のみ・各160字に制限（過大入力防止）
+  const sanitizedItems: Record<string, string> = {};
+  for (const [k, v] of Object.entries(items as Record<string, unknown>)) {
+    if (typeof v === "string" && v.trim()) sanitizedItems[k] = v.trim().slice(0, 160);
+  }
+  console.log("[/api/compare-reference] start");
+  try {
+    const out = await compareReference(url, sanitizedItems);
+    res.json(out);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[/api/compare-reference] failed:", message);
     res.status(500).json({ error: message });
   }
 });

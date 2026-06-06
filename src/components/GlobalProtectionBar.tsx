@@ -51,9 +51,11 @@ interface Props {
   analysisSummary?: ReactNode;
   /** P4: 展開時に表示する AI分析の詳細（5分析チップ＋ライブビュー誘導） */
   analysisDetail?: ReactNode;
+  /** ヘッダー右側に固定表示する操作群（出力先/案数/✨生成）。UI配置のみ・生成ロジックには無関係。 */
+  actions?: ReactNode;
 }
 
-export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisDetail }: Props) {
+export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisDetail, actions }: Props) {
   const [open, setOpen] = useState(false);
   const lvl = LEVEL_STYLE[risk.level];
 
@@ -100,12 +102,21 @@ export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisD
             </>
           )}
 
+          {/* ✨ 生成アクション（出力先/案数/✨生成）：ヘッダー右側に固定表示。
+              ヘッダー行は flex-wrap なので狭い画面では自動で2段目へ折り返す。 */}
+          {actions && (
+            <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
+              {actions}
+            </div>
+          )}
+
           {/* 詳細トグル */}
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
             className={[
-              "ml-auto shrink-0 flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border transition",
+              actions ? "" : "ml-auto",
+              "shrink-0 flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg border transition",
               open
                 ? "border-accent/50 bg-accent/10 text-accent"
                 : "border-[#252e44] text-text-muted/60 hover:border-accent/40 hover:text-text-base",

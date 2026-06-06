@@ -63,6 +63,8 @@ interface Props {
   comboPolicies:     ComboPolicyMap;
   /** コンボごとのポリシー変更ハンドラ */
   onComboPolicyChange: (comboKey: string, policy: ComboPolicy) => void;
+  /** 🔬 分析ラボ（詳細探索の別画面）を開く（任意）。 */
+  onOpenLab?: () => void;
 
   // ── 🎨 色分析（生成制御センター） ──
   /** 色分析結果（履歴×ウィンドウサイズで集計） */
@@ -1460,7 +1462,7 @@ function DuplicateAnalysisPanelInner({
   levels, policyApplied,
   onLevelChange, onApplyPolicies, onUnapplyPolicies, onResetPolicies, onBulkLevel, onClearNg,
   onAutoAdjust, onUndoAutoAdjust, canUndoAuto, changedIds,
-  comboPolicies, onComboPolicyChange,
+  comboPolicies, onComboPolicyChange, onOpenLab,
   colorAnalysis,
   colorWeights, onColorWeightChange, onColorWeightsReset,
   onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
@@ -1773,6 +1775,19 @@ function DuplicateAnalysisPanelInner({
 
             {/* === 重複分析タブ === */}
             {tab === "dup" && <>
+
+            {/* 🔬 分析ラボ入口（詳細探索：件数/フィルタ/検索/ソート/一括編集は別画面） */}
+            {onOpenLab && (
+              <div className="flex items-center justify-between gap-2 rounded-lg border border-violet-400/40 bg-violet-500/10 px-3 py-2">
+                <span className="text-[11px] text-violet-100/90 leading-snug">
+                  ここは概要（TOP10）。全件・カテゴリ別・検索・並べ替え・一括編集は分析ラボで。
+                </span>
+                <button type="button" onClick={onOpenLab}
+                  className="shrink-0 text-[12px] font-bold px-3 py-1.5 rounded-lg border border-violet-400/55 bg-violet-500/20 text-violet-50 hover:bg-violet-500/30 transition">
+                  🔬 分析ラボを開く
+                </button>
+              </div>
+            )}
 
             {/* AIコメント — トップに目立つように */}
             {ha && <AiCommentSection comment={ha.aiComment} />}

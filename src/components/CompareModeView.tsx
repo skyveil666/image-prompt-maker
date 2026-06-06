@@ -9,12 +9,16 @@
  * 読み取り専用：生成・抽出・保存ロジックは一切変更しない。referenceRecords / history を読むだけ。
  * 一致率（matchScores）と「生成側の自動抽出」は Phase C で追加する（ここでは枠のみ）。
  */
-import { useEffect, useMemo, useState } from "react";
-import { getReferenceRecords, type ReferenceRecord } from "../lib/referenceRecords";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { getReferenceRecords, updateReferenceRecord, type ReferenceRecord } from "../lib/referenceRecords";
 import { getByIndex, STORE_HISTORY } from "../lib/idb";
 import { getResultImages } from "../lib/history";
+import { compareReferenceViaBackend } from "../lib/backendClient";
 import type { PromptHistoryItem } from "../types";
 import { REFERENCE_CATEGORIES } from "./ReferenceImportPanel";
+
+/** 評価対象の生成結果（出所つき）。 */
+interface ResultImage { url: string; historyItemId: string; imageIndex: number; }
 
 /** 比較項目（design: 背景/衣装/ポーズ/髪型/色味/空気感）。key は抽出13カテゴリと対応。 */
 const COMPARE_ITEMS: { key: string; label: string }[] = [
@@ -34,9 +38,12 @@ interface Props {
 export function CompareModeView({ open, onClose }: Props) {
   const [records, setRecords] = useState<ReferenceRecord[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [resultImages, setResultImages] = useState<string[]>([]);
+  const [results, setResults] = useState<ResultImage[]>([]);
   const [loadingResults, setLoadingResults] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  /** 一致率を算出中の生成結果 url（null=非算出） */
+  const [computing, setComputing] = useState<string | null>(null);
+  const [computeError, setComputeError] = useState<string | null>(null);
 
   // 開いたら参照レコードを読み込み（最新順）。選択が無ければ先頭を自動選択。
   useEffect(() => {
@@ -61,27 +68,55 @@ export function CompareModeView({ open, onClose }: Props) {
     [records, selectedId],
   );
 
-  // 選択レコードの batchId から生成結果画像を取得（history を読むだけ）。
+  // 選択レコードの batchId から生成結果画像を取得（history を読むだけ・出所つき）。
   useEffect(() => {
-    if (!open || !selected) { setResultImages([]); return; }
+    if (!open || !selected) { setResults([]); return; }
     let alive = true;
     setLoadingResults(true);
+    setComputeError(null);
     void (async () => {
       try {
         const items = await getByIndex<PromptHistoryItem>(STORE_HISTORY, "batchId", selected.batchId);
-        const imgs: string[] = [];
+        const list: ResultImage[] = [];
         for (const it of items) {
-          for (const u of getResultImages(it)) if (u && !imgs.includes(u)) imgs.push(u);
+          getResultImages(it).forEach((u, idx) => {
+            if (u && !list.some((r) => r.url === u)) list.push({ url: u, historyItemId: it.id, imageIndex: idx });
+          });
         }
-        if (alive) setResultImages(imgs.slice(0, 6));
+        if (alive) setResults(list.slice(0, 6));
       } catch {
-        if (alive) setResultImages([]);
+        if (alive) setResults([]);
       } finally {
         if (alive) setLoadingResults(false);
       }
     })();
     return () => { alive = false; };
   }, [open, selected]);
+
+  // 一致率を算出（案1：生成結果画像×参照6項目を Gemini 採点）。結果は referenceRecords にキャッシュ。
+  const computeMatch = useCallback(async (target: ResultImage) => {
+    if (!selected) return;
+    setComputing(target.url);
+    setComputeError(null);
+    try {
+      const referenceItems: Record<string, string> = {};
+      for (const it of COMPARE_ITEMS) {
+        const v = (selected.applied?.[it.key] ?? selected.extracted?.[it.key] ?? "").trim();
+        if (v) referenceItems[it.key] = v;
+      }
+      const { scores, resultExtracted } = await compareReferenceViaBackend(target.url, referenceItems);
+      const matchComputedAt = Date.now();
+      const resultImageRef = { historyItemId: target.historyItemId, imageIndex: target.imageIndex };
+      await updateReferenceRecord(selected.id, { matchScores: scores, resultExtracted, matchComputedAt, resultImageRef });
+      setRecords((prev) => prev
+        ? prev.map((r) => (r.id === selected.id ? { ...r, matchScores: scores, resultExtracted, matchComputedAt, resultImageRef } : r))
+        : prev);
+    } catch (e) {
+      setComputeError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setComputing(null);
+    }
+  }, [selected]);
 
   // Escape：ライトボックス優先で閉じ、無ければビューを閉じる。
   useEffect(() => {
@@ -104,6 +139,9 @@ export function CompareModeView({ open, onClose }: Props) {
       });
     } catch { return String(ms); }
   };
+
+  /** 一致率の色分け（70+緑 / 40-69 橙 / それ未満ローズ）。 */
+  const scoreColor = (s: number) => (s >= 70 ? "text-emerald-300" : s >= 40 ? "text-amber-300" : "text-rose-300");
 
   const appliedLabels = (r: ReferenceRecord) =>
     REFERENCE_CATEGORIES.filter((c) => (r.applied?.[c.key] ?? "").trim()).map((c) => c.label);
@@ -183,21 +221,23 @@ export function CompareModeView({ open, onClose }: Props) {
                     </div>
                   </div>
 
-                  {/* 中央：抽出 / 適用 比較表（6項目） */}
+                  {/* 中央：参照 ⇔ 生成 比較表（6項目＋一致率） */}
                   <div className="space-y-2">
-                    <h3 className="text-[11px] font-bold text-text-muted">抽出 / 適用（参照側）</h3>
+                    <h3 className="text-[11px] font-bold text-text-muted">参照 ⇔ 生成 ＋ 一致率</h3>
                     <div className="rounded-lg border border-bg-border overflow-hidden">
-                      <table className="w-full text-[11px]">
+                      <table className="w-full text-[11px] table-fixed">
                         <thead>
                           <tr className="bg-bg-base/50 text-text-muted/80">
-                            <th className="text-left font-semibold px-2 py-1 w-16">項目</th>
+                            <th className="text-left font-semibold px-2 py-1 w-14">項目</th>
                             <th className="text-left font-semibold px-2 py-1">参照（抽出）</th>
-                            <th className="text-center font-semibold px-2 py-1 w-14">一致率</th>
+                            <th className="text-left font-semibold px-2 py-1">生成側（抽出）</th>
+                            <th className="text-center font-semibold px-2 py-1 w-12">一致率</th>
                           </tr>
                         </thead>
                         <tbody>
                           {COMPARE_ITEMS.map((it) => {
                             const ext = (selected.extracted?.[it.key] ?? "").trim();
+                            const gen = (selected.resultExtracted?.[it.key] ?? "").trim();
                             const isApplied = !!(selected.applied?.[it.key] ?? "").trim();
                             const score = selected.matchScores?.[it.key];
                             return (
@@ -208,13 +248,16 @@ export function CompareModeView({ open, onClose }: Props) {
                                     ? <span className="ml-1 text-[9px] text-violet-200 bg-violet-500/20 rounded px-1">適用</span>
                                     : ext ? <span className="ml-1 text-[9px] text-text-muted/60">抽出のみ</span> : null}
                                 </td>
-                                <td className="px-2 py-1.5 text-text-base/90 leading-snug">
+                                <td className="px-2 py-1.5 text-text-base/90 leading-snug break-words">
                                   {ext || <span className="text-text-muted/45">—</span>}
+                                </td>
+                                <td className="px-2 py-1.5 text-text-base/80 leading-snug break-words">
+                                  {gen || <span className="text-text-muted/35">—</span>}
                                 </td>
                                 <td className="px-2 py-1.5 text-center">
                                   {typeof score === "number"
-                                    ? <span className="font-semibold text-text-base">{score}%</span>
-                                    : <span className="text-text-muted/40" title="次段階（Phase C）で生成画像から自動算出します">—</span>}
+                                    ? <span className={`font-bold ${scoreColor(score)}`}>{score}%</span>
+                                    : <span className="text-text-muted/40" title="右の生成結果で「一致率を算出」を押すと表示されます">—</span>}
                                 </td>
                               </tr>
                             );
@@ -222,31 +265,56 @@ export function CompareModeView({ open, onClose }: Props) {
                         </tbody>
                       </table>
                     </div>
-                    <p className="text-[10px] text-text-muted/60 leading-snug">
-                      ※「生成側の自動抽出」と「項目別の一致率」は次段階（Phase C）で、生成結果画像を再解析して自動表示されます。
-                    </p>
+                    {selected.matchComputedAt
+                      ? <p className="text-[10px] text-text-muted/60 leading-snug">一致率：{fmtDate(selected.matchComputedAt)} に算出（生成結果ごとに「🎯 一致率を算出」で更新）。</p>
+                      : <p className="text-[10px] text-text-muted/60 leading-snug">右の生成結果で「🎯 一致率を算出」を押すと、生成画像を解析して項目別の一致率と「生成側」を表示します。</p>}
                   </div>
 
-                  {/* 右：生成結果画像 */}
+                  {/* 右：生成結果画像（＋一致率を算出） */}
                   <div className="space-y-2">
                     <h3 className="text-[11px] font-bold text-text-muted">生成結果</h3>
                     {loadingResults ? (
                       <div className="text-[11px] text-text-muted">読み込み中…</div>
-                    ) : resultImages.length === 0 ? (
+                    ) : results.length === 0 ? (
                       <div className="rounded-lg border border-dashed border-bg-border bg-bg-base/30 px-3 py-6 text-center text-[11px] text-text-muted leading-snug">
                         この生成の結果画像は未登録です。<br />
                         履歴で生成結果を貼り戻すと、ここに並んで比較できます。
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-2">
-                        {resultImages.map((src, i) => (
-                          <img
-                            key={i} src={src} alt={`生成結果${i + 1}`} title="クリックで拡大"
-                            onClick={() => setLightbox(src)}
-                            className="w-full rounded-lg border border-bg-border object-cover cursor-zoom-in bg-bg-base/40"
-                          />
-                        ))}
+                        {results.map((r, i) => {
+                          const isScored = selected.resultImageRef?.historyItemId === r.historyItemId
+                            && selected.resultImageRef?.imageIndex === r.imageIndex;
+                          const busy = computing === r.url;
+                          return (
+                            <div key={i} className="space-y-1">
+                              <div className="relative">
+                                <img
+                                  src={r.url} alt={`生成結果${i + 1}`} title="クリックで拡大"
+                                  onClick={() => setLightbox(r.url)}
+                                  className={["w-full rounded-lg border object-cover cursor-zoom-in bg-bg-base/40",
+                                    isScored ? "border-emerald-400/70" : "border-bg-border"].join(" ")}
+                                />
+                                {isScored && (
+                                  <span className="absolute top-1 left-1 text-[9px] px-1 rounded bg-emerald-500/80 text-white">算出済み</span>
+                                )}
+                              </div>
+                              <button
+                                type="button" disabled={!!computing}
+                                onClick={() => { void computeMatch(r); }}
+                                className="w-full text-[10px] px-1.5 py-1 rounded border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1"
+                              >
+                                {busy
+                                  ? <><span className="w-1.5 h-1.5 rounded-full bg-violet-200 animate-pulse" />算出中…</>
+                                  : isScored ? "🎯 再算出" : "🎯 一致率を算出"}
+                              </button>
+                            </div>
+                          );
+                        })}
                       </div>
+                    )}
+                    {computeError && (
+                      <p className="text-[10px] text-rose-300/90 leading-snug">⚠ {computeError}</p>
                     )}
                   </div>
                 </div>

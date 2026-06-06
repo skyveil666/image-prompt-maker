@@ -46,6 +46,7 @@ import { analyzeFullHistory, filterRecentWindow, WINDOW_DAYS, type FullHistoryAn
 import { DuplicateAnalysisPanel } from "./components/DuplicateAnalysisPanel";
 import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
 import { CompareModeView } from "./components/CompareModeView";
+import { AnalysisLabPanel } from "./components/AnalysisLabPanel";
 import {
   loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
   isApplied, setAppliedStorage,
@@ -213,6 +214,8 @@ export default function App() {
   }, [referenceNote]);
   /** Compare Mode（参照↔生成 比較ビュー）の開閉。Reference Picker の「🆚 比較」から開く。 */
   const [compareOpen, setCompareOpen] = useState(false);
+  /** 分析ラボ（重複分析の詳細探索・全幅ビュー）の開閉。ダッシュボードの「🔬 分析ラボ」から開く。 */
+  const [analysisLabOpen, setAnalysisLabOpen] = useState(false);
   /** スコープボタンのフラッシュアニメーション用キー（インクリメントで発火） */
   const [scopeFlashKey, setScopeFlashKey] = useState(0);
   /** 多様性エンジン：直近の背景/衣装/ムード/前景エフェクトを記憶して連発を防ぐ */
@@ -2379,6 +2382,63 @@ export default function App() {
                 onDetail={toggleAnalysisDetail}
               />
             }
+            actions={
+              <>
+                {/* 出力先 */}
+                <PromptTargetSelector value={promptTarget} onChange={setPromptTarget} />
+                {/* 案数 */}
+                <div className="flex items-center gap-1.5 select-none">
+                  <span className="text-[10px] text-text-muted/50 shrink-0">案数</span>
+                  <div className="flex gap-1">
+                    {([2, 3, 4, 5, 6] as Count[]).map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setCount(c)}
+                        className={[
+                          "w-6 h-6 rounded-md text-[11px] font-bold border transition leading-none",
+                          count === c
+                            ? "border-accent/80 bg-accent/25 text-white shadow-[0_0_6px_rgba(139,92,246,0.4)]"
+                            : "border-[#252e44] bg-transparent text-white/45 hover:border-accent/40 hover:text-white/80",
+                        ].join(" ")}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* ✨ 生成ボタン（コンパクト・機能と Ctrl+Enter は不変） */}
+                <button
+                  type="button"
+                  disabled={!canGenerate || generating}
+                  onClick={handleGenerate}
+                  className={[
+                    "inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg font-bold text-[13px]",
+                    "transition-all duration-300 select-none shrink-0",
+                    "disabled:opacity-40 disabled:cursor-not-allowed",
+                    justCompleted
+                      ? "bg-emerald-500 text-white hover:bg-emerald-400"
+                      : canGenerate
+                        ? "bg-accent text-white hover:bg-accent-hover"
+                        : "bg-[#1a2030] text-white/40",
+                  ].join(" ")}
+                >
+                  {generating ? (
+                    <>
+                      <span className="inline-block animate-spin leading-none">⟳</span>
+                      生成中…
+                    </>
+                  ) : justCompleted ? (
+                    "✅ 完了！"
+                  ) : (
+                    <>
+                      ✨ プロンプトを生成
+                      <span className="text-[10px] font-normal opacity-50 ml-0.5 hidden lg:inline">Ctrl+↵</span>
+                    </>
+                  )}
+                </button>
+              </>
+            }
           />
           {/* 🤖 AI分析ライブビュー：GPB 展開内の[ライブビュー]で開く（M-2 統合） */}
           {analysisDetailOpen && (
@@ -2654,6 +2714,7 @@ export default function App() {
                   changedIds={changedIds}
                   comboPolicies={comboPolicies}
                   onComboPolicyChange={handleComboPolicyChange}
+                  onOpenLab={() => setAnalysisLabOpen(true)}
                   colorAnalysis={colorAnalysis}
                   colorWeights={colorWeights}
                   onColorWeightChange={handleColorWeightChange}
@@ -3053,6 +3114,19 @@ export default function App() {
       {/* 🆚 Compare Mode（参照↔生成 比較・全幅ビュー） */}
       <CompareModeView open={compareOpen} onClose={() => setCompareOpen(false)} />
 
+      {/* 🔬 分析ラボ（重複分析の詳細探索・全幅ビュー） */}
+      <AnalysisLabPanel
+        open={analysisLabOpen}
+        onClose={() => setAnalysisLabOpen(false)}
+        motifCounts={historyAnalysis?.motifCounts ?? []}
+        topCombos={historyAnalysis?.topCombos ?? []}
+        levels={levels}
+        comboPolicies={comboPolicies}
+        onLevelChange={handleLevelChange}
+        onBulkLevel={handleDupBulkLevel}
+        onComboPolicyChange={handleComboPolicyChange}
+      />
+
       {/* 🖌 選択範囲プロンプトモーダル */}
       {selectionModalOpen && imageDataUrl && (
         <SelectionPromptModal
@@ -3110,68 +3184,8 @@ export default function App() {
         </div>
       )}
 
-      {/* ── ✨ フローティングバー（出力先 + 案数 + 生成ボタン） ──────────────── */}
-      <div className="fixed bottom-6 right-6 z-[100] flex items-center gap-0 rounded-2xl border border-[#252e44]/90 bg-[#0e1219]/95 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.65)] overflow-hidden">
-        {/* 出力先セレクタ */}
-        <div className="px-3 py-2.5">
-          <PromptTargetSelector value={promptTarget} onChange={setPromptTarget} />
-        </div>
-        {/* 縦区切り */}
-        <div className="w-px self-stretch bg-[#252e44]/80 shrink-0" />
-        {/* 案数 */}
-        <div className="px-3 py-2.5 flex items-center gap-2 select-none">
-          <span className="text-[11px] text-white/40 shrink-0">案数</span>
-          <div className="flex gap-1">
-            {([2, 3, 4, 5, 6] as Count[]).map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => setCount(c)}
-                className={[
-                  "w-7 h-7 rounded-lg text-[12px] font-bold border transition leading-none",
-                  count === c
-                    ? "border-accent/80 bg-accent/25 text-white shadow-[0_0_8px_rgba(139,92,246,0.45)]"
-                    : "border-[#252e44] bg-transparent text-white/45 hover:border-accent/40 hover:text-white/80",
-                ].join(" ")}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        </div>
-        {/* 縦区切り */}
-        <div className="w-px self-stretch bg-[#252e44]/80 shrink-0" />
-        {/* 生成ボタン */}
-        <button
-          type="button"
-          disabled={!canGenerate || generating}
-          onClick={handleGenerate}
-          className={[
-            "inline-flex items-center justify-center gap-2 px-6 py-3 font-bold text-[15px]",
-            "transition-all duration-300 select-none",
-            "disabled:opacity-40 disabled:cursor-not-allowed",
-            justCompleted
-              ? "bg-emerald-500 text-white hover:bg-emerald-400"
-              : canGenerate
-                ? "bg-accent text-white hover:bg-accent-hover"
-                : "bg-transparent text-white/40",
-          ].join(" ")}
-        >
-          {generating ? (
-            <>
-              <span className="inline-block animate-spin leading-none">⟳</span>
-              生成中…
-            </>
-          ) : justCompleted ? (
-            "✅ 完了！"
-          ) : (
-            <>
-              ✨ プロンプトを生成
-              <span className="text-[11px] font-normal opacity-50 ml-0.5 hidden sm:inline">Ctrl+↵</span>
-            </>
-          )}
-        </button>
-      </div>
+      {/* ✨ 生成操作（出力先 / 案数 / プロンプト生成）は上部ヘッダー（GlobalProtectionBar の actions スロット）へ移設。
+          下部固定バーは廃止し作業領域を広く確保。生成ロジック・Ctrl+Enter（グローバル keydown）は不変。 */}
     </div>
   );
 }

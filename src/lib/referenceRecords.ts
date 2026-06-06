@@ -37,8 +37,16 @@ export interface ReferenceRecord {
   resultExtracted?: Record<string, string>;
   /** Phase C：項目別一致率 0-100（cat -> score。任意） */
   matchScores?: Record<string, number>;
-  /** 任意：評価（学習連携用） */
-  rating?: number;
+  /** Phase C：一致率を算出した時刻 */
+  matchComputedAt?: number;
+  /** Phase C：採点・評価した生成結果の出所（history item と画像index） */
+  resultImageRef?: { historyItemId: string; imageIndex: number };
+  /** Phase C：全体のユーザー評価（5=良かった / 3=普通 / 1=違う） */
+  userEvalOverall?: 5 | 3 | 1;
+  /** Phase C：任意の軸別評価（押した軸のみ・5=👍 / 1=👎） */
+  userAxisEval?: Record<string, 5 | 1>;
+  /** Phase C：評価した時刻 */
+  evaluatedAt?: number;
   /** 任意：お気に入り（学習連携用） */
   favorite?: boolean;
 }

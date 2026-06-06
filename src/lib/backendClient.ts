@@ -116,6 +116,46 @@ export async function extractReferenceViaBackend(
   return { elements: data.elements ?? {}, missingRequired: data.missingRequired ?? [] };
 }
 
+// ── Compare Mode：生成結果×参照の一致率採点（Gemini Vision・案1）─────────────
+
+export interface CompareReferenceResponse {
+  version: number;
+  scores: Record<string, number>;
+  reasons?: Record<string, string>;
+  resultExtracted: Record<string, string>;
+  model: string;
+}
+
+/**
+ * 生成結果画像と参照6項目テキストを比較し、項目別一致率(0-100)＋生成側抽出を返す。失敗時は例外。
+ */
+export async function compareReferenceViaBackend(
+  resultImageDataUrl: string,
+  referenceItems: Record<string, string>,
+): Promise<{ scores: Record<string, number>; reasons: Record<string, string>; resultExtracted: Record<string, string> }> {
+  const res = await fetch("/api/compare-reference", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resultImageDataUrl, referenceItems }),
+  });
+  if (!res.ok) {
+    // Body は1度しか読めないので text() で取ってから JSON 試行（BUG-11 と同方式）
+    let detail = "";
+    try {
+      const rawText = await res.text();
+      try {
+        const j = JSON.parse(rawText) as BackendError;
+        detail = j.error || rawText;
+      } catch {
+        detail = rawText;
+      }
+    } catch { /* noop */ }
+    throw new Error(`一致率の算出に失敗しました (${res.status}): ${detail || "unknown"}`);
+  }
+  const data = (await res.json()) as CompareReferenceResponse;
+  return { scores: data.scores ?? {}, reasons: data.reasons ?? {}, resultExtracted: data.resultExtracted ?? {} };
+}
+
 export async function checkBackendHealth(): Promise<{ ok: boolean; model?: string }> {
   try {
     const res = await fetch("/api/health");
