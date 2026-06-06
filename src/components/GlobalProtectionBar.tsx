@@ -152,7 +152,7 @@ export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisD
                 <p className="text-[11px] font-semibold text-text-muted/70">{lvl.icon} Identity Shield 採点理由</p>
                 <ul className="space-y-0.5">
                   {risk.reasons.map((r, i) => (
-                    <li key={i} className="text-[11.5px] text-text-base/80 leading-snug">・{r}</li>
+                    <li key={`${i}-${r}`} className="text-[11.5px] text-text-base/80 leading-snug">・{r}</li>
                   ))}
                 </ul>
               </div>
@@ -164,7 +164,7 @@ export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisD
                 <p className="text-[11px] font-semibold text-rose-200/85">⚠ 注意</p>
                 <ul className="space-y-0.5">
                   {risk.warnings.map((w, i) => (
-                    <li key={i} className="text-[11.5px] text-rose-200/85 leading-snug">・{w}</li>
+                    <li key={`${i}-${w}`} className="text-[11.5px] text-rose-200/85 leading-snug">・{w}</li>
                   ))}
                 </ul>
               </div>
@@ -176,7 +176,7 @@ export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisD
                 <p className="text-[11px] font-semibold text-emerald-200/80">💡 安全提案</p>
                 <ul className="space-y-0.5">
                   {risk.safeSuggestions.map((s, i) => (
-                    <li key={i} className="text-[11.5px] text-emerald-100/80 leading-snug">・{s}</li>
+                    <li key={`${i}-${s}`} className="text-[11.5px] text-emerald-100/80 leading-snug">・{s}</li>
                   ))}
                 </ul>
               </div>

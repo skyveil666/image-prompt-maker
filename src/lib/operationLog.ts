@@ -70,7 +70,7 @@ async function pruneIfNeeded(): Promise<void> {
     // 新しい順に MAX_ENTRIES 件残し、古いものを削除
     const sorted = all.sort((a, b) => b.ts - a.ts);
     const toRemove = sorted.slice(MAX_ENTRIES);
-    for (const e of toRemove) await remove(STORE_OPERATION_LOG, e.id);
+    await Promise.all(toRemove.map((e) => remove(STORE_OPERATION_LOG, e.id)));
   } catch {
     /* noop */
   }

@@ -232,7 +232,7 @@ function CompareModal({
                   ) : (
                     <div className="flex flex-col gap-2 max-h-[65vh] overflow-y-auto">
                       {imgs.map((url, i) => (
-                        <div key={i} className="relative">
+                        <div key={url} className="relative">
                           <img
                             src={url}
                             alt={`生成結果 ${i + 1}`}
@@ -338,7 +338,7 @@ function GeneratedImageSlot({ imageUrl, onImage }: GeneratedImageSlotProps) {
           </button>
           <button
             type="button"
-            onClick={async () => await onImage("")}
+            onClick={async () => { try { await onImage(""); } catch (e) { console.error("画像の削除に失敗しました:", e); } }}
             title="削除"
             className="text-[9px] text-rose-300/90 bg-rose-500/15 rounded-md px-1.5 py-1 hover:bg-rose-500/30 transition"
           >
@@ -579,7 +579,7 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
           ) : (
             <>
               {resultImages.map((url, i) => (
-                <div key={i} className="relative">
+                <div key={url} className="relative">
                   <WithImagePreview
                     src={url}
                     label={`生成結果 ${i + 1}`}

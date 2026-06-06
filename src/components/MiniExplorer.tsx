@@ -702,6 +702,9 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
       setNavIndex(trimmed.length - 1);
       return trimmed;
     });
+    // フォルダ移動時は選択状態をリセット（initRoot と整合。別フォルダの同ID画像の誤選択を防ぐ）
+    setSelectedId(null);
+    setSelectedName(null);
     void loadImages(handle);
   }, [navIndex, loadImages]);
 

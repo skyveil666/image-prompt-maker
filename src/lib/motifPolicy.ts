@@ -241,7 +241,7 @@ export function loadComboPolicies(): ComboPolicyMap {
     const raw = localStorage.getItem(COMBO_KEY);
     if (!raw) return {};
     const obj = JSON.parse(raw);
-    if (!obj || typeof obj !== "object") return {};
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return {};
     const out: ComboPolicyMap = {};
     for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
       if (v === "block" || v === "alt") out[k] = v as ComboPolicy;

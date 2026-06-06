@@ -33,10 +33,8 @@ export function pushRecentSubStyles(ids: string[]): void {
     const fresh = ids.filter((v): v is string => typeof v === "string" && v.length > 0);
     if (fresh.length === 0) return;
     const prev = getRecentSubStyles();
-    const merged: string[] = [];
-    for (const id of [...fresh, ...prev]) {
-      if (!merged.includes(id)) merged.push(id);
-    }
+    // ID重複を前方優先で除去（Setで O(n)）
+    const merged = [...new Set([...fresh, ...prev])];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged.slice(0, MAX)));
   } catch {
     // localStorage 不可（プライベートブラウジング等）は無視

@@ -100,7 +100,7 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore,
             <div className="flex items-center gap-0.5 flex-shrink-0">
               {getResultImages(item).map((url, i) => (
                 <WithImagePreview
-                  key={i}
+                  key={url}
                   src={url}
                   label={`生成結果 ${i + 1}`}
                   sublabel={`案${item.proposalIndex}`}

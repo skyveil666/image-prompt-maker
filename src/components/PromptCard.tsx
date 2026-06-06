@@ -254,7 +254,7 @@ function GeneratedResultSlot({
             {resultImages.map((url, i) => {
               const rating = resultRatings[i] ?? null;
               return (
-                <div key={i} className="relative group">
+                <div key={url} className="relative group">
                   <img
                     src={url}
                     alt={`生成結果 ${i + 1}`}
@@ -337,7 +337,7 @@ function GeneratedResultSlot({
                 : rating === 1 ? "border-rose-400/65    bg-rose-500/15    text-rose-100"
                 : "border-white/15 bg-white/4 text-text-muted/60";
                 return (
-                  <div key={i} className="space-y-1">
+                  <div key={resultImages[i]} className="space-y-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className={[
                         "inline-flex items-center justify-center w-6 h-6 rounded border text-[11px] font-bold leading-none shrink-0",

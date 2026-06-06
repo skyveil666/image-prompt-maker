@@ -188,11 +188,16 @@ export function ReflectionStatusBar(p: Props) {
 
   return (
     <section className="rounded-lg border border-violet-400/25 bg-violet-500/5 overflow-hidden">
-      {/* ヘッダ */}
-      <button
-        type="button"
+      {/* ヘッダ（button入れ子を避けるため div+role=button。Enter/Spaceで開閉） */}
+      <div
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-white/3 transition text-left"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((v) => !v); }
+        }}
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 hover:bg-white/3 transition text-left cursor-pointer"
       >
         <span className="text-[12px] font-bold text-violet-200 tracking-wide shrink-0">
           📡 現在の反映状態
@@ -214,7 +219,7 @@ export function ReflectionStatusBar(p: Props) {
           </button>
         )}
         <span className="ml-auto text-[10px] text-slate-400 shrink-0">{open ? "▲ 閉じる" : "▼ 開く"}</span>
-      </button>
+      </div>
 
       {/* ── 確認ダイアログ（インライン）────────────────────────────── */}
       {confirmingReset && (

@@ -490,6 +490,8 @@ export default function App() {
       analysisLive.completeStep("loadFavorites");
       analysisLive.startStep("loadRatings", `評価データ ${rated.length}件を確認`, rated.length);
       setHistoryItemsForColor(all);
+      // 復旧・再読込時に重複分析センターの集計も同期（従来は色用 items のみ更新で分析が古いままだった）
+      if (all.length > 0) setHistoryAnalysis(analyzeFullHistory(all, []));
       analysisLive.completeStep("loadRatings");
       analysisLive.startStep("favoriteAnalysis", "お気に入り傾向を分析中");
       analysisLive.completeStep("favoriteAnalysis", "お気に入り傾向の集計完了");

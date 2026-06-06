@@ -87,7 +87,7 @@ async function pruneIfNeeded(): Promise<void> {
     if (all.length <= MAX_RECORDS) return;
     const sorted = all.sort((a, b) => b.createdAt - a.createdAt);
     const toRemove = sorted.slice(MAX_RECORDS);
-    for (const e of toRemove) await remove(STORE_REFERENCE_RECORDS, e.id);
+    await Promise.all(toRemove.map((e) => remove(STORE_REFERENCE_RECORDS, e.id)));
   } catch {
     /* noop */
   }

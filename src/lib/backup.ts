@@ -105,7 +105,8 @@ export async function exportBackup(): Promise<void> {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // ダウンロード開始前に URL を破棄するとリンク切れになり得るため、1秒後に解放する。
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // ─── インポート ──────────────────────────────────────────────────────────────

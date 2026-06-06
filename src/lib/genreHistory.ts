@@ -33,11 +33,8 @@ export function pushRecentGenres(ids: string[]): void {
     const fresh = ids.filter((v): v is string => typeof v === "string" && v.length > 0);
     if (fresh.length === 0) return;
     const prev = getRecentGenres();
-    // 新規（バッチ内重複除去）→ 既存 の順で連結し、ID重複を前方優先で除去
-    const merged: string[] = [];
-    for (const id of [...fresh, ...prev]) {
-      if (!merged.includes(id)) merged.push(id);
-    }
+    // 新規（バッチ内重複除去）→ 既存 の順で連結し、ID重複を前方優先で除去（Setで O(n)）
+    const merged = [...new Set([...fresh, ...prev])];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged.slice(0, MAX)));
   } catch {
     // localStorage 不可（プライベートブラウジング等）は無視
