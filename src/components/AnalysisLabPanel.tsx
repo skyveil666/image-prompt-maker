@@ -1,14 +1,17 @@
 /**
- * AnalysisLabPanel — 分析ラボ（重複分析の詳細探索・全幅ビュー）。docs/26 Lab-1。
+ * AnalysisLabPanel — 分析ラボ（重複分析の詳細探索・全幅ビュー）。docs/26 Lab-1/2・docs/28 P2。
  *
  * ダッシュボード（重複分析タブ・TOP10概要）とは別画面。同じデータ・同じハンドラを再利用し、
- * 件数(10/20/50/100/全件) / カテゴリ・リスクフィルタ / 検索 / ソート / NG一括 / 一括ポリシー を提供する。
+ * 件数(10/20/50/100/全件) / カテゴリ・リスクフィルタ / 検索 / ソート / NG一括 / 一括ポリシー / タグ一括 を提供する。
+ * P2: 未開拓度（untappedScore）列＋ソート、🔭未開拓ビュー（未踏の表現領域発見）、カテゴリ色チップ＋順序フィルタ、
+ *     一括操作はフィルタ全件対象（290要素規模対応）。仮想化はせずページング維持。
  *
  * 不変条件: 分析ロジック・既存ハンドラ・保存形式は一切変更しない（読む＋既存ハンドラ呼び出しのみ）。
- * タグ（Lab-2）は未実装。
  */
 import { useEffect, useMemo, useState } from "react";
 import type { MotifCount, MotifCombo } from "../lib/historyAnalyzer";
+import { categoryColorClass } from "../lib/biasAnalyzer";
+import { MOTIF_CATEGORY_ORDER } from "../data/monitoredMotifs";
 import {
   LEVEL_META,
   DEFAULT_LEVEL,
@@ -28,11 +31,16 @@ import {
 } from "../lib/motifTags";
 
 type LabTab = "element" | "combo";
-type ElemSort = "count" | "recent" | "fav" | "level" | "name" | "cat";
+type ElemSort = "count" | "recent" | "fav" | "level" | "name" | "cat" | "untapped";
 type ComboSort = "count" | "risk" | "name";
 
 const COUNT_OPTIONS: number[] = [10, 20, 50, 100, Infinity];
 const countLabel = (n: number) => (n === Infinity ? "全件" : String(n));
+
+// 未開拓度バーの色（高いほど狙い目＝緑／中＝琥珀／低＝淡）。docs/28 P2。
+const UNTAPPED_THRESHOLD = 80;
+const untappedBarClass = (s: number) =>
+  s >= UNTAPPED_THRESHOLD ? "bg-emerald-400" : s >= 40 ? "bg-amber-400" : "bg-text-muted/40";
 
 const RISK_RANK: Record<MotifCombo["risk"], number> = { danger: 3, high: 2, medium: 1, low: 0 };
 const RISK_LABEL: Record<MotifCombo["risk"], string> = { danger: "危険", high: "高", medium: "中", low: "低" };
@@ -73,6 +81,8 @@ export function AnalysisLabPanel({
   const [elemSort, setElemSort] = useState<ElemSort>("count");
   const [elemSel, setElemSel] = useState<Set<string>>(new Set());
   const [elemTag, setElemTag] = useState<string>("all");
+  // P2: 未開拓ビュー（未踏の表現領域＝低出現要素のみ）
+  const [untappedOnly, setUntappedOnly] = useState(false);
   // Lab-2: モチーフ自由タグ（ラボ内メタデータ・localStorage 自己管理。生成には不使用）
   const [motifTags, setMotifTags] = useState<MotifTagMap>({});
   const [tagInput, setTagInput] = useState("");
@@ -94,11 +104,24 @@ export function AnalysisLabPanel({
   // Lab-2: 開いたらタグを読み込み（localStorage）
   useEffect(() => { if (open) setMotifTags(loadMotifTags()); }, [open]);
 
-  const categories = useMemo(
-    () => Array.from(new Set(motifCounts.map((m) => m.motif.category))),
-    [motifCounts],
-  );
+  // P2: 実データに存在するカテゴリを MOTIF_CATEGORY_ORDER 順に整列（従来は Set 順＝不定）。
+  const categories = useMemo(() => {
+    const present = new Set<string>(motifCounts.map((m) => m.motif.category));
+    return MOTIF_CATEGORY_ORDER.filter((c) => present.has(c));
+  }, [motifCounts]);
   const lvlOf = (id: string): MotifLevel => levels[id] ?? DEFAULT_LEVEL;
+
+  // P2: カテゴリ別「未出現(totalCount=0)」集計＝未踏の表現領域（新軸探索の入口）。多い順。
+  const untappedByCat = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const mc of motifCounts) {
+      if (mc.totalCount === 0) m.set(mc.motif.category, (m.get(mc.motif.category) ?? 0) + 1);
+    }
+    return MOTIF_CATEGORY_ORDER
+      .filter((c) => m.has(c))
+      .map((c) => ({ cat: c, n: m.get(c)! }))
+      .sort((a, b) => b.n - a.n);
+  }, [motifCounts]);
 
   const tagOptions = useMemo(() => allMotifTags(motifTags), [motifTags]);
 
@@ -106,6 +129,7 @@ export function AnalysisLabPanel({
     let arr = motifCounts.slice();
     if (elemCat !== "all") arr = arr.filter((m) => m.motif.category === elemCat);
     if (elemTag !== "all") arr = arr.filter((m) => tagsForMotif(motifTags, m.motif.id).includes(elemTag));
+    if (untappedOnly) arr = arr.filter((m) => m.untappedScore >= UNTAPPED_THRESHOLD);
     const q = elemSearch.trim().toLowerCase();
     if (q) arr = arr.filter((m) =>
       m.motif.label.toLowerCase().includes(q) ||
@@ -117,11 +141,12 @@ export function AnalysisLabPanel({
         case "level": return (levels[a.motif.id] ?? DEFAULT_LEVEL) - (levels[b.motif.id] ?? DEFAULT_LEVEL);
         case "name": return a.motif.label.localeCompare(b.motif.label, "ja");
         case "cat": return a.motif.category.localeCompare(b.motif.category, "ja") || b.totalCount - a.totalCount;
+        case "untapped": return (b.untappedScore - a.untappedScore) || (a.totalCount - b.totalCount);
         default: return b.totalCount - a.totalCount;
       }
     });
     return arr;
-  }, [motifCounts, elemCat, elemTag, elemSearch, elemSort, levels, motifTags]);
+  }, [motifCounts, elemCat, elemTag, untappedOnly, elemSearch, elemSort, levels, motifTags]);
   const shownElements = useMemo(
     () => (elemCount === Infinity ? filteredElements : filteredElements.slice(0, elemCount)),
     [filteredElements, elemCount],
@@ -146,16 +171,37 @@ export function AnalysisLabPanel({
     [filteredCombos, comboCount],
   );
 
+  // フィルタ変更で表示対象から外れた選択を破棄（UIの「選択N件」と実適用の乖離を防ぐ）。
+  useEffect(() => {
+    const valid = new Set(filteredElements.map((m) => m.motif.id));
+    setElemSel((s) => {
+      let changed = false;
+      const n = new Set<string>();
+      for (const id of s) { if (valid.has(id)) n.add(id); else changed = true; }
+      return changed ? n : s;
+    });
+  }, [filteredElements]);
+  useEffect(() => {
+    const valid = new Set(filteredCombos.map((c) => c.comboKey));
+    setComboSel((s) => {
+      let changed = false;
+      const n = new Set<string>();
+      for (const k of s) { if (valid.has(k)) n.add(k); else changed = true; }
+      return changed ? n : s;
+    });
+  }, [filteredCombos]);
+
   if (!open) return null;
 
   // ── 選択ヘルパ ──
   const toggleElem = (id: string) => setElemSel((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const shownElemIds = shownElements.map((m) => m.motif.id);
-  const elemAllSelected = shownElemIds.length > 0 && shownElemIds.every((id) => elemSel.has(id));
+  // P2: 全選択は「表示中(slice後)」ではなく「フィルタ全件」を対象（290規模で意図どおり一括できるように）。
+  const filteredElemIds = filteredElements.map((m) => m.motif.id);
+  const elemAllSelected = filteredElemIds.length > 0 && filteredElemIds.every((id) => elemSel.has(id));
   const toggleAllElem = () => setElemSel((s) => {
     const n = new Set(s);
-    if (elemAllSelected) shownElemIds.forEach((id) => n.delete(id));
-    else shownElemIds.forEach((id) => n.add(id));
+    if (elemAllSelected) filteredElemIds.forEach((id) => n.delete(id));
+    else filteredElemIds.forEach((id) => n.add(id));
     return n;
   });
   const applyBulkLevel = (level: MotifLevel) => { const ids = [...elemSel]; if (ids.length) onBulkLevel(ids, level); };
@@ -177,12 +223,13 @@ export function AnalysisLabPanel({
   };
 
   const toggleCombo = (key: string) => setComboSel((s) => { const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n; });
-  const shownComboKeys = shownCombos.map((c) => c.comboKey);
-  const comboAllSelected = shownComboKeys.length > 0 && shownComboKeys.every((k) => comboSel.has(k));
+  // 全選択は「表示中(slice後)」ではなく「フィルタ全件」を対象（ページング時の不整合を防ぐ）。
+  const filteredComboKeys = filteredCombos.map((c) => c.comboKey);
+  const comboAllSelected = filteredComboKeys.length > 0 && filteredComboKeys.every((k) => comboSel.has(k));
   const toggleAllCombo = () => setComboSel((s) => {
     const n = new Set(s);
-    if (comboAllSelected) shownComboKeys.forEach((k) => n.delete(k));
-    else shownComboKeys.forEach((k) => n.add(k));
+    if (comboAllSelected) filteredComboKeys.forEach((k) => n.delete(k));
+    else filteredComboKeys.forEach((k) => n.add(k));
     return n;
   });
   const applyBulkPolicy = (policy: ComboPolicy) => { comboSel.forEach((k) => onComboPolicyChange(k, policy)); };
@@ -247,24 +294,53 @@ export function AnalysisLabPanel({
                   <option value="level">レベル</option>
                   <option value="name">名前</option>
                   <option value="cat">カテゴリ</option>
+                  <option value="untapped">未開拓度（高い順）</option>
                 </select>
               </label>
+              {/* P2: 未開拓ビュー＝未踏の表現領域を一発抽出（ソート未開拓↓＋未出現/低出現のみ） */}
+              <button type="button"
+                onClick={() => {
+                  if (untappedOnly) { setUntappedOnly(false); setElemSort("count"); setElemSel(new Set()); }
+                  else { setUntappedOnly(true); setElemSort("untapped"); setElemCat("all"); setElemSel(new Set()); }
+                }}
+                title={`未開拓度 ${UNTAPPED_THRESHOLD} 以上に絞り、未開拓度の高い順に並べます`}
+                className={["text-[11px] px-2 py-1 rounded border transition whitespace-nowrap",
+                  untappedOnly
+                    ? "border-emerald-400/70 bg-emerald-500/20 text-emerald-100 font-semibold"
+                    : "border-bg-border bg-bg-base/60 text-text-muted hover:text-text-base hover:border-emerald-400/40"].join(" ")}>
+                🔭 未開拓ビュー
+              </button>
               <input className={`${selectCls} flex-1 min-w-[120px]`} placeholder="🔎 要素を検索（名前・キーワード）"
                 value={elemSearch} onChange={(e) => setElemSearch(e.target.value)} />
               <span className="text-[10px] text-text-muted/60">{filteredElements.length}件中 {shownElements.length}件表示</span>
             </div>
+
+            {/* P2: 未開拓ビュー時のカテゴリ別「未出現」サマリ＝新軸探索の入口 */}
+            {untappedOnly && untappedByCat.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap px-3 py-1.5 border-b border-bg-border bg-emerald-500/[0.04] shrink-0">
+                <span className="text-[10px] text-emerald-200/80 font-semibold">🌱 未踏の表現領域（未出現の要素数）:</span>
+                {untappedByCat.slice(0, 10).map(({ cat, n }) => (
+                  <button key={cat} type="button" onClick={() => setElemCat(cat)} title={`${cat} に絞り込む`}
+                    className={["text-[10px] px-1.5 py-0.5 rounded border transition hover:brightness-125",
+                      categoryColorClass(cat)].join(" ")}>
+                    {cat} <span className="tabular-nums opacity-80">{n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* テーブル */}
             <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
               <table className="w-full text-[11px]">
                 <thead className="sticky top-0 bg-bg-panel">
                   <tr className="text-text-muted/70 border-b border-bg-border">
-                    <th className="w-7 px-1 py-1"><input type="checkbox" checked={elemAllSelected} onChange={toggleAllElem} aria-label="全選択" /></th>
+                    <th className="w-7 px-1 py-1" title="フィルタ全件を選択"><input type="checkbox" checked={elemAllSelected} onChange={toggleAllElem} aria-label="フィルタ全件を選択" /></th>
                     <th className="text-left font-semibold px-2 py-1">要素</th>
-                    <th className="text-left font-semibold px-2 py-1 w-16">カテゴリ</th>
+                    <th className="text-left font-semibold px-2 py-1 w-20">カテゴリ</th>
                     <th className="text-right font-semibold px-2 py-1 w-12">出現</th>
                     <th className="text-right font-semibold px-2 py-1 w-12">直近</th>
                     <th className="text-right font-semibold px-2 py-1 w-10">⭐</th>
+                    <th className="text-left font-semibold px-2 py-1 w-24" title="未開拓度＝低出現ほど高い（新軸の狙い目）">未開拓度</th>
                     <th className="text-left font-semibold px-2 py-1">レベル（NG・0-5）</th>
                     <th className="text-left font-semibold px-2 py-1 w-40">タグ</th>
                   </tr>
@@ -277,10 +353,22 @@ export function AnalysisLabPanel({
                       <tr key={m.motif.id} className={["border-b border-bg-border/50", sel ? "bg-violet-500/8" : ""].join(" ")}>
                         <td className="px-1 py-1.5 text-center"><input type="checkbox" checked={sel} onChange={() => toggleElem(m.motif.id)} /></td>
                         <td className="px-2 py-1.5 text-text-base font-medium">{m.motif.label}</td>
-                        <td className="px-2 py-1.5 text-text-muted">{m.motif.category}</td>
+                        <td className="px-2 py-1.5">
+                          <span className={["inline-block text-[9px] px-1.5 py-0.5 rounded border leading-none", categoryColorClass(m.motif.category)].join(" ")}>
+                            {m.motif.category}
+                          </span>
+                        </td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-text-base/90">{m.totalCount}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-text-muted">{m.recentCount}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-text-muted">{m.favoriteCount}</td>
+                        <td className="px-2 py-1.5">
+                          <div className="flex items-center gap-1" title={`未開拓度 ${m.untappedScore}`}>
+                            <div className="flex-1 h-1.5 rounded bg-bg-base/70 overflow-hidden min-w-[28px]">
+                              <div className={["h-full rounded", untappedBarClass(m.untappedScore)].join(" ")} style={{ width: `${m.untappedScore}%` }} />
+                            </div>
+                            <span className="tabular-nums text-[10px] text-text-muted w-6 text-right">{m.untappedScore}</span>
+                          </div>
+                        </td>
                         <td className="px-2 py-1.5">
                           <div className="flex gap-0.5">
                             {LEVEL_META.map((lm) => (
@@ -309,7 +397,7 @@ export function AnalysisLabPanel({
                     );
                   })}
                   {shownElements.length === 0 && (
-                    <tr><td colSpan={8} className="px-2 py-6 text-center text-[11px] text-text-muted">該当する要素がありません。</td></tr>
+                    <tr><td colSpan={9} className="px-2 py-6 text-center text-[11px] text-text-muted">{untappedOnly ? "未開拓（未出現/低出現）の要素はありません。" : "該当する要素がありません。"}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -436,7 +524,8 @@ export function AnalysisLabPanel({
         {/* フッタ注記 */}
         <div className="px-3 py-1.5 border-t border-bg-border shrink-0">
           <p className="text-[10px] text-text-muted/55 leading-snug">
-            ※ レベル・ポリシーの変更はダッシュボードと共通（即保存）。生成への反映は重複分析タブの「提案を反映」を押した時のみ。タグ一括編集は次段階（Lab-2）で追加予定。
+            ※ レベル・ポリシーの変更はダッシュボードと共通（即保存）。生成への反映は重複分析タブの「提案を反映」を押した時のみ。
+            🔭 未開拓ビュー＝未踏の表現領域（低出現要素）を探す発見用ビュー（タグ一括・全選択はフィルタ全件が対象）。
           </p>
         </div>
       </div>

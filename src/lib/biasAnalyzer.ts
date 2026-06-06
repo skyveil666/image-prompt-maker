@@ -256,13 +256,15 @@ export function categoryColorClass(cat: MotifCategory): string {
     '映画表現':   'text-red-300 border-red-400/40 bg-red-400/10',
     '写真表現':   'text-teal-300 border-teal-400/40 bg-teal-400/10',
     '雑誌表現':   'text-purple-300 border-purple-400/40 bg-purple-400/10',
-    '世界観':     'text-indigo-300 border-indigo-400/40 bg-indigo-400/10',
+    // 色被り解消（docs/28 P2）: 芸術様式/世界観・色/感情トーン・衣装/ジャンル・小物/時代 の
+    // 第2要素を未使用カラーへ振替（ジャンルは発見主軸なので鮮やかな green）。
+    '世界観':     'text-zinc-300 border-zinc-400/40 bg-zinc-400/10',
     '文化圏':     'text-emerald-300 border-emerald-400/40 bg-emerald-400/10',
     'プロダクト': 'text-blue-300 border-blue-400/40 bg-blue-400/10',
     '素材':       'text-stone-300 border-stone-400/40 bg-stone-400/10',
-    '感情トーン': 'text-pink-300 border-pink-400/40 bg-pink-400/10',
-    'ジャンル':   'text-violet-300 border-violet-400/40 bg-violet-400/10',
-    '時代':       'text-amber-300 border-amber-400/40 bg-amber-400/10',
+    '感情トーン': 'text-gray-300 border-gray-400/40 bg-gray-400/10',
+    'ジャンル':   'text-green-300 border-green-400/40 bg-green-400/10',
+    '時代':       'text-neutral-300 border-neutral-400/40 bg-neutral-400/10',
   };
   return map[cat] ?? 'text-text-muted/60 border-text-muted/20 bg-text-muted/5';
 }

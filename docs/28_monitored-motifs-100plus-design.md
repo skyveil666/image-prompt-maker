@@ -89,4 +89,26 @@
 
 **残（承認後）**：P2＝分析ラボに 未開拓度 列/ソート＋カテゴリ表示拡張＋仮想化＋未開拓ビュー。P3＝発見層 `detectCandidateMotifs`＋昇格/タグ/無視（userMotifs／無視リスト localStorage）。
 
-**End of Doc 28（P1 実装・検証済み／P2・P3 未着手）**
+## 11. P2 仕様（承認済み 2026-06-06・分析ラボ「未開拓発見」強化）
+
+**ユーザー決定**: 仮想化＝**依存なし・ページング維持**／未開拓ビュー＝**プリセットボタン**／カテゴリ表示＝**色チップ＋順序フィルタ**。
+
+対象は `src/components/AnalysisLabPanel.tsx`（頻出要素タブ）。`untappedScore` は既に `motifCounts`（MotifCount直下）で届いており **prop/配線変更なし**。
+
+1. **未開拓度 列＋ソート**：行に未開拓度バー＋数値（≥80緑＝狙い目／40–79琥珀／<40淡）。`ElemSort` に `'untapped'`、ソートに「未開拓度（高い順）」、比較 `b.untappedScore - a.untappedScore`。
+2. **未開拓ビュー（プリセット）**：「🔭 未開拓ビュー」トグル＝ソート未開拓↓＋`untappedOnly`(≥80)フィルタを一発適用（再押下で解除）。有効時、上部に**カテゴリ別「未出現(totalCount=0)」集計チップ**（MOTIF_CATEGORY_ORDER順・多い順）＝新軸探索の入口。
+3. **カテゴリ表示**：カテゴリフィルタを **MOTIF_CATEGORY_ORDER 順**に整列（現状 Set 順不同）。カテゴリ列を `categoryColorClass` の**色チップ**化。色被り4組（芸術様式/世界観・色/感情トーン・衣装/ジャンル・小物/時代）の第2要素を未使用色（green/gray/zinc/neutral）へ振替えて完全被りを解消（チップは文字ラベルも持つため軽微）。
+4. **一括操作のスケール対応**：「全選択」を `shownElements`(slice後)→`filteredElements`(フィルタ全件)へ。290規模で意図どおり一括NG/タグ可能に（選択件数は表示済みで透明）。
+5. **仮想化なし**：`COUNT_OPTIONS=[10,20,50,100,∞]`＋`slice`＋overflow-auto を維持。実測で重ければ段階的に手動windowing（将来）。
+
+**不変条件**: 検出/生成/抽出/保存/適用ロジック不変。localStorage は既存キー流用（追加なし）。学習は自動適用しない／固定ルール最優先。ロールバックは当コンポーネントの追加分を戻すだけ。
+
+### 11.1 P2 実装・検証済み（2026-06-06／未コミット）
+**変更**: `AnalysisLabPanel.tsx`（未開拓度列＋バー＋`untapped`ソート、🔭未開拓ビュー＝`untappedOnly`(≥80)＋未開拓↓、カテゴリを `MOTIF_CATEGORY_ORDER` 順＋色チップ、全選択を `filteredElements` 対象化、空表示colSpan/フッタ注記更新）。`biasAnalyzer.categoryColorClass` 色被り4組を未使用色（zinc/gray/green/neutral）へ振替。`historyAnalyzer` は P1 のままで変更なし（`untappedScore` は既存流通）。
+
+**検証**: `tsc -b` ✅／`vite build` ✅。Playwright（隔離プロファイル・合成履歴48件シード→リロード）で実UI確認＝
+- 頻出要素タブ「**290**」、ヘッダに**未開拓度**列、🔭未開拓ビュー・未開拓度ソート・カテゴリ順（MOTIF_CATEGORY_ORDER通り）・色チップ（衣装=violet/演出=cyan…）を確認。
+- 件数=全件で **290行を描画（クラッシュなし）**。未開拓度はシード頻度に応じ **0/58/69/100** とばらつき（列が実値を反映）。
+- 🔭未開拓ビュー＝290→**279行**（≥80のみ）・降順・ボタンactive・「未踏の表現領域」サマリ表示。エラー境界なし。
+
+**End of Doc 28（P1・P2 実装/検証済み・未コミット／P3 未着手）**
