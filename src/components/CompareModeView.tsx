@@ -11,11 +11,15 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getReferenceRecords, updateReferenceRecord, type ReferenceRecord } from "../lib/referenceRecords";
-import { getByIndex, STORE_HISTORY } from "../lib/idb";
-import { getResultImages } from "../lib/history";
+import { getByIndex, get, STORE_HISTORY } from "../lib/idb";
+import { getResultImages, getAxisRatingAt, buildAxisRatingPatch, updateItem, type RatingAxisKey } from "../lib/history";
 import { compareReferenceViaBackend } from "../lib/backendClient";
+import { logOperation } from "../lib/operationLog";
 import type { PromptHistoryItem } from "../types";
 import { REFERENCE_CATEGORIES } from "./ReferenceImportPanel";
+
+/** Compare の6項目のうち、履歴の軸別評価（好み学習）へミラーできるもの。 */
+const CAT_TO_AXIS: Record<string, RatingAxisKey> = { background: "bg", outfit: "outfit", pose: "pose" };
 
 /** 評価対象の生成結果（出所つき）。 */
 interface ResultImage { url: string; historyItemId: string; imageIndex: number; }
@@ -145,6 +149,47 @@ export function CompareModeView({ open, onClose }: Props) {
 
   const appliedLabels = (r: ReferenceRecord) =>
     REFERENCE_CATEGORIES.filter((c) => (r.applied?.[c.key] ?? "").trim()).map((c) => c.label);
+
+  // ── C2: 評価（ハイブリッド）と学習連携 ──────────────────────────────
+  // 評価対象＝一致率を算出した生成結果（resultImageRef）。無ければ先頭の生成結果。
+  const evalTarget = selected?.resultImageRef
+    ?? (results[0] ? { historyItemId: results[0].historyItemId, imageIndex: results[0].imageIndex } : null);
+
+  const patchSelectedRecord = (patch: Partial<ReferenceRecord>) => {
+    if (!selected) return;
+    const full: Partial<ReferenceRecord> = { ...patch, evaluatedAt: Date.now(), ...(evalTarget ? { resultImageRef: evalTarget } : {}) };
+    void updateReferenceRecord(selected.id, full);
+    setRecords((prev) => (prev ? prev.map((r) => (r.id === selected.id ? { ...r, ...full } : r)) : prev));
+  };
+  // 背景/衣装/ポーズの👍👎を、対象生成結果が未評価(null)の時だけ history 軸別評価へミラー（非破壊）。
+  const mirrorAxis = (catKey: string, value: 5 | 1) => {
+    const axis = CAT_TO_AXIS[catKey];
+    if (!axis || !evalTarget) return;
+    void (async () => {
+      try {
+        const item = await get<PromptHistoryItem>(STORE_HISTORY, evalTarget.historyItemId);
+        if (!item) return;
+        if (getAxisRatingAt(item, axis, evalTarget.imageIndex) !== null) return; // 既存評価は上書きしない
+        await updateItem(evalTarget.historyItemId, buildAxisRatingPatch(item, axis, evalTarget.imageIndex, value));
+      } catch { /* ミラー失敗は無視（評価自体は参照レコードに保存済み） */ }
+    })();
+  };
+  const setOverall = (v: 5 | 3 | 1) => {
+    if (!selected) return;
+    patchSelectedRecord({ userEvalOverall: v });
+    void logOperation("rate", { kind: "compare_eval", refId: selected.id, batchId: selected.batchId, overall: v });
+  };
+  const setAxisEval = (catKey: string, v: 5 | 1) => {
+    if (!selected) return;
+    patchSelectedRecord({ userAxisEval: { ...(selected.userAxisEval ?? {}), [catKey]: v } });
+    mirrorAxis(catKey, v);
+  };
+  const toggleFavorite = () => {
+    if (!selected) return;
+    const nf = !selected.favorite;
+    patchSelectedRecord({ favorite: nf });
+    if (nf && evalTarget) void updateItem(evalTarget.historyItemId, { isFavorite: true }).catch(() => {});
+  };
 
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-2 sm:p-4" onClick={onClose}>
@@ -317,6 +362,47 @@ export function CompareModeView({ open, onClose }: Props) {
                       <p className="text-[10px] text-rose-300/90 leading-snug">⚠ {computeError}</p>
                     )}
                   </div>
+                </div>
+
+                {/* ── C2: 評価（全体 良/普/違 ＋任意6項目👍👎 ＋⭐）。背景/衣装/ポーズは履歴の軸別評価へ非破壊ミラー ── */}
+                <div className="mt-3 rounded-lg border border-bg-border bg-bg-base/30 p-3 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-bold text-text-muted">この生成結果の評価：</span>
+                    {([[5, "😀 良かった"], [3, "🙂 普通"], [1, "🙁 違う"]] as [5 | 3 | 1, string][]).map(([v, label]) => (
+                      <button key={v} type="button" onClick={() => setOverall(v)}
+                        className={["text-[12px] px-3 py-1 rounded-lg border transition",
+                          selected.userEvalOverall === v ? "border-violet-400 bg-violet-500/25 text-white font-bold" : "border-bg-border text-text-muted hover:text-text-base hover:border-violet-400/40"].join(" ")}>
+                        {label}
+                      </button>
+                    ))}
+                    <button type="button" onClick={toggleFavorite}
+                      className={["ml-2 text-[12px] px-3 py-1 rounded-lg border transition",
+                        selected.favorite ? "border-amber-400 bg-amber-500/20 text-amber-100 font-bold" : "border-bg-border text-text-muted hover:text-text-base"].join(" ")}>
+                      {selected.favorite ? "⭐ お気に入り" : "☆ お気に入り"}
+                    </button>
+                    {selected.evaluatedAt ? <span className="text-[10px] text-text-muted/60">（{fmtDate(selected.evaluatedAt)} 保存）</span> : null}
+                  </div>
+                  <details className="text-[11px]">
+                    <summary className="cursor-pointer text-text-muted/80 hover:text-text-base select-none">▼ 項目別（任意・＊は好み学習へ反映）</summary>
+                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1.5">
+                      {COMPARE_ITEMS.map((it) => {
+                        const cur = selected.userAxisEval?.[it.key];
+                        const learns = !!CAT_TO_AXIS[it.key];
+                        return (
+                          <span key={it.key} className="inline-flex items-center gap-1">
+                            <span className="text-text-muted">{it.label}{learns ? <span className="text-violet-300/70" title="好み学習へ反映">＊</span> : null}</span>
+                            <button type="button" onClick={() => setAxisEval(it.key, 5)} title="良い"
+                              className={["px-1.5 py-0.5 rounded border text-[11px]", cur === 5 ? "border-emerald-400 bg-emerald-500/25 text-white" : "border-bg-border text-text-muted/70 hover:text-text-base"].join(" ")}>👍</button>
+                            <button type="button" onClick={() => setAxisEval(it.key, 1)} title="違う"
+                              className={["px-1.5 py-0.5 rounded border text-[11px]", cur === 1 ? "border-rose-400 bg-rose-500/25 text-white" : "border-bg-border text-text-muted/70 hover:text-text-base"].join(" ")}>👎</button>
+                          </span>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-text-muted/55 mt-1.5 leading-snug">
+                      ＊背景/衣装/ポーズは、対象の生成結果が未評価の時のみ履歴の軸別評価へ反映（既存評価は上書きしません→好み学習が自動で拾います）。髪型/色味/空気感は参照レコードに蓄積（将来の学習用）。
+                    </p>
+                  </details>
                 </div>
               </div>
             )}

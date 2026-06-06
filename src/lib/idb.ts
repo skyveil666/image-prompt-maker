@@ -1,7 +1,7 @@
 /**
  * Minimal promisified IndexedDB wrapper.
  *
- * DB layout (v6):
+ * DB layout (v7):
  *  - `history`          : 生成案 1 件＝1 レコード（id, dateKey, createdAt, batchId 等）
  *  - `recentImages`     : 直近で使った画像（id=ハッシュ, thumbnailDataUrl, imageDataUrl, addedAt 等）
  *  - `selectionHistory` : 選択範囲プロンプト履歴（id, createdAt, maskDataUrl, generatedPrompt 等）
@@ -9,12 +9,15 @@
  *  - `operationLog`     : skyveil好み学習の操作ログ（id, ts, type, detail）
  *  - `referenceRecords` : Reference Picker / Compare Mode の参照レコード（id, createdAt, refThumb, extracted, applied, batchId）
  *
- * 既存ユーザーは onupgradeneeded 内で oldVersion を見て段階マイグレーション。
- * ※ 各 if(oldVersion < N) は「ストア追加のみ」の加算的migration。既存ストア・既存データは破壊しない。
+ * migration 方針（v7〜）：onupgradeneeded で **objectStoreNames.contains() による「無ければ作成」の冪等 migration**。
+ * createObjectStore は追加のみ＝既存ストア・既存データは破壊しない（clear/deleteDatabase は使わない）。
+ * version-gate ではなく存在判定にすることで、過去に不完全なバージョン（例：HMR中に DB_VERSION だけ上がり
+ * referenceRecords が作られなかった）で固定化された DB も、ストア欠落を安全に自己修復する。
+ * ※ DB_VERSION を上げるのは「既存DBで onupgradeneeded を発火させ、欠落ストアを補う」ため。
  */
 
 const DB_NAME = "image-prompt-maker";
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 export const STORE_HISTORY   = "history";
 export const STORE_RECENT    = "recentImages";
@@ -33,70 +36,93 @@ type StoreName =
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
+/** 期待するストア一覧（自己修復の欠落判定に使用）。 */
+const EXPECTED_STORES: readonly string[] = [
+  STORE_HISTORY, STORE_RECENT, STORE_SELECTION,
+  STORE_IMAGE_FEATURES, STORE_OPERATION_LOG, STORE_REFERENCE_RECORDS,
+];
+
+/**
+ * 冪等にストアを作成（存在しなければ作成）。createObjectStore は追加のみ＝既存ストア・既存データ非破壊。
+ * onupgradeneeded 内からのみ呼ぶ（versionchange トランザクション中）。
+ */
+function ensureStores(db: IDBDatabase): void {
+  if (!db.objectStoreNames.contains(STORE_HISTORY)) {
+    const s = db.createObjectStore(STORE_HISTORY, { keyPath: "id" });
+    s.createIndex("dateKey", "dateKey", { unique: false });
+    s.createIndex("createdAt", "createdAt", { unique: false });
+    s.createIndex("batchId", "batchId", { unique: false });
+  }
+  if (!db.objectStoreNames.contains(STORE_RECENT)) {
+    const s = db.createObjectStore(STORE_RECENT, { keyPath: "id" });
+    s.createIndex("addedAt", "addedAt", { unique: false });
+  }
+  if (!db.objectStoreNames.contains(STORE_SELECTION)) {
+    const s = db.createObjectStore(STORE_SELECTION, { keyPath: "id" });
+    s.createIndex("createdAt", "createdAt", { unique: false });
+  }
+  if (!db.objectStoreNames.contains(STORE_IMAGE_FEATURES)) {
+    const s = db.createObjectStore(STORE_IMAGE_FEATURES, { keyPath: "id" });
+    s.createIndex("hash", "hash", { unique: false });
+    s.createIndex("analyzedAt", "analyzedAt", { unique: false });
+  }
+  if (!db.objectStoreNames.contains(STORE_OPERATION_LOG)) {
+    // skyveil好み学習エージェント：操作ログ（押したボタン・変更対象・プリセット等）
+    const s = db.createObjectStore(STORE_OPERATION_LOG, { keyPath: "id" });
+    s.createIndex("ts", "ts", { unique: false });
+    s.createIndex("type", "type", { unique: false });
+  }
+  if (!db.objectStoreNames.contains(STORE_REFERENCE_RECORDS)) {
+    // Reference Picker / Compare Mode：参照レコード（参照サムネ＋抽出＋適用→batchIdで生成へ紐付）
+    const s = db.createObjectStore(STORE_REFERENCE_RECORDS, { keyPath: "id" });
+    s.createIndex("batchId", "batchId", { unique: false });
+    s.createIndex("createdAt", "createdAt", { unique: false });
+  }
+}
+
+/** 1 回の open。version 未指定なら「現状確認用」（既存versionをそのまま開き upgrade しない）。 */
+function openRaw(version?: number): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = version === undefined ? indexedDB.open(DB_NAME) : indexedDB.open(DB_NAME, version);
+    req.onupgradeneeded = () => ensureStores(req.result);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    // BUG-8: 別タブが旧versionで開いたままだと blocked。永久ハングを防ぐため reject。
+    req.onblocked = () => reject(new Error(
+      "IndexedDB の更新がブロックされました（別タブが古いバージョンで開いています）。" +
+      "他のタブを閉じてから再読み込みしてください。"
+    ));
+  });
+}
+
+/**
+ * DB を開く（自己修復つき）。
+ * version 依存の段階migrationは廃し、「現状を覗いて必要ストアが欠けていれば onupgradeneeded を
+ * 強制発火して補完する」方式。これにより、過去の不完全アップグレードで『現行versionなのにストア欠落』
+ * という状態に固定化された DB も、データを壊さず確実に修復する（version は floor として扱う）。
+ */
 function openDB(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = req.result;
-      const oldVersion = e.oldVersion;
-      if (oldVersion < 1) {
-        const s = db.createObjectStore(STORE_HISTORY, { keyPath: "id" });
-        s.createIndex("dateKey", "dateKey", { unique: false });
-        s.createIndex("createdAt", "createdAt", { unique: false });
-        s.createIndex("batchId", "batchId", { unique: false });
-      }
-      if (oldVersion < 2) {
-        const s = db.createObjectStore(STORE_RECENT, { keyPath: "id" });
-        s.createIndex("addedAt", "addedAt", { unique: false });
-      }
-      if (oldVersion < 3) {
-        const s = db.createObjectStore(STORE_SELECTION, { keyPath: "id" });
-        s.createIndex("createdAt", "createdAt", { unique: false });
-      }
-      if (oldVersion < 4) {
-        const s = db.createObjectStore(STORE_IMAGE_FEATURES, { keyPath: "id" });
-        s.createIndex("hash", "hash", { unique: false });
-        s.createIndex("analyzedAt", "analyzedAt", { unique: false });
-      }
-      if (oldVersion < 5) {
-        // skyveil好み学習エージェント：操作ログ（押したボタン・変更対象・プリセット等）
-        const s = db.createObjectStore(STORE_OPERATION_LOG, { keyPath: "id" });
-        s.createIndex("ts", "ts", { unique: false });
-        s.createIndex("type", "type", { unique: false });
-      }
-      if (oldVersion < 6) {
-        // Reference Picker / Compare Mode：参照レコード（参照サムネ＋抽出＋適用→batchIdで生成へ紐付）
-        const s = db.createObjectStore(STORE_REFERENCE_RECORDS, { keyPath: "id" });
-        s.createIndex("batchId", "batchId", { unique: false });
-        s.createIndex("createdAt", "createdAt", { unique: false });
-      }
-    };
-    req.onsuccess = () => {
-      const db = req.result;
-      // BUG-8: 別タブがこの DB のバージョンアップを要求したら、自タブの接続を閉じて
-      // ブロック源にならないようにする（次回操作で新バージョンを開き直す）。
-      db.onversionchange = () => {
-        db.close();
-        dbPromise = null;
-      };
-      resolve(db);
-    };
-    req.onerror = () => {
-      // キャッシュを破棄しておくことで、次回呼び出し時にリトライできる
-      dbPromise = null;
-      reject(req.error);
-    };
-    // BUG-8: 別タブが旧バージョンの DB を開いたままだと open が blocked で保留し続ける。
-    // ここで reject して永久ハングを防ぐ（他タブを閉じれば次回リトライで開ける）。
-    req.onblocked = () => {
-      dbPromise = null;
-      reject(new Error(
-        "IndexedDB の更新がブロックされました（別タブが古いバージョンで開いています）。" +
-        "他のタブを閉じてから再読み込みしてください。"
-      ));
-    };
-  });
+  dbPromise = (async () => {
+    try {
+      // 1) 現状確認（upgrade を起こさず existing version とストアを読む）。
+      const peek = await openRaw(undefined);
+      const existingVersion = peek.version;
+      const missing = EXPECTED_STORES.some((s) => !peek.objectStoreNames.contains(s));
+      peek.close();
+      // 2) 目標version：最低 DB_VERSION。現行versionで既にストア欠落なら +1 して onupgradeneeded を強制。
+      let target = Math.max(DB_VERSION, existingVersion);
+      if (missing && existingVersion >= target) target = existingVersion + 1;
+      // 3) target で開く（必要なら onupgradeneeded → ensureStores が欠落ストアを作成）。
+      const db = await openRaw(target);
+      // BUG-8: 別タブがアップグレードを要求したら自タブ接続を閉じてブロック源にならない。
+      db.onversionchange = () => { db.close(); dbPromise = null; };
+      return db;
+    } catch (err) {
+      dbPromise = null; // 次回呼び出しでリトライ可能に
+      throw err;
+    }
+  })();
   return dbPromise;
 }
 

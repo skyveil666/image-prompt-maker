@@ -114,7 +114,18 @@ evaluatedAt?     : number
   - 検証シードは単一キー削除で後片付け。
 - 別件（スコープ外）：`ReflectionStatusBar.tsx:153` の button-in-button DOMネスト警告を発見 → 別タスクに切り出し（task_343000e6）。
 
-### C2（評価・学習連携）— 未着手（承認待ち）
-ハイブリッド評価UI（良/普/違＋任意6項目👍/👎＋⭐）＋ `userEvalOverall/userAxisEval/favorite` 保存＋背景/衣装/ポーズの軸別評価ミラー（null時のみ・非破壊）＋⭐の isFavorite true追記同期＋`logOperation("compare_eval",…)`。
+### C2（評価・学習連携）— ✅ 実装・検証済み（2026-06-06／未コミット）
+**変更ファイル**
+- `src/components/CompareModeView.tsx`：評価バー（全体 良=5/普=3/違=1 ＋任意6項目👍=5/👎=1 ＋⭐）。保存先＝`referenceRecords`（userEvalOverall/userAxisEval/favorite/evaluatedAt/resultImageRef）。
+  - 学習連携：背景/衣装/ポーズの👍👎を、評価対象生成結果(resultImageRef→無ければ先頭)の `history.resultBg/Outfit/PoseRatings[idx]` へ **null時のみ非破壊ミラー**（既存 `ratingAnalyzer→buildSkyveilProfile` が自動消費）。髪型/色味/空気感は参照レコードのみ蓄積。⭐は `history.isFavorite=true` 追記同期。
+  - `logOperation("rate", { kind:"compare_eval", refId, batchId, overall })`（operationLog の型は不変＝既存"rate"＋detailで記録）。
+- 既存 `history.updateItem` / `buildAxisRatingPatch` / `getAxisRatingAt` を再利用（評価/学習/分析ロジックは不変）。
+
+**検証**（front tsc/build ✅、隔離 preview 4330）
+- 良かった→`userEvalOverall:5`、⭐→`favorite:true`＋`history.isFavorite:true`、背景👍→`userAxisEval.background:5`＋`history.resultBgRatings:[5]`（null→5）、髪型👎→参照レコードのみ（履歴軸なし）、operationLog compare_eval 1件 ✅。
+- **非破壊保証**：履歴が[5]の状態で背景👎→参照側は1に更新・`history.resultBgRatings:[5]` のまま（**既存評価を上書きしない**）✅。
+- 検証シードは後片付け（isolated origin）。
+
+→ Compare Mode A/B/C1/C2 完了（一致率＋ハイブリッド評価＋好み学習連携）。
 
 **End of Doc 25**
