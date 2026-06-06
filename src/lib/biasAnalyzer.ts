@@ -12,10 +12,19 @@
  *   score = (1 - 0.6^3) × 100 ≈ 78 ← ユーザー仕様の想定値と一致
  */
 
+// 監視要素タクソノミー（curated）は data/monitoredMotifs.ts に分離（100+要素・docs/28）。
+// 型は当ファイル定義 → データ側は type-only import なので実行時の循環は無い。
+import { MONITORED_MOTIFS } from "../data/monitoredMotifs";
+
 // ── 型定義 ───────────────────────────────────────────────────────────────────
 
 export type MotifCategory =
-  | '衣装' | '背景' | '色' | '演出' | '小物' | '世界観' | 'その他';
+  // A群（造形・好み制御／既存互換）
+  | '衣装' | '髪' | 'ポーズ' | '色' | 'ライティング' | 'カメラ' | '演出' | '背景' | '小物'
+  // B群（表現スタイル・発見・意外性）
+  | '芸術様式' | '建築' | '広告表現' | '映画表現' | '写真表現' | '雑誌表現'
+  | '世界観' | '文化圏' | 'プロダクト' | '素材' | '感情トーン' | 'ジャンル' | '時代'
+  | 'その他';
 
 export type BiasRisk = 'low' | 'medium' | 'high' | 'danger';
 
@@ -56,176 +65,9 @@ export interface BiasAnalysisResult {
   readonly checkedCount:   number;
 }
 
-// ── 監視対象モチーフ定義（20件）────────────────────────────────────────────────
-
-export const MONITORED_MOTIFS: readonly MonitoredMotif[] = [
-  // ── 衣装 ──────────────────────────────────────────────────────────────────
-  {
-    id: 'gothic_black', label: '黒ゴシック衣装', category: '衣装',
-    tokens: [
-      'gothic', 'dark gothic', 'gothic dress', 'gothic outfit', 'gothic aesthetic',
-      'gothic costume', 'gothic lolita', 'gothic style', 'black gothic',
-      'ゴシック', '黒ゴシック', 'gothic fashion',
-    ],
-  },
-  {
-    id: 'black_outfit', label: '黒系衣装', category: '衣装',
-    tokens: [
-      'black outfit', 'black dress', 'black clothing', 'black coat',
-      'all-black outfit', 'dark outfit', 'black jacket',
-      '黒衣装', '黒い衣装', '黒系衣装',
-    ],
-  },
-  {
-    id: 'dress_general', label: 'ドレス全般', category: '衣装',
-    tokens: [
-      'dress', 'gown', 'princess dress', 'ball gown', 'flowing dress',
-      'elaborate dress', 'goddess dress',
-      'ドレス', 'フレアドレス', 'ドレス系',
-    ],
-  },
-  {
-    id: 'white_dress', label: '白ドレス・白ワンピ', category: '衣装',
-    tokens: [
-      'white dress', 'white gown', 'white one-piece', 'flowing white dress',
-      'white flowing dress', 'white elegant dress',
-      '白ドレス', '白ワンピ', '白いドレス',
-    ],
-  },
-  {
-    id: 'transparent_outfit', label: '透明素材衣装', category: '衣装',
-    tokens: [
-      'transparent', 'see-through', 'pvc dress', 'translucent fabric',
-      'clear material', 'sheer fabric', 'transparent dress',
-      '透明素材', '透け素材', 'PVC',
-    ],
-  },
-  {
-    id: 'long_coat', label: 'ロングコート', category: '衣装',
-    tokens: [
-      'long coat', 'trench coat', 'long black coat', 'duster coat',
-      'long overcoat', 'flowing coat',
-      'ロングコート', 'ロングジャケット',
-    ],
-  },
-  // ── 背景 ──────────────────────────────────────────────────────────────────
-  {
-    id: 'cyber_bg', label: 'サイバー・ネオン都市', category: '背景',
-    tokens: [
-      'cyberpunk city', 'cyber city', 'neon city', 'neon-lit street',
-      'futuristic city', 'city skyline neon', 'digital city',
-      'サイバー', 'ネオン都市', 'サイバーパンク', '電脳都市',
-    ],
-  },
-  {
-    id: 'church_stained', label: '教会・ステンドグラス', category: '背景',
-    tokens: [
-      'church', 'stained glass', 'cathedral', 'chapel', 'gothic church',
-      'cathedral interior', 'church window',
-      '教会', 'ステンドグラス', '大聖堂',
-    ],
-  },
-  {
-    id: 'rooftop_urban', label: '屋上・地下・駐車場', category: '背景',
-    tokens: [
-      'rooftop', 'skyscraper rooftop', 'underground', 'parking lot',
-      'basement', 'underground garage', 'parking garage',
-      '屋上', '地下駐車場', '地下', 'ルーフトップ',
-    ],
-  },
-  {
-    id: 'dark_bg', label: '暗い・黒背景', category: '背景',
-    tokens: [
-      'dark background', 'black background', 'dark void', 'pitch black background',
-      'dark space', 'black space',
-      '黒背景', '暗い背景', 'ダーク背景',
-    ],
-  },
-  // ── 色 ─────────────────────────────────────────────────────────────────────
-  {
-    id: 'blue_purple', label: '青紫配色', category: '色',
-    tokens: [
-      'blue-purple', 'cyan purple', 'blue violet', 'purple and cyan',
-      'teal and violet', 'blue purple neon', 'cyan-violet', 'indigo violet',
-      '青紫', 'シアン紫', '青系紫',
-    ],
-  },
-  // ── 演出 ──────────────────────────────────────────────────────────────────
-  {
-    id: 'neon_glow', label: 'ネオン発光', category: '演出',
-    tokens: [
-      'neon glow', 'neon light', 'neon sign', 'neon-lit', 'led strip',
-      'glowing neon', 'neon tube',
-      'ネオン', 'ネオン発光', 'ネオン光',
-    ],
-  },
-  {
-    id: 'crystal', label: 'クリスタル・結晶', category: '演出',
-    tokens: [
-      'crystal', 'crystal orb', 'glowing crystal', 'ice crystal', 'crystal shard',
-      'crystal formation', 'gem crystal', 'crystal background',
-      'クリスタル', '結晶', '水晶', '氷結晶',
-    ],
-  },
-  {
-    id: 'hologram_hud', label: 'ホログラム・HUD', category: '演出',
-    tokens: [
-      'hologram', 'holographic', 'hud display', 'holographic ui',
-      'cyber interface', 'floating screen', 'digital panel', 'ar overlay',
-      'ホログラム', 'HUD', 'ホログラフィック',
-    ],
-  },
-  {
-    id: 'snow_ice', label: '雪・氷演出', category: '演出',
-    tokens: [
-      'snow', 'snowflakes', 'ice', 'frozen', 'icy', 'blizzard',
-      'snow particles', 'falling snow', 'ice crystals',
-      '雪', '氷', '雪エフェクト', '吹雪', '雪の結晶',
-    ],
-  },
-  {
-    id: 'feathers_wings', label: '羽・翼', category: '演出',
-    tokens: [
-      'feathers', 'wings', 'angel wings', 'transparent wings', 'feather particles',
-      'floating feathers', 'wing motif', 'gossamer wings',
-      '羽', '翼', '天使の羽', '羽根', '羽エフェクト',
-    ],
-  },
-  {
-    id: 'petals', label: '花びら', category: '演出',
-    tokens: [
-      'petals', 'flower petals', 'sakura', 'cherry blossoms', 'rose petals',
-      'falling petals', 'petal shower',
-      '花びら', '桜', '花弁', '散る花びら',
-    ],
-  },
-  {
-    id: 'light_particles', label: '発光粒子', category: '演出',
-    tokens: [
-      'light particles', 'glowing particles', 'particle effects', 'floating particles',
-      'sparkling particles', 'golden particles', 'magical particles',
-      '発光粒子', '光の粒子', '輝く粒', '光粒',
-    ],
-  },
-  // ── 小物 ──────────────────────────────────────────────────────────────────
-  {
-    id: 'sword_katana', label: '刀・剣', category: '小物',
-    tokens: [
-      'katana', 'sword', 'blade', 'neon sword', 'glowing sword',
-      'energy sword', 'samurai sword', 'katana blade',
-      '刀', '剣', '刀剣', 'ネオン刀', '発光剣',
-    ],
-  },
-  // ── 世界観 ────────────────────────────────────────────────────────────────
-  {
-    id: 'goddess_ethereal', label: '女神・天使系', category: '世界観',
-    tokens: [
-      'goddess', 'celestial', 'angelic', 'ethereal', 'divine',
-      'angel aesthetic', 'heavenly', 'seraphic',
-      '女神', '天使', '神々しい', '天上的', '幻想的な神',
-    ],
-  },
-];
+// 監視対象モチーフ定義は data/monitoredMotifs.ts に分離（100+要素・docs/28）。
+// 後方互換: 既存20IDは新タクソノミー内に保持。biasAnalyzer/historyAnalyzer は本再エクスポートを参照。
+export { MONITORED_MOTIFS };
 
 // ── 内部ユーティリティ ────────────────────────────────────────────────────────
 
@@ -236,6 +78,45 @@ function normalizeForSearch(text: string): string {
 export function containsMotif(text: string, motif: MonitoredMotif): boolean {
   const lower = normalizeForSearch(text);
   return motif.tokens.some((t) => lower.includes(normalizeForSearch(t)));
+}
+
+// ── 大量走査向け検出（正規化1回化＋hitキャッシュ・docs/28 P1）─────────────────────
+// containsMotif と完全に同一判定だが、テキスト/トークンの正規化を再利用することで
+// 「監視要素(最大~300) × 履歴(最大1000)」の走査コストを抑える。
+
+/** モチーフ別・正規化済みトークン（モジュール初期化時に1回だけ算出） */
+const NORM_MOTIF_TOKENS: ReadonlyArray<{ id: string; tokens: readonly string[] }> =
+  MONITORED_MOTIFS.map((m) => ({ id: m.id, tokens: m.tokens.map(normalizeForSearch) }));
+
+/** タクソノミー版数（要素数で代用。変化すれば検出キャッシュを実質無効化） */
+const TAXONOMY_VERSION = `v1.${MONITORED_MOTIFS.length}`;
+
+/** テキスト1件に含まれる全監視モチーフIDの集合（テキスト側の正規化も1回だけ） */
+export function detectMotifIds(text: string): Set<string> {
+  const lower = normalizeForSearch(text);
+  const out = new Set<string>();
+  for (const m of NORM_MOTIF_TOKENS) {
+    for (const t of m.tokens) {
+      if (lower.includes(t)) { out.add(m.id); break; }
+    }
+  }
+  return out;
+}
+
+// 履歴アイテムの promptText は不変なので (version:id) で結果をメモ化（再分析で再利用）。
+// 返す Set は呼び出し側で .has() のみ参照（破壊しない）前提。
+const detectCache = new Map<string, Set<string>>();
+
+/** 安定IDを持つテキスト（履歴アイテム）向け：検出結果をキャッシュして再利用する */
+export function detectMotifIdsCached(stableId: string, text: string): Set<string> {
+  const key = `${TAXONOMY_VERSION}:${stableId}`;
+  const cached = detectCache.get(key);
+  if (cached) return cached;
+  // 異常増加ガード（履歴は想定最大1000程度。上限超過時は作り直す）
+  if (detectCache.size > 5000) detectCache.clear();
+  const set = detectMotifIds(text);
+  detectCache.set(key, set);
+  return set;
 }
 
 function toMotifRisk(historyCount: number, historyTotal: number): BiasRisk {
@@ -359,15 +240,31 @@ export function biasRiskBorderClass(risk: BiasRisk): string {
 }
 
 export function categoryColorClass(cat: MotifCategory): string {
-  return {
-    '衣装':   'text-violet-300 border-violet-400/40 bg-violet-400/10',
-    '背景':   'text-sky-300   border-sky-400/40    bg-sky-400/10',
-    '色':     'text-pink-300  border-pink-400/40   bg-pink-400/10',
-    '演出':   'text-cyan-300  border-cyan-400/40   bg-cyan-400/10',
-    '小物':   'text-amber-300 border-amber-400/40  bg-amber-400/10',
-    '世界観': 'text-indigo-300 border-indigo-400/40 bg-indigo-400/10',
-    'その他': 'text-text-muted/60 border-text-muted/20 bg-text-muted/5',
-  }[cat];
+  const map: Partial<Record<MotifCategory, string>> = {
+    '衣装':       'text-violet-300 border-violet-400/40 bg-violet-400/10',
+    '髪':         'text-fuchsia-300 border-fuchsia-400/40 bg-fuchsia-400/10',
+    'ポーズ':     'text-rose-300 border-rose-400/40 bg-rose-400/10',
+    '色':         'text-pink-300 border-pink-400/40 bg-pink-400/10',
+    'ライティング': 'text-yellow-300 border-yellow-400/40 bg-yellow-400/10',
+    'カメラ':     'text-lime-300 border-lime-400/40 bg-lime-400/10',
+    '演出':       'text-cyan-300 border-cyan-400/40 bg-cyan-400/10',
+    '背景':       'text-sky-300 border-sky-400/40 bg-sky-400/10',
+    '小物':       'text-amber-300 border-amber-400/40 bg-amber-400/10',
+    '芸術様式':   'text-indigo-300 border-indigo-400/40 bg-indigo-400/10',
+    '建築':       'text-slate-300 border-slate-400/40 bg-slate-400/10',
+    '広告表現':   'text-orange-300 border-orange-400/40 bg-orange-400/10',
+    '映画表現':   'text-red-300 border-red-400/40 bg-red-400/10',
+    '写真表現':   'text-teal-300 border-teal-400/40 bg-teal-400/10',
+    '雑誌表現':   'text-purple-300 border-purple-400/40 bg-purple-400/10',
+    '世界観':     'text-indigo-300 border-indigo-400/40 bg-indigo-400/10',
+    '文化圏':     'text-emerald-300 border-emerald-400/40 bg-emerald-400/10',
+    'プロダクト': 'text-blue-300 border-blue-400/40 bg-blue-400/10',
+    '素材':       'text-stone-300 border-stone-400/40 bg-stone-400/10',
+    '感情トーン': 'text-pink-300 border-pink-400/40 bg-pink-400/10',
+    'ジャンル':   'text-violet-300 border-violet-400/40 bg-violet-400/10',
+    '時代':       'text-amber-300 border-amber-400/40 bg-amber-400/10',
+  };
+  return map[cat] ?? 'text-text-muted/60 border-text-muted/20 bg-text-muted/5';
 }
 
 export function motifRiskDotClass(risk: BiasRisk): string {

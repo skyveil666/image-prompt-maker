@@ -12,7 +12,7 @@
  */
 
 import type { PromptHistoryItem } from "../types";
-import { MONITORED_MOTIFS, containsMotif } from "./biasAnalyzer";
+import { MONITORED_MOTIFS, detectMotifIds, detectMotifIdsCached } from "./biasAnalyzer";
 import type { MonitoredMotif } from "./biasAnalyzer";
 
 // ── 型定義 ───────────────────────────────────────────────────────────────────
@@ -31,6 +31,8 @@ export interface MotifCount {
   penaltyLevel: PenaltyLevel;
   /** auto-NG 候補（heavy / blocked 相当の頻度） */
   autoNgCandidate: boolean;
+  /** 0–100。100に近いほど未開拓（低出現＝多様性提案の核・docs/28 P1） */
+  untappedScore: number;
 }
 
 export interface SimilarHistoryItem {
@@ -447,14 +449,11 @@ export function analyzeFullHistory(
   const window = filterRecentWindow(allItems);
   const windowSize = window.length;
 
-  // ── 1. 各ヒストリーアイテムのモチーフを検出（後でループを減らすために先に計算）
+  // ── 1. 各ヒストリーアイテムのモチーフを検出（正規化1回化＋hitキャッシュ：docs/28 P1）
+  //     promptText は不変なので detectMotifIdsCached が再分析時に結果を再利用する。
   const itemMotifIds: Map<string, Set<string>> = new Map();
   for (const item of window) {
-    const detected = new Set<string>();
-    for (const motif of MONITORED_MOTIFS) {
-      if (containsMotif(item.promptText, motif)) detected.add(motif.id);
-    }
-    itemMotifIds.set(item.id, detected);
+    itemMotifIds.set(item.id, detectMotifIdsCached(item.id, item.promptText));
   }
 
   // ── 2. モチーフ頻度カウント
@@ -476,6 +475,11 @@ export function analyzeFullHistory(
     }
 
     const penaltyLevel = calcPenalty(totalCount, windowSize);
+    // 未開拓度：detectUntappedGenres と同じ式（100 - ratio×500）を全モチーフへ一般化。
+    const untappedScore =
+      windowSize === 0
+        ? 100
+        : Math.max(0, Math.min(100, Math.round(100 - (totalCount / windowSize) * 500)));
     return {
       motif,
       totalCount,
@@ -484,15 +488,14 @@ export function analyzeFullHistory(
       lastSeenDate,
       penaltyLevel,
       autoNgCandidate: penaltyLevel === "heavy" || penaltyLevel === "blocked",
+      untappedScore,
     };
   }).sort((a, b) => b.totalCount - a.totalCount);
 
-  // ── 3. 現バッチのモチーフセット
+  // ── 3. 現バッチのモチーフセット（現バッチは安定IDが無いので非キャッシュ版）
   const currentBatchMotifIds = new Set<string>();
   for (const text of currentTexts) {
-    for (const motif of MONITORED_MOTIFS) {
-      if (containsMotif(text, motif)) currentBatchMotifIds.add(motif.id);
-    }
+    for (const id of detectMotifIds(text)) currentBatchMotifIds.add(id);
   }
 
   // ── 4. 類似履歴（現バッチと2つ以上共通するモチーフを持つ過去アイテム）
