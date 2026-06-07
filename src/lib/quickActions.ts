@@ -3175,15 +3175,15 @@ export function buildCombinedEffectInputs(
 
 // ─── 👑 神引きコンボ ──────────────────────────────────────────────────────────
 
-/** 神引きモードの表示ラベル（combineable + solo 共通） */
+/** 神引きモードの表示ラベル（combineable + solo 共通）。表示名は QuickActions.GOD_DISPLAY / ReflectionStatusBar.GOD_JP と揃える */
 export const GOD_MODE_DISPLAY: Record<string, string> = {
-  normal:      "👑 ノーマル",
-  chaos:       "🎲 カオス",
+  normal:      "👑 強力おまかせ",
+  chaos:       "🎲 ぶっ飛び融合",
   outfit:      "🧥 衣装",
   bg:          "🌍 背景",
   composition: "📷 構図",
   color:       "🎨 色",
-  world_god:   "🌌 世界観",
+  world_god:   "🌌 異世界ガチャ",
   props:       "🎁 小物",
   bigobject:   "🏛️ 大物",
   myth:        "🐉 神話",

@@ -207,7 +207,7 @@ export function QuickActions({
   // 「変化」グループのアクティブ表示（神引きモード＋雰囲気を逆に＋世界観を一新）
   const changeChips: string[] = [
     ...activeGodChips,
-    activeAssistModes.includes("gap") ? "🎭 逆に" : null,
+    activeAssistModes.includes("gap") ? "🎭 雰囲気を逆に" : null,
     activeBoosts.includes("other_world") ? "🌀 世界観を一新" : null,
   ].filter((x): x is string => x !== null);
 
