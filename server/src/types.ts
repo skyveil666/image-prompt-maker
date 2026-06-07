@@ -529,6 +529,13 @@ export interface GenerateRequest {
    * 省略時は true と同じ扱い（デフォルト ON）。
    */
   avoidCliche?: boolean;
+  /**
+   * リアル背景回避モード（true = 有効・既定ON）。
+   * 背景が変更対象（scopes に background）の時だけ、実写風の住宅街・路地・生活感ある背景を強め抑制し、
+   * 映画的・デザイン的・非写真的な演出背景へ誘導する指示を追加する。省略時は true 扱い。
+   * ※背景がscope外（背景固定）の時は適用しない。
+   */
+  avoidRealBackground?: boolean;
   /** 時代軸（null / 省略 = 設定なし）。プロンプトの【時代軸】ブロックに反映。 */
   era?: Era | null;
   /** 色戦略（null / 省略 = 設定なし）。肯定系は【色戦略】ブロック、否定系は NG ブロックに追加。 */

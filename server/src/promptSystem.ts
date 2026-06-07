@@ -2113,6 +2113,25 @@ function strengthBlock(strength: number): string {
  * ひとひねりした独自性のある構成を促す。
  * 完全禁止ではなく頻度を下げる方針（25%ルール）。
  */
+/**
+ * リアル背景回避ブロック（強め抑制・完全禁止ではない）。
+ * 背景が変更対象（scopes に background）かつ req.avoidRealBackground !== false の時だけ注入する。
+ * 実写風の住宅街・路地・生活感ある背景の優先度を大きく下げ、映画的・デザイン的・非写真的背景へ誘導。
+ */
+function avoidRealBackgroundBlock(): string {
+  return [
+    "【リアル背景回避 — 背景が変更対象の時のみ・強め抑制】",
+    "背景は「実写写真のような住宅街・普通の路地・生活感のある建物・リアルな非常階段・現実スナップ風の街角」を強く避ける（完全禁止ではなく優先度を大きく下げる）。",
+    "代わりにキャラクターの雰囲気に合う演出背景へ強く誘導する：",
+    "  映画的な都市セット / 抽象化されたストリート背景 / ファッション撮影用のデザイン背景 /",
+    "  キャラに馴染む非写真的背景 / 生活感を抑えた演出背景 / 人物のシルエットが映える背景",
+    "推奨: stylized cinematic background, semi-abstract urban backdrop, designed fashion editorial set, atmospheric fictional street, non-photorealistic background, character-matching environment",
+    "回避（頻度を大きく下げる）: realistic residential street, ordinary alley, real-life staircase, documentary photo background, mundane city snapshot, plain everyday street, raw camera photo background",
+    "※背景が人物を食わないよう、被写体を立てる演出背景に整える。",
+    "背景は実写写真のような住宅街や普通の路地ではなく、キャラの雰囲気に合わせた映画的・デザイン的な演出背景にする。生活感のある建物・リアルすぎる非常階段・現実スナップ風の街角は避け、人物と一体感のある非写真的な背景へ整える。",
+  ].join("\n");
+}
+
 function avoidClicheBlock(): string {
   return [
     "【量産構図回避ルール】",
@@ -4073,6 +4092,8 @@ export function buildSystemPrompt(
     // 量産構図回避：UIトグルに従う（デフォルトON。省略時も true 扱い）。
     // ※「量産AI検知（Gemini採点）」は別物で gemini.ts 側で常時実行している。
     (req.avoidCliche !== false) ? "\n" + avoidClicheBlock() : "",
+    // リアル背景回避：背景が変更対象 かつ トグルON(既定) の時だけ注入（背景固定/scope外では非適用）
+    (req.scopes.includes("background") && req.avoidRealBackground !== false) ? "\n" + avoidRealBackgroundBlock() : "",
     // 衣装生成ガイド：outfit スコープ選択時は必須挿入
     req.scopes.includes("outfit") ? "\n" + outfitDiversityBlock() : "",
     // 衣装サブジャンル展開：大カテゴリ名は出さず案ごとにサブジャンルへ展開

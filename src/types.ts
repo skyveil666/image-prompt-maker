@@ -1166,6 +1166,12 @@ export interface PromptInputs {
    */
   avoidCliche?: boolean;
   /**
+   * リアル背景回避（true = 有効・既定ON）。背景が変更対象（scopes に background）の時だけ、
+   * 実写風の住宅街・路地・生活感ある背景を強め抑制し、映画的・デザイン的・非写真的背景へ誘導する。
+   * 背景がscope外（背景固定）の時は適用されない。省略時は true 扱い。
+   */
+  avoidRealBackground?: boolean;
+  /**
    * 時代軸指定（null = 設定なし）。
    * プロンプトの【時代軸】ブロックに反映される。
    */

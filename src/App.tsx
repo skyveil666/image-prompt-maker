@@ -166,6 +166,8 @@ export default function App() {
   const [compositionLock, setCompositionLock] = useState(s0.compositionLock);
   const [viralMode, setViralMode] = useState(s0.viralMode);
   const [avoidCliche, setAvoidCliche] = useState(s0.avoidCliche);
+  /** 🌆 リアル背景回避（既定ON・非永続）。背景が変更対象の時だけサーバで実写背景を強め抑制（avoidRealBackgroundBlock）。 */
+  const [avoidRealBackground, setAvoidRealBackground] = useState(true);
   const [strength, setStrength] = useState(s0.strength);
   const [glossLevel,       setGlossLevel]       = useState(s0.glossLevel);      // 1-5, 3=標準
   // dimensionLevel は互換のため state に持つ（旧履歴・旧設定の保存のため）。UI からは外した。
@@ -680,6 +682,7 @@ export default function App() {
       // null（解除）は undefined として扱い、サーバー側で "full" にフォールバックさせる
       promptTarget: promptTarget ?? undefined,
       avoidCliche,
+      avoidRealBackground,
       era: era ?? undefined,
       colorStrategy: colorStrategy ?? undefined,
       artStyle: artStyle ?? undefined,
@@ -732,6 +735,7 @@ export default function App() {
       textureDisabled,
       promptTarget,
       avoidCliche,
+      avoidRealBackground,
       era,
       colorStrategy,
       artStyle,
@@ -2715,6 +2719,8 @@ export default function App() {
                 onBoostToggle={handleBoostToggle}
                 avoidCliche={avoidCliche}
                 onAvoidClicheChange={setAvoidCliche}
+                avoidRealBackground={avoidRealBackground}
+                onAvoidRealBackgroundChange={setAvoidRealBackground}
                 onAssistToggle={handleAssistToggle}
                 activeGodModes={activeGodModes}
                 activeBoosts={activeBoosts}

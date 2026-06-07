@@ -65,6 +65,9 @@ interface QuickActionsProps {
   /** 量産回避（avoidCliche・サーバ側 cliche 回避ブロック。既定ON） */
   avoidCliche?:        boolean;
   onAvoidClicheChange?: (v: boolean) => void;
+  /** 🌆 リアル背景回避（既定ON）。背景が変更対象の時だけサーバ側で実写背景を強め抑制（表示トグル） */
+  avoidRealBackground?: boolean;
+  onAvoidRealBackgroundChange?: (v: boolean) => void;
   // アクティブ状態（ボタン active 表示用）
   activeGodModes?:      string[];
   activeBoosts?:        string[];
@@ -190,6 +193,7 @@ export function QuickActions({
   onWorldPresetToggle, onEffectToggle,
   onGodToggle, onAssistToggle, onBoostToggle,
   avoidCliche = true, onAvoidClicheChange,
+  avoidRealBackground = true, onAvoidRealBackgroundChange,
   onResetAll,
   onToggleFavPanel, onShowCalendar,
 }: QuickActionsProps) {
@@ -387,6 +391,7 @@ export function QuickActions({
             <TagBtn label={avoidCliche ? "🛡 テンプレ回避 ON" : "🛡 テンプレ回避"} title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避ける常時補正（既定ON・サーバ側で全案に効く）" onClick={() => onAvoidClicheChange?.(!avoidCliche)} disabled={disabled} variant="amber" active={avoidCliche} />
             <TagBtn label="🔁 被り回避"  title="直近の生成と似た背景・衣装・色・前景・カメラ・世界観を避ける（複数選択可）"                          onClick={() => onBoostToggle?.("avoid_overlap")} disabled={disabled} variant="amber" active={activeBoosts.includes("avoid_overlap")} />
             <TagBtn label="🔎 AIっぽさ確認" title="分析センターを開いて、AIっぽさ（量産パターン）・テンプレ回避を確認します（生成画面では分析を実行しません）" onClick={onOpenAnalysisCenter} disabled={disabled} variant="rose" />
+            <TagBtn label={avoidRealBackground ? "🌆 リアル背景を避ける ON" : "🌆 リアル背景を避ける"} title="実写っぽい住宅街・普通の路地・生活感のある背景を避け、キャラに合う演出背景へ寄せる（背景を変更対象にした時だけ効く・既定ON）" onClick={() => onAvoidRealBackgroundChange?.(!avoidRealBackground)} disabled={disabled} variant="amber" active={avoidRealBackground} />
           </div>
         )}
       </CategoryRow>

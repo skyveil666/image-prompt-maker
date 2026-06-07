@@ -42,6 +42,7 @@ export async function generateViaBackend(
       promptTarget: inputs.promptTarget,
       autoMoodCategories: inputs.autoMoodCategories,
       avoidCliche: inputs.avoidCliche,
+      avoidRealBackground: inputs.avoidRealBackground,
       era: inputs.era,
       colorStrategy: inputs.colorStrategy,
       artStyle: inputs.artStyle,
