@@ -2740,37 +2740,14 @@ export default function App() {
                   candidates={discoveryCandidates}
                   onIgnoreTerm={handleIgnoreTerm}
                   skyveilSlot={(
+                    /* 分析センターは確認専用（読み取り専用）。操作の主入口は生成画面の「あなたの好み（skyveil）」。 */
                     <SkyveilBar
+                      readOnly
                       enabled={favoriteLearnEnabled}
                       strength={skyveilStrength}
                       profile={skyveilProfile}
-                      analyzing={analyzingProfile}
-                      sampleCount={profileSampleCount}
-                      minSamples={MIN_SAMPLES}
                       oneShotArmed={skyveilOneShot}
-                      onToggle={(v) => {
-                        setFavoriteLearnEnabled(v);
-                        if (v) setSkyveilOneShot(false);
-                        showPresetToast(v ? "🧬 skyveil好み反映 ON" : "skyveil好み反映 OFF",
-                          v ? `${skyveilProfile.summary || "好みを次回生成に反映します"}` : "");
-                      }}
-                      onStrength={(s) => setFavoriteStrength(STRENGTH_TO_FAVORITE[s])}
-                      onUpdateAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
-                      onOneShot={() => {
-                        setSkyveilOneShot(true);
-                        showPresetToast("✨ 今回だけ skyveil好みを反映します", "次の生成にのみ適用されます。");
-                      }}
-                      onReset={() => {
-                        setFavoriteLearnEnabled(false);
-                        setSkyveilOneShot(false);
-                        showPresetToast("skyveil好み反映をリセットしました", "");
-                      }}
-                      profileError={profileError}
-                      autoLearnEnabled={autoLearnEnabled}
-                      onToggleAutoLearn={handleToggleAutoLearn}
-                      onClearProfile={handleClearPreferenceProfile}
                       successPatterns={successPatterns}
-                      onApplyPattern={handleApplyPattern}
                     />
                   )}
                   colorWeights={colorWeights}
@@ -2848,12 +2825,41 @@ export default function App() {
                   setZozoApplied(null);
                 }}
                 boostArea={
+                  <div className="space-y-2">
+                    {/* 🧬 あなたの好み（skyveil）：好み最適化の主入口。反映はユーザー操作時のみ（自動反映しない） */}
+                    <SkyveilBar
+                      enabled={favoriteLearnEnabled}
+                      strength={skyveilStrength}
+                      profile={skyveilProfile}
+                      analyzing={analyzingProfile}
+                      sampleCount={profileSampleCount}
+                      minSamples={MIN_SAMPLES}
+                      oneShotArmed={skyveilOneShot}
+                      onToggle={(v) => {
+                        setFavoriteLearnEnabled(v);
+                        if (v) setSkyveilOneShot(false);
+                        showPresetToast(v ? "🧬 あなたの好み（skyveil）反映 ON" : "あなたの好み（skyveil）反映 OFF",
+                          v ? `${skyveilProfile.summary || "好みを次回生成に反映します"}` : "");
+                      }}
+                      onStrength={(s) => setFavoriteStrength(STRENGTH_TO_FAVORITE[s])}
+                      onUpdateAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
+                      onOneShot={() => {
+                        setSkyveilOneShot(true);
+                        showPresetToast("✨ 今回だけ あなたの好みを反映します", "次の生成にのみ適用されます（保存しません）。");
+                      }}
+                      onReset={() => {
+                        setFavoriteLearnEnabled(false);
+                        setSkyveilOneShot(false);
+                        showPresetToast("あなたの好み反映をリセットしました", "");
+                      }}
+                      profileError={profileError}
+                      autoLearnEnabled={autoLearnEnabled}
+                      onToggleAutoLearn={handleToggleAutoLearn}
+                      onClearProfile={handleClearPreferenceProfile}
+                      successPatterns={successPatterns}
+                      onApplyPattern={handleApplyPattern}
+                    />
                   <BoostControls
-                    favoriteEnabled={favoriteLearnEnabled}
-                    onFavoriteEnabledChange={setFavoriteLearnEnabled}
-                    favoriteStrength={favoriteStrength}
-                    onFavoriteStrengthChange={setFavoriteStrength}
-                    favoriteProfile={favoriteProfile}
                     outfitScopeOn={scopes.includes("outfit")}
                     outfitConflict={
                       // 衣装に強い影響を与える指定がアクティブな時のみ「他指定が優先」を提示
@@ -2896,6 +2902,7 @@ export default function App() {
                       scopes.includes("camera")
                     }
                   />
+                  </div>
                 }
                 scopeFlashKey={scopeFlashKey}
                 strength={strength}

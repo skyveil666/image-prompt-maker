@@ -21,27 +21,29 @@ interface Props {
   enabled: boolean;
   strength: SkyveilStrength;
   profile: SkyveilProfile;
-  analyzing: boolean;
+  analyzing?: boolean;
   /** 実Gemini分析のサンプル数（更新ボタンの有効/無効に使う） */
-  sampleCount: number;
-  minSamples: number;
+  sampleCount?: number;
+  minSamples?: number;
   /** 今回だけ反映が予約されているか */
   oneShotArmed: boolean;
+  /** true＝操作不可の読み取り専用表示（分析センター確認用）。操作の主入口は生成画面側。 */
+  readOnly?: boolean;
 
-  onToggle: (v: boolean) => void;
-  onStrength: (s: SkyveilStrength) => void;
-  onUpdateAnalysis: () => void;
-  onOneShot: () => void;
-  onReset: () => void;
+  onToggle?: (v: boolean) => void;
+  onStrength?: (s: SkyveilStrength) => void;
+  onUpdateAnalysis?: () => void;
+  onOneShot?: () => void;
+  onReset?: () => void;
 
   // ── M-3 で移設（DuplicateAnalysisPanel から集約・既存ハンドラ再利用） ──
   /** 直近の分析エラー（成功時 null） */
   profileError?: string | null;
   /** 自動学習 ON/OFF */
-  autoLearnEnabled: boolean;
-  onToggleAutoLearn: (enabled: boolean) => void;
+  autoLearnEnabled?: boolean;
+  onToggleAutoLearn?: (enabled: boolean) => void;
   /** 好み分析プロファイルの削除（学習データ削除＝反映リセットとは別物） */
-  onClearProfile: () => void;
+  onClearProfile?: () => void;
 
   /** 成功プロンプト抽出（#9） */
   successPatterns?: SuccessPromptPattern[];
@@ -51,14 +53,60 @@ interface Props {
 const STRENGTHS: SkyveilStrength[] = ["weak", "standard", "strong"];
 
 export function SkyveilBar({
-  enabled, strength, profile, analyzing, sampleCount, minSamples, oneShotArmed,
+  enabled, strength, profile, analyzing = false, sampleCount = 0, minSamples = 0, oneShotArmed,
+  readOnly = false,
   onToggle, onStrength, onUpdateAnalysis, onOneShot, onReset,
-  profileError, autoLearnEnabled, onToggleAutoLearn, onClearProfile,
+  profileError, autoLearnEnabled = false, onToggleAutoLearn, onClearProfile,
   successPatterns, onApplyPattern,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [patternsOpen, setPatternsOpen] = useState(false);
   const active = enabled || oneShotArmed;
+
+  // ── 読み取り専用（分析センター確認用）：操作は出さず、学習結果の要約のみ表示 ──
+  if (readOnly) {
+    return (
+      <div className="rounded-2xl border border-violet-400/40 bg-violet-500/8">
+        <div className="px-3 py-2 flex items-center gap-2 flex-wrap">
+          <span className="text-[14px] leading-none">🧬</span>
+          <span className="text-[13px] font-bold text-text-base leading-none">あなたの好み / skyveil傾向</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/12 text-violet-200/90 leading-none">確認用（読み取り専用）</span>
+          <span className="ml-auto text-[11px] text-text-muted/80 leading-none">
+            現在の反映：
+            <span className={active ? "text-violet-200 font-semibold ml-1" : "text-text-muted ml-1"}>
+              {enabled ? `ON / ${STRENGTH_LABEL[strength]}` : oneShotArmed ? `今回だけ / ${STRENGTH_LABEL[strength]}` : "OFF"}
+            </span>
+          </span>
+        </div>
+        <div className="px-3.5 pb-3 pt-1 border-t border-violet-400/15 space-y-2.5">
+          {!profile.hasData ? (
+            <p className="text-[12px] text-text-muted/80 leading-snug py-1">
+              まだ好みデータが足りません。生成・お気に入り・評価を重ねると、ここに skyveil の好み傾向が表示されます。
+            </p>
+          ) : (
+            <>
+              {profile.summary && (
+                <p className="text-[12px] text-violet-100/85 leading-snug bg-violet-500/8 rounded-lg px-2.5 py-1.5 border border-violet-400/20">
+                  💬 {profile.summary}
+                </p>
+              )}
+              <ProfileRow color="emerald" label="好き"          items={profile.likes} />
+              <ProfileRow color="amber"   label="出すぎ注意"     items={profile.overusedButLiked}
+                          note="（好みだが頻出。変換して新鮮さを出します）" />
+              <ProfileRow color="rose"    label="避けたい"       items={profile.avoid} />
+              <ProfileRow color="sky"     label="未開拓おすすめ" items={profile.underusedRecommended} />
+            </>
+          )}
+          <div className="text-[11px] text-text-muted/70 leading-snug pt-1 border-t border-violet-400/10">
+            分析ソース：⭐お気に入り ・ 🆚Compare評価 ・ 📊画像評価 ・ 🕒履歴
+          </div>
+          <p className="text-[11px] text-violet-200/85 leading-snug">
+            ↩ 反映・更新などの操作は、生成画面の「あなたの好み（skyveil）」で行えます（ここは確認専用）。
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={[
@@ -68,12 +116,12 @@ export function SkyveilBar({
       {/* ── 上段（常時表示・P4微圧縮）：トグル＋強度＋今回だけ反映 ── */}
       <div className="px-3 py-1.5 flex items-center gap-2 flex-wrap">
         <span className="text-[14px] leading-none">🧬</span>
-        <span className="text-[13px] font-bold text-text-base leading-none">skyveil好みAI</span>
+        <span className="text-[13px] font-bold text-text-base leading-none">あなたの好み（skyveil）</span>
 
         {/* ON/OFF */}
         <button
           type="button"
-          onClick={() => onToggle(!enabled)}
+          onClick={() => onToggle?.(!enabled)}
           aria-pressed={enabled}
           className={[
             "ml-1 px-2.5 py-1 rounded-full text-[12px] font-bold border transition leading-none",
@@ -93,7 +141,7 @@ export function SkyveilBar({
               <button
                 key={s}
                 type="button"
-                onClick={() => onStrength(s)}
+                onClick={() => onStrength?.(s)}
                 disabled={!enabled && !oneShotArmed}
                 className={[
                   "px-2 py-1 rounded-md text-[12px] font-semibold border transition leading-none",
@@ -153,7 +201,7 @@ export function SkyveilBar({
             {/* 自動学習トグル（移設） */}
             <button
               type="button"
-              onClick={() => onToggleAutoLearn(!autoLearnEnabled)}
+              onClick={() => onToggleAutoLearn?.(!autoLearnEnabled)}
               aria-pressed={autoLearnEnabled}
               title="評価が増えるたびに自動で好みプロファイルを再分析する（生成への反映は反映ボタン方式のまま）"
               className={[
@@ -183,6 +231,12 @@ export function SkyveilBar({
             >
               🗑 プロファイル削除
             </button>
+          </div>
+
+          {/* 分析ソース（読み取り専用の説明）＋ 今回だけ反映の説明 */}
+          <div className="text-[11px] text-text-muted/70 leading-snug space-y-0.5">
+            <div>分析ソース：⭐お気に入り ・ 🆚Compare評価 ・ 📊画像評価 ・ 🕒履歴（自動では反映しません）</div>
+            <div>✨ 今回だけ反映＝保存せず、この1回だけ適用。反映は<span className="text-amber-200/90 font-semibold">あなたが押した時だけ</span>。</div>
           </div>
 
           {/* エラー表示（移設） */}

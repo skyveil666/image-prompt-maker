@@ -306,7 +306,7 @@ function PreferenceReportSection({
       {/* skyveil好みAI への誘導（分析・反映・自動学習・削除は SkyveilBar に集約） */}
       <div className="rounded-lg border border-violet-400/30 bg-violet-500/8 px-2.5 py-2 space-y-1">
         <p className="text-[11px] text-violet-100/90 leading-snug">
-          🧬 好み傾向の<span className="font-bold">分析・反映・自動学習・削除</span>は、上部の「skyveil好みAI」に集約しました。
+          🧬 好み傾向の<span className="font-bold">分析・反映・自動学習・削除</span>は、生成画面の「あなたの好み（skyveil）」に集約しました（ここは確認用）。
         </p>
         <p className="text-[10px] text-slate-400 leading-snug">
           現在：{profile
@@ -348,7 +348,7 @@ function PreferenceReportSection({
             ))}
           </div>
           <p className="text-[10px] text-slate-400 px-1 pt-1 leading-snug">
-            ※ これは画像評価ボタンの集計結果（実数値）です。傾向の分析・反映は「skyveil好みAI」で行えます。
+            ※ これは画像評価ボタンの集計結果（実数値）です。傾向の分析・反映は生成画面の「あなたの好み（skyveil）」で行えます。
           </p>
         </div>
       )}
@@ -2494,7 +2494,7 @@ function DuplicateAnalysisPanelInner({
                   : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
               ].join(" ")}
             >
-              🧬 skyveil好みAI
+              🧬 あなたの好み
             </button>
           </div>
 
@@ -2531,9 +2531,9 @@ function DuplicateAnalysisPanelInner({
             {tab === "skyveil" && (
               <div className="space-y-2 pb-2">
                 <div className="rounded-lg border border-violet-400/45 bg-violet-500/10 px-3 py-2 text-[12px] text-violet-100 leading-snug">
-                  ⚠ これは <strong>好み最適化担当</strong>。下の操作（反映ON/OFF・強度・更新・自動学習・反映リセット・プロフィール削除）は <strong>生成に影響</strong>します。重複分析・🔭発見・神引き候補（＝未開拓発見担当）とは別系統です。
+                  ℹ これは <strong>確認用（読み取り専用）</strong>。反映ON/OFF・強度・更新・自動学習・リセット・削除などの<strong>操作は、生成画面の「あなたの好み（skyveil）」</strong>で行えます。重複分析・🔭発見・神引き候補（＝未開拓発見担当）とは別系統です。
                 </div>
-                {skyveilSlot ?? <p className="text-[12px] text-slate-400 px-1">skyveil好みAI を読み込めませんでした。</p>}
+                {skyveilSlot ?? <p className="text-[12px] text-slate-400 px-1">あなたの好み を読み込めませんでした。</p>}
               </div>
             )}
 

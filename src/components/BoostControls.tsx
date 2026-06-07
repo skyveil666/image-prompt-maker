@@ -1,26 +1,13 @@
 /**
- * BoostControls — 「生成ブースト」セクションの中身（お気に入り傾向 + ZOZOトレンド）
+ * BoostControls — 「生成ブースト」セクションの中身（風のなびき + ZOZOトレンド）
  *
  * ControlPanel の boostArea スロットに差し込まれる。
- * （旧 ReflectionOptionsBar のうち、変更/固定サマリーとリセットを除いた補助部分を継承）
+ * お気に入り傾向（好み学習）は「あなたの好み（skyveil）」へ集約したため、ここからは撤去。
  */
-import type { FavoriteProfile } from "../lib/favoriteProfile";
 import type { ZozoTrend } from "../lib/zozoTrend";
 import { ZozoTrendBar } from "./ZozoTrendBar";
 
-const STRENGTH_OPTIONS = [
-  { value: 1, label: "弱" },
-  { value: 2, label: "標準" },
-  { value: 3, label: "強" },
-];
-
 interface Props {
-  // お気に入り学習
-  favoriteEnabled: boolean;
-  onFavoriteEnabledChange: (v: boolean) => void;
-  favoriteStrength: number;
-  onFavoriteStrengthChange: (v: number) => void;
-  favoriteProfile: FavoriteProfile | null;
   // ZOZOトレンド
   outfitScopeOn: boolean;
   /** 衣装系の他指定がアクティブか（神引き衣装・世界観衣装系など） */
@@ -46,71 +33,19 @@ const WIND_LEVELS: { value: number; label: string; full: string }[] = [
 ];
 
 export function BoostControls({
-  favoriteEnabled, onFavoriteEnabledChange, favoriteStrength, onFavoriteStrengthChange, favoriteProfile,
   outfitScopeOn, outfitConflict = false, zozoApplied, onZozoApply, onZozoSetPriority, onZozoClear,
   windLevel, onWindLevelChange, windApplicable,
 }: Props) {
-  const favHasData = (favoriteProfile?.favoriteCount ?? 0) > 0;
-  const favTraits = favoriteProfile?.traitPhrases ?? [];
-
   return (
     <div className="space-y-1">
-      {/* ── 全体補助（選択中の変更対象すべてに効く）── */}
+      {/* ── 全体補助（風のなびき。お気に入り傾向は「あなたの好み（skyveil）」に集約）── */}
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] font-bold text-text-muted/60 leading-none select-none">全体補助</span>
-        <span className="text-[10px] text-text-muted/40 leading-none">お気に入り傾向・風（神引きは「神引き」ボタンから）</span>
+        <span className="text-[10px] text-text-muted/40 leading-none">風のなびき（髪・衣装・前景・ポーズ・カメラに反映）</span>
       </div>
-      {/* ── お気に入り傾向 ── */}
+      {/* ── 風の強さ（0〜5）── */}
       <div className="flex items-center gap-x-2.5 gap-y-0.5 flex-wrap">
-        <button
-          type="button"
-          disabled={!favHasData}
-          onClick={() => onFavoriteEnabledChange(!favoriteEnabled)}
-          title={favHasData
-            ? (favoriteEnabled ? "お気に入り傾向 ON（クリックでOFF）" : "お気に入り傾向 OFF（クリックでON）")
-            : "お気に入りがありません"}
-          className={[
-            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[12px] font-semibold leading-none transition shrink-0",
-            "disabled:opacity-40 disabled:cursor-not-allowed",
-            favoriteEnabled && favHasData
-              ? "border-amber-400/60 bg-amber-400/15 text-amber-100"
-              : "border-bg-border bg-bg-panel/60 text-text-muted/70 hover:border-amber-400/35",
-          ].join(" ")}
-        >
-          <span>⭐ お気に入り傾向</span>
-          <span className={favoriteEnabled && favHasData ? "text-amber-300" : "text-text-muted/50"}>
-            {favoriteEnabled && favHasData ? "ON" : "OFF"}
-          </span>
-        </button>
-
-        {favoriteEnabled && favHasData && (
-          <div className="flex rounded-lg border border-amber-400/30 overflow-hidden shrink-0">
-            {STRENGTH_OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                onClick={() => onFavoriteStrengthChange(o.value)}
-                className={[
-                  "text-[12px] px-2 py-0.5 leading-none transition",
-                  favoriteStrength === o.value
-                    ? "bg-amber-500/70 text-white font-bold"
-                    : "text-amber-200/60 hover:bg-amber-400/15",
-                ].join(" ")}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {!favHasData && (
-          <span className="text-[12px] text-text-muted/45 leading-snug">
-            お気に入りを登録すると、好みの傾向を学習して反映できます。
-          </span>
-        )}
-
-        {/* ── 風の強さ（0〜5）── */}
-        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className={[
             "text-[12px] font-semibold leading-none",
             windLevel > 0 && windApplicable ? "text-cyan-200"
@@ -149,19 +84,6 @@ export function BoostControls({
           )}
         </div>
       </div>
-
-      {/* 反映中の傾向（ON時のみ・小さく表示） */}
-      {favoriteEnabled && favHasData && favTraits.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1">
-          <span className="text-[12px] text-amber-200/55 leading-none mr-0.5">傾向:</span>
-          {favTraits.map((t) => (
-            <span key={t}
-              className="text-[12px] px-1.5 py-0.5 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-100/85 leading-none">
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
 
       {/* ── 衣装補助（衣装ON時のみ有効）── */}
       <div className="border-t border-bg-border/30 pt-1">
