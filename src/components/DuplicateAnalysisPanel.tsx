@@ -1119,14 +1119,18 @@ function ComboPolicyBtn({
 }
 
 function ComboRanking({
-  combos, policies, onChange,
+  combos, policies, onChange, windowSize,
 }: {
   combos: MotifCombo[];
   policies: ComboPolicyMap;
   onChange: (key: string, p: ComboPolicy) => void;
+  windowSize: number;
 }) {
-  const show = combos.slice(0, 10);
-  if (show.length === 0) return null;
+  const [count, setCount] = useState<number>(20);
+  if (combos.length === 0) return null;
+  const sorted = [...combos].sort((a, b) => b.count - a.count);
+  const show = count === Infinity ? sorted : sorted.slice(0, count);
+  const rate = (n: number) => (windowSize > 0 ? Math.round((n / windowSize) * 100) : 0);
   const riskCls = (r: MotifCombo["risk"]) =>
     r === "danger" ? "text-rose-300 border-rose-400/55 bg-rose-500/15"
     : r === "high" ? "text-orange-200 border-orange-400/50 bg-orange-500/12"
@@ -1137,11 +1141,20 @@ function ComboRanking({
 
   return (
     <>
-      <SectionTitle icon="🧩">頻出構成（概要・上位）</SectionTitle>
-      <p className="text-[11px] text-slate-400 px-1 pb-1 leading-snug">
-        同じ案内で何度も揃っているモチーフの組み合わせです。「今後出さない」で同時使用を禁止、「別ジャンル化」で出そうな時に別方向へ振り替えます。全件・一括操作は📊分析センターの「頻出構成」タブで。
-      </p>
-      <div className="space-y-1 px-1">
+      <SectionTitle icon="🧩">頻出構成（出現率順）</SectionTitle>
+      <div className="flex items-center gap-2 flex-wrap px-1 pb-1">
+        <p className="text-[11px] text-slate-400 leading-snug flex-1 min-w-[200px]">
+          同じ案内で何度も揃う組み合わせ。「今後出さない」で同時使用を禁止、「別ジャンル化」で別方向へ振り替え。
+        </p>
+        <label className="flex items-center gap-1 text-[10px] text-slate-400">件数
+          <select value={String(count)} onChange={(e) => setCount(Number(e.target.value))}
+            className="rounded border border-white/15 bg-bg-base/60 text-[11px] text-slate-100 px-1.5 py-1 focus:outline-none">
+            {[20, 50, 100, Infinity].map((n) => <option key={n} value={String(n)}>{n === Infinity ? "全件" : n}</option>)}
+          </select>
+        </label>
+        <span className="text-[10px] text-slate-400/70 tabular-nums">{combos.length}件中 {show.length}件</span>
+      </div>
+      <div className="space-y-1 px-1 max-h-[46vh] overflow-y-auto">
         {show.map((c, i) => {
           const policy = getComboPolicy(policies, c.comboKey);
           const rowBg = policy === "block" ? "bg-rose-500/8"
@@ -1168,9 +1181,10 @@ function ComboRanking({
                   </span>
                 ))}
               </span>
-              {/* 件数 */}
-              <span className="text-[13px] text-white font-bold tabular-nums leading-none shrink-0">
-                {c.count}<span className="text-[10px] text-slate-400 font-normal">回</span>
+              {/* 出現率 + 件数 */}
+              <span className="flex items-baseline gap-1 shrink-0 tabular-nums">
+                <span className="text-[13px] text-white font-bold leading-none">{rate(c.count)}<span className="text-[10px] text-slate-400 font-normal">%</span></span>
+                <span className="text-[11px] text-slate-400 leading-none">{c.count}回</span>
               </span>
               {/* 操作 */}
               <span className="flex items-center gap-1 shrink-0">
@@ -1218,7 +1232,7 @@ function AiCommentSection({ comment }: { comment: string }) {
 
 function FrequencyRanking({
   topMotifs, levels, onLevelChange, onBulkLevel, onClearNg,
-  onAutoAdjust, onUndoAutoAdjust, canUndoAuto, changedIds,
+  onAutoAdjust, onUndoAutoAdjust, canUndoAuto, changedIds, windowSize,
 }: {
   topMotifs: MotifCount[];
   levels: LevelMap;
@@ -1229,10 +1243,13 @@ function FrequencyRanking({
   onUndoAutoAdjust: () => void;
   canUndoAuto: boolean;
   changedIds: ReadonlySet<string>;
+  windowSize: number;
 }) {
+  const [count, setCount] = useState<number>(20);
   const max = topMotifs[0]?.totalCount ?? 1;
-  const show = topMotifs.slice(0, 12);
-  if (show.length === 0) return null;
+  if (topMotifs.length === 0) return null;
+  const show = count === Infinity ? topMotifs : topMotifs.slice(0, count);
+  const rate = (n: number) => (windowSize > 0 ? Math.round((n / windowSize) * 100) : 0);
 
   const top5  = topMotifs.slice(0, 5).map((m) => m.motif.id);
   const top10 = topMotifs.slice(0, 10).map((m) => m.motif.id);
@@ -1240,7 +1257,16 @@ function FrequencyRanking({
 
   return (
     <>
-      <SectionTitle icon="📊">頻出要素一覧（出現制御）</SectionTitle>
+      <SectionTitle icon="📊">頻出要素一覧（出現制御・出現率順）</SectionTitle>
+      <div className="flex items-center gap-2 px-1 pb-1">
+        <label className="flex items-center gap-1 text-[10px] text-slate-400">件数
+          <select value={String(count)} onChange={(e) => setCount(Number(e.target.value))}
+            className="rounded border border-white/15 bg-bg-base/60 text-[11px] text-slate-100 px-1.5 py-1 focus:outline-none">
+            {[20, 50, 100, Infinity].map((n) => <option key={n} value={String(n)}>{n === Infinity ? "全件" : n}</option>)}
+          </select>
+        </label>
+        <span className="text-[10px] text-slate-400/70 tabular-nums">{topMotifs.length}件中 {show.length}件</span>
+      </div>
 
       {/* 自動調整（メインアクション） */}
       <div className="flex flex-wrap items-center gap-1.5 px-1 pb-1.5">
@@ -1294,7 +1320,7 @@ function FrequencyRanking({
         </button>
       </div>
 
-      <div className="space-y-px px-1 ipm-list">
+      <div className="space-y-px px-1 ipm-list max-h-[42vh] overflow-y-auto">
         {show.map((mc) => {
           const level = getLevel(levels, mc.motif.id);
           const m = levelMeta(level);
@@ -1318,6 +1344,8 @@ function FrequencyRanking({
               </span>
               {/* バー（長さ=回数, 色=制御レベル）+ 回数 */}
               <MiniBar count={mc.totalCount} max={max} level={level} />
+              {/* 出現率 */}
+              <span className="text-[10px] text-slate-400 tabular-nums w-10 text-right shrink-0">{rate(mc.totalCount)}%</span>
               {/* 現在レベルの短ラベル */}
               <span className={["text-[10px] font-bold leading-none w-12 text-right shrink-0", level <= 1 ? "text-rose-300" : level <= 3 ? "text-amber-200" : level === 5 ? "text-cyan-200" : "text-emerald-300"].join(" ")}>
                 {level}:{m.label}
@@ -1806,10 +1834,11 @@ function DuplicateAnalysisPanelInner({
             {/* AIコメント — トップに目立つように */}
             {ha && <AiCommentSection comment={ha.aiComment} />}
 
-            {/* 頻出構成（概要＝上位5件のみ。全件・一括操作は分析センターの「頻出構成」タブで） */}
+            {/* 頻出構成（出現率順・件数20/50/100/全件・スクロール） */}
             {ha && ha.topCombos.length > 0 && (
               <ComboRanking
-                combos={ha.topCombos.slice(0, 5)}
+                combos={ha.topCombos}
+                windowSize={ha.windowSize}
                 policies={comboPolicies}
                 onChange={onComboPolicyChange}
               />
@@ -1833,6 +1862,7 @@ function DuplicateAnalysisPanelInner({
             {ha && ha.topMotifs.length > 0 && (
               <FrequencyRanking
                 topMotifs={ha.topMotifs}
+                windowSize={ha.windowSize}
                 levels={levels}
                 onLevelChange={onLevelChange}
                 onBulkLevel={onBulkLevel}
