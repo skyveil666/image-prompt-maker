@@ -47,6 +47,7 @@ import { DuplicateAnalysisPanel } from "./components/DuplicateAnalysisPanel";
 import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
 import { CompareModeView } from "./components/CompareModeView";
 import { AnalysisLabPanel } from "./components/AnalysisLabPanel";
+import { detectCandidateMotifs, addIgnoredTerm, loadIgnoredTerms } from "./lib/discoveryMotifs";
 import {
   loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
   isApplied, setAppliedStorage,
@@ -217,6 +218,8 @@ export default function App() {
   const [compareOpen, setCompareOpen] = useState(false);
   /** 分析ラボ（重複分析の詳細探索・全幅ビュー）の開閉。ダッシュボードの「🔬 分析ラボ」から開く。 */
   const [analysisLabOpen, setAnalysisLabOpen] = useState(false);
+  /** P3 発見層：無視した候補語（localStorage 同期）。 */
+  const [ignoredTerms, setIgnoredTerms] = useState<string[]>(() => loadIgnoredTerms());
   /** Phase D: Compare評価(referenceRecords)を集計した好み素材。マウント＋Compareクローズ（評価後）に再読込。 */
   const [referenceLearning, setReferenceLearning] = useState<ReferenceLearning | null>(null);
   useEffect(() => {
@@ -1013,6 +1016,18 @@ export default function App() {
     const r = analyzeRatings(historyItemsForColor);
     return r.totalRatedImages > 0 ? r : null;
   }, [historyItemsForColor]);
+
+  // ── 🔭 発見層（P3a）：監視外の頻出新語を候補抽出（好み非依存・無視リストで減衰） ──
+  const discoveryCandidates = useMemo(
+    () => detectCandidateMotifs(
+      historyItemsForColor.map((i) => ({ promptText: i.promptText, createdAt: i.createdAt })),
+      { ignored: ignoredTerms },
+    ),
+    [historyItemsForColor, ignoredTerms],
+  );
+  const handleIgnoreTerm = useCallback((term: string) => {
+    setIgnoredTerms(addIgnoredTerm(term));
+  }, []);
 
   // ── 📊 分析対象サマリ（パネル見出しの「直近90日/N件」表示用） ──
   const analysisStats = useMemo(() => {
@@ -3143,6 +3158,8 @@ export default function App() {
         onLevelChange={handleLevelChange}
         onBulkLevel={handleDupBulkLevel}
         onComboPolicyChange={handleComboPolicyChange}
+        candidates={discoveryCandidates}
+        onIgnoreTerm={handleIgnoreTerm}
       />
 
       {/* 🖌 選択範囲プロンプトモーダル */}

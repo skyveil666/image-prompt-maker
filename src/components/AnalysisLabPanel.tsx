@@ -29,8 +29,9 @@ import {
   allMotifTags,
   type MotifTagMap,
 } from "../lib/motifTags";
+import type { CandidateMotif } from "../lib/discoveryMotifs";
 
-type LabTab = "element" | "combo";
+type LabTab = "element" | "combo" | "discovery";
 type ElemSort = "count" | "recent" | "fav" | "level" | "name" | "cat" | "untapped";
 type ComboSort = "count" | "risk" | "name";
 
@@ -66,11 +67,16 @@ interface Props {
   onLevelChange: (motifId: string, level: MotifLevel) => void;
   onBulkLevel: (motifIds: string[], level: MotifLevel) => void;
   onComboPolicyChange: (comboKey: string, policy: ComboPolicy) => void;
+  /** P3 発見層：監視外の頻出新語候補（任意） */
+  candidates?: CandidateMotif[];
+  /** P3 発見層：候補を無視リストへ（任意） */
+  onIgnoreTerm?: (term: string) => void;
 }
 
 export function AnalysisLabPanel({
   open, onClose, motifCounts, topCombos, levels, comboPolicies,
   onLevelChange, onBulkLevel, onComboPolicyChange,
+  candidates = [], onIgnoreTerm,
 }: Props) {
   const [tab, setTab] = useState<LabTab>("element");
 
@@ -93,6 +99,10 @@ export function AnalysisLabPanel({
   const [comboSearch, setComboSearch] = useState("");
   const [comboSort, setComboSort] = useState<ComboSort>("count");
   const [comboSel, setComboSel] = useState<Set<string>>(new Set());
+
+  // 🔭 発見タブ（P3a）
+  const [discCount, setDiscCount] = useState<number>(20);
+  const [discSearch, setDiscSearch] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -169,6 +179,16 @@ export function AnalysisLabPanel({
   const shownCombos = useMemo(
     () => (comboCount === Infinity ? filteredCombos : filteredCombos.slice(0, comboCount)),
     [filteredCombos, comboCount],
+  );
+
+  // 🔭 発見タブ（P3a）：候補の検索フィルタ＋件数
+  const filteredCandidates = useMemo(() => {
+    const q = discSearch.trim().toLowerCase();
+    return q ? candidates.filter((c) => c.term.includes(q)) : candidates;
+  }, [candidates, discSearch]);
+  const shownCandidates = useMemo(
+    () => (discCount === Infinity ? filteredCandidates : filteredCandidates.slice(0, discCount)),
+    [filteredCandidates, discCount],
   );
 
   // フィルタ変更で表示対象から外れた選択を破棄（UIの「選択N件」と実適用の乖離を防ぐ）。
@@ -255,11 +275,11 @@ export function AnalysisLabPanel({
 
         {/* タブ */}
         <div className="flex items-center gap-1 px-3 pt-2 shrink-0">
-          {([["element", "頻出要素"], ["combo", "頻出構成"]] as [LabTab, string][]).map(([k, label]) => (
+          {([["element", "頻出要素"], ["combo", "頻出構成"], ["discovery", "🔭 発見"]] as [LabTab, string][]).map(([k, label]) => (
             <button key={k} type="button" onClick={() => setTab(k)}
               className={["text-[12px] px-3 py-1.5 rounded-t-lg border-b-2 transition",
                 tab === k ? "border-violet-400 text-text-base font-bold bg-bg-base/40" : "border-transparent text-text-muted hover:text-text-base"].join(" ")}>
-              {label}（{k === "element" ? motifCounts.length : topCombos.length}）
+              {label}（{k === "element" ? motifCounts.length : k === "combo" ? topCombos.length : candidates.length}）
             </button>
           ))}
         </div>
@@ -518,6 +538,56 @@ export function AnalysisLabPanel({
                   className="ml-auto text-[11px] px-2 py-1 rounded border border-bg-border text-text-muted hover:text-text-base">選択解除</button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ───────── 🔭 発見タブ（P3a：監視外の頻出新語） ───────── */}
+        {tab === "discovery" && (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <div className="flex items-center gap-2 flex-wrap px-3 py-2 border-b border-bg-border shrink-0">
+              <span className="text-[10.5px] text-emerald-200/85 font-semibold">🔭 監視外で頻出し始めた新語＝未開拓/新ジャンル/神引き候補（好み非依存）</span>
+              <label className="flex items-center gap-1 text-[10px] text-text-muted ml-auto">件数
+                <select className={selectCls} value={String(discCount)} onChange={(e) => setDiscCount(Number(e.target.value))}>
+                  {COUNT_OPTIONS.map((n) => <option key={n} value={String(n)}>{countLabel(n)}</option>)}
+                </select>
+              </label>
+              <input className={`${selectCls} flex-1 min-w-[120px]`} placeholder="🔎 候補語を検索"
+                value={discSearch} onChange={(e) => setDiscSearch(e.target.value)} />
+              <span className="text-[10px] text-text-muted/60">{filteredCandidates.length}件中 {shownCandidates.length}件表示</span>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
+              <table className="w-full text-[11px]">
+                <thead className="sticky top-0 bg-bg-panel">
+                  <tr className="text-text-muted/70 border-b border-bg-border">
+                    <th className="text-left font-semibold px-2 py-1">候補語</th>
+                    <th className="text-right font-semibold px-2 py-1 w-12">出現</th>
+                    <th className="text-left font-semibold px-2 py-1">サンプル文脈</th>
+                    <th className="text-right font-semibold px-2 py-1 w-16">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shownCandidates.map((c) => (
+                    <tr key={c.term} className="border-b border-bg-border/50">
+                      <td className="px-2 py-1.5 text-text-base font-medium">{c.term}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-text-base/90">{c.count}</td>
+                      <td className="px-2 py-1.5 text-text-muted/70">
+                        <span title={c.sampleContexts.join(" / ")}>{c.sampleContexts[0] ?? "—"}</span>
+                      </td>
+                      <td className="px-2 py-1.5 text-right">
+                        <button type="button" onClick={() => onIgnoreTerm?.(c.term)} title="この語を今後の候補から無視"
+                          className="text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted hover:text-rose-300 hover:border-rose-400/40 transition">🚫 無視</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {shownCandidates.length === 0 && (
+                    <tr><td colSpan={4} className="px-2 py-6 text-center text-[11px] text-text-muted">
+                      候補がありません（履歴が少ない／すべて監視済み・無視済み）。昇格は次段階（P3b）で追加予定。
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
