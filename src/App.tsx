@@ -127,7 +127,6 @@ import {
 import {
   previewSuccessPattern, applyPreviewedScopes, type LearningApplyPreviewResult,
 } from "./lib/learningPreview";
-import { PostingCalendarModal } from "./components/PostingCalendarModal";
 import {
   loadPreferenceProfile, savePreferenceProfile, clearPreferenceProfile,
   loadAutoLearn, saveAutoLearn,
@@ -414,8 +413,8 @@ export default function App() {
   const [arrangeSource, setArrangeSource] = useState<PromptHistoryItem | null>(null);
   /** 「同じ構成で再生成」復元後の確認バナー用 */
   const [restoredItem, setRestoredItem] = useState<PromptHistoryItem | null>(null);
-  /** 📅 投稿カレンダーモーダルの開閉 */
-  const [postCalendarOpen, setPostCalendarOpen] = useState(false);
+  /** 📅 分析センターを開く時の初期タブ（誘導導線用：右上「1ヶ月生成カレンダー」→ plan ／ 左メニュー → dup） */
+  const [analysisInitialTab, setAnalysisInitialTab] = useState<"dup" | "plan">("dup");
   /** 🤖 AI分析ライブビュー */
   const analysisLive = useAnalysisLive();
   /** runGenerate 内で items の最新値を読むためのリファレンス */
@@ -2433,9 +2432,9 @@ export default function App() {
                 />
                 <button
                   type="button"
-                  onClick={() => setAnalysisCenterOpen(true)}
+                  onClick={() => { setAnalysisInitialTab("dup"); setAnalysisCenterOpen(true); }}
                   className="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition leading-none whitespace-nowrap"
-                  title="分析センターを開く（重複分析・AIっぽさ・色・画像・評価集計・発見）"
+                  title="分析センターを開く（重複分析・AIっぽさ・色・画像・評価集計・発見・1ヶ月生成カレンダー）"
                 >
                   🔎 分析センターで見る
                 </button>
@@ -2561,14 +2560,15 @@ export default function App() {
 
             <div className="space-y-5 mt-5 lg:mt-0 min-w-0 pb-24">
 
-              {/* 📅 投稿カレンダー（履歴・お気に入り復旧ボタンは左メニュー「お気に入り一覧」付近へ移設） */}
+              {/* 📅 1ヶ月生成カレンダー：分析センターの plan タブを開く誘導ボタン（Phase1・直接起動はしない） */}
               <div className="flex justify-end items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => setPostCalendarOpen(true)}
+                  onClick={() => { setAnalysisInitialTab("plan"); setAnalysisCenterOpen(true); }}
                   className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-accent/40 bg-accent/8 text-accent/90 hover:bg-accent/15 hover:border-accent/60 transition leading-none"
+                  title="分析センター内の「1ヶ月生成カレンダー」タブを開きます"
                 >
-                  📅 1ヶ月投稿カレンダー
+                  📅 1ヶ月生成カレンダー
                 </button>
               </div>
               {/* 🛟 復旧パネル本体：トグルは左メニューの「履歴・お気に入り復旧」ボタン。展開はこのメイン列に表示 */}
@@ -2732,10 +2732,18 @@ export default function App() {
               {analysisCenterOpen && (
                 <div className="fixed inset-0 z-40 bg-black/70 p-2 sm:p-4 grid place-items-center" onClick={() => setAnalysisCenterOpen(false)}>
                   <div className="w-[95vw] h-[92vh] rounded-xl border border-bg-border bg-bg-panel shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                  {(massProductionResult || historyAnalysis) ? (
+                  {(massProductionResult || historyAnalysis || analysisInitialTab === "plan") ? (
                 <DuplicateAnalysisPanel
                   asModal
                   onCenterClose={() => setAnalysisCenterOpen(false)}
+                  initialTab={analysisInitialTab}
+                  onUseCalendarTheme={(hint) => {
+                    // 📅 1ヶ月生成カレンダー：テーマヒントを追加指示に追記するだけ（scope・固定・顔は触らない）
+                    setExtraInstructions((prev) => prev ? `${prev}\n${hint}` : hint);
+                    setAnalysisCenterOpen(false);
+                    setView("main");
+                    showPresetToast("📅 生成テーマを反映しました", "追加指示にヒントを追記。スコープ・固定設定は変更していません。");
+                  }}
                   biasResult={massProductionResult}
                   onRunBiasCheck={handleMassProductionCheck}
                   historyAnalysis={historyAnalysis}
@@ -3215,27 +3223,6 @@ export default function App() {
           onClose={() => setSelectionModalOpen(false)}
         />
       )}
-
-      {/* 📅 1ヶ月投稿カレンダー */}
-      {postCalendarOpen && (() => {
-        const now = new Date();
-        const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-        return (
-          <PostingCalendarModal
-            todayKey={todayKey}
-            initialYear={now.getFullYear()}
-            initialMonth={now.getMonth() + 1}
-            onClose={() => setPostCalendarOpen(false)}
-            onUseTheme={(hint) => {
-              // テーマヒントを追加指示に追記（変更対象・固定設定は触らない）
-              setExtraInstructions((prev) => prev ? `${prev}\n${hint}` : hint);
-              setPostCalendarOpen(false);
-              setView("main");
-              showPresetToast("📅 投稿テーマを反映しました", "追加指示にヒントを追記。スコープ・固定設定は変更していません。");
-            }}
-          />
-        );
-      })()}
 
       {/* 🎨 簡易画像編集モーダル */}
       {simpleEditorOpen && imageDataUrl && (

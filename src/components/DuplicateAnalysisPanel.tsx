@@ -28,6 +28,7 @@ import type { CandidateMotif } from "../lib/discoveryMotifs";
 import { COLOR_GROUPS, COLOR_AXES } from "../lib/colorAnalyzer";
 import type { ColorWeight, ColorWeightMap, ColorAxisCtrl } from "../lib/colorPolicy";
 import { WEIGHT_META, COLOR_AXIS_CTRL, getColorEntry, countWeights } from "../lib/colorPolicy";
+import { MonthlyCalendarSection } from "./MonthlyCalendarSection";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -130,6 +131,12 @@ interface Props {
   asModal?:          boolean;
   /** 全画面モーダルを閉じる（asModal 時の ✕ / Esc）。 */
   onCenterClose?:    () => void;
+
+  // ── 📅 1ヶ月生成カレンダー（plan タブ・Phase1: 移設のみ／A案B案はPhase2）──
+  /** 初期表示タブ（誘導導線から開いた時に指定。省略時 "dup"）。 */
+  initialTab?:       "dup" | "discovery" | "agent" | "color" | "image" | "pref" | "rank" | "skyveil" | "plan";
+  /** テーマで生成準備：ヒント文を追加指示へ追記するだけ（scope/固定/顔は触らない）。任意。 */
+  onUseCalendarTheme?: (hint: string) => void;
 
   // ── 📊 分析対象サマリ（見出しの件数表示用） ──
   analysisStats?: {
@@ -2182,6 +2189,7 @@ function DuplicateAnalysisPanelInner({
   preferenceProfile, profileSampleCount,
   agent, onAgentAction,
   onAutoFix, onReroll, onResetBias, onDismiss, asModal, onCenterClose,
+  initialTab, onUseCalendarTheme,
   analysisStats, activeScopes, favoriteProfile, favoriteLearnEnabled,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
@@ -2193,7 +2201,7 @@ function DuplicateAnalysisPanelInner({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [asModal, onCenterClose]);
-  const [tab, setTab] = useState<"dup" | "discovery" | "agent" | "color" | "image" | "pref" | "rank" | "skyveil">("dup");
+  const [tab, setTab] = useState<"dup" | "discovery" | "agent" | "color" | "image" | "pref" | "rank" | "skyveil" | "plan">(initialTab ?? "dup");
   // 🔭発見タブ（未開拓発見担当）
   const [discSearch, setDiscSearch] = useState("");
   const [discCount, setDiscCount] = useState<number>(20);
@@ -2496,6 +2504,18 @@ function DuplicateAnalysisPanelInner({
             >
               🧬 あなたの好み
             </button>
+            <button
+              type="button"
+              onClick={() => setTab("plan")}
+              className={[
+                "text-[12px] font-bold px-2.5 py-1 rounded-md transition leading-none flex items-center gap-1",
+                tab === "plan"
+                  ? "bg-accent/20 text-accent border border-accent/50"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
+              ].join(" ")}
+            >
+              📅 1ヶ月生成カレンダー
+            </button>
           </div>
 
           <div className="px-3 overflow-y-auto max-h-[62vh]">
@@ -2535,6 +2555,13 @@ function DuplicateAnalysisPanelInner({
                 </div>
                 {skyveilSlot ?? <p className="text-[12px] text-slate-400 px-1">あなたの好み を読み込めませんでした。</p>}
               </div>
+            )}
+
+            {/* === 📅 1ヶ月生成カレンダー タブ（Phase1: 現行カレンダーを移設・分析ドリブンのA案/B案はPhase2）=== */}
+            {tab === "plan" && (
+              onUseCalendarTheme
+                ? <MonthlyCalendarSection onUseTheme={(hint) => onUseCalendarTheme(hint)} />
+                : <p className="text-[12px] text-slate-400 px-1 py-2">1ヶ月生成カレンダーを読み込めませんでした。</p>
             )}
 
             {/* === 🔭 発見タブ（未開拓発見担当・監視外の頻出新語）=== */}
