@@ -23,7 +23,7 @@ import type { AgentAnalysis, AgentActionId } from "../lib/aiAgent";
 import type { ImageAnalysisResult } from "../lib/imageAnalyzer";
 import type { RatingAnalysis } from "../lib/ratingAnalyzer";
 import { type PreferenceProfile } from "../lib/preferenceProfile";
-import type { ColorAnalysis, ColorAxis } from "../lib/colorAnalyzer";
+import type { ColorAnalysis, ColorAxis, ColorSuccessAnalysis } from "../lib/colorAnalyzer";
 import { COLOR_GROUPS, COLOR_AXES } from "../lib/colorAnalyzer";
 import type { ColorWeight, ColorWeightMap, ColorAxisCtrl } from "../lib/colorPolicy";
 import { WEIGHT_META, COLOR_AXIS_CTRL, getColorEntry, countWeights } from "../lib/colorPolicy";
@@ -69,6 +69,8 @@ interface Props {
   // ── 🎨 色分析（生成制御センター） ──
   /** 色分析結果（履歴×ウィンドウサイズで集計） */
   colorAnalysis:     ColorAnalysis | null;
+  /** A2-3b: 色の成功率分析（色×評価×時系列）。任意。 */
+  colorSuccess?:     ColorSuccessAnalysis | null;
   /** 色×軸の重み（髪/服/背景それぞれ 0-5） */
   colorWeights:      ColorWeightMap;
   /** 色×軸の重み変更ハンドラ */
@@ -599,11 +601,12 @@ function RateCard({ title, rates }: { title: string; rates: { label: string; cou
 // ── セクション：🎨 色生成制御センター ─────────────────────────────────────
 
 function ColorAnalysisSection({
-  analysis, weights, onWeightChange, onReset,
+  analysis, colorSuccess, weights, onWeightChange, onReset,
   onAutoAdjust, onUndoAdjust, canUndo, changedKeys,
   windowSize, onWindowSizeChange,
 }: {
   analysis:   ColorAnalysis | null;
+  colorSuccess: ColorSuccessAnalysis | null;
   weights:    ColorWeightMap;
   onWeightChange: (colorId: string, axis: ColorAxisCtrl, w: ColorWeight) => void;
   onReset:        () => void;
@@ -679,6 +682,82 @@ function ColorAnalysisSection({
           );
         })()}
       </div>
+
+      {/* ── A2-3b: 色の成功率分析（評価×時系列）── */}
+      {colorSuccess && colorSuccess.ratedItemCount > 0 && (() => {
+        const meta = (id: string) => COLOR_GROUPS.find((c) => c.id === id);
+        const chip = (id: string, suffix: string) => {
+          const g = meta(id); if (!g) return null;
+          return (
+            <span key={id} className="inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-full border border-white/15 bg-white/5 text-slate-100 leading-none">
+              <span className="w-3 h-3 rounded-sm border border-white/20" style={{ backgroundColor: g.swatch }} />
+              {g.jp}<span className="text-slate-400">{suffix}</span>
+            </span>
+          );
+        };
+        const list = (title: string, items: { colorId: string; count: number }[]) => (
+          <div>
+            <p className="text-[13px] font-bold text-slate-200 mb-1">{title}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {items.length === 0 ? <span className="text-[12px] text-slate-500">データなし</span>
+                : items.map((e) => chip(e.colorId, ` ${e.count}`))}
+            </div>
+          </div>
+        );
+        return (
+          <div className="space-y-3">
+            <SectionTitle icon="🏆">成功率分析（評価4-5=成功 / 1-2=失敗・{colorSuccess.ratedItemCount}件）</SectionTitle>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 px-1">
+              {list("✅ 成功色 TOP（評価4-5）", colorSuccess.successTop)}
+              {list("❌ 失敗色 TOP（評価1-2）", colorSuccess.failTop)}
+            </div>
+            {colorSuccess.successRate.length > 0 && (
+              <div>
+                <p className="text-[13px] font-bold text-slate-200 mb-1 px-1">色別 成功率（成功/失敗/率）</p>
+                <div className="space-y-1.5 px-1">
+                  {colorSuccess.successRate.map((e) => {
+                    const g = meta(e.colorId);
+                    return (
+                      <div key={e.colorId} className="flex items-center gap-2.5">
+                        <span className="w-4 h-4 rounded border border-white/25 shrink-0" style={{ backgroundColor: g?.swatch }} />
+                        <span className="text-[13px] text-slate-100 w-20 shrink-0">{g?.jp ?? e.colorId}</span>
+                        <div className="flex-1 h-4 rounded bg-rose-500/25 overflow-hidden" title={`成功${e.good} / 失敗${e.bad}`}>
+                          <div className="h-full rounded bg-emerald-500/70" style={{ width: `${e.rate}%` }} />
+                        </div>
+                        <span className="text-[13px] tabular-nums text-slate-200 w-28 text-right shrink-0">
+                          {e.rate}% <span className="text-emerald-300">{e.good}</span>/<span className="text-rose-300">{e.bad}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 px-1">
+              <div className="space-y-2">
+                {list("📈 直近30日 よく使った色", colorSuccess.trend30)}
+                {list("🗓 直近90日 よく使った色", colorSuccess.trend90)}
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-[13px] font-bold text-emerald-300 mb-1">⤴ 急上昇色（30日 vs 31-90日）</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {colorSuccess.rising.length === 0 ? <span className="text-[12px] text-slate-500">なし</span>
+                      : colorSuccess.rising.map((d) => chip(d.colorId, ` +${d.delta}%`))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[13px] font-bold text-rose-300 mb-1">⤵ 急下降色</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {colorSuccess.falling.length === 0 ? <span className="text-[12px] text-slate-500">なし</span>
+                      : colorSuccess.falling.map((d) => chip(d.colorId, ` ${d.delta}%`))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── 偏り警告 ─────────────────────────────────── */}
       {analysis.biasWarnings.length > 0 && (
@@ -1692,7 +1771,7 @@ function DuplicateAnalysisPanelInner({
   onLevelChange, onApplyPolicies, onUnapplyPolicies, onResetPolicies, onBulkLevel, onClearNg,
   onAutoAdjust, onUndoAutoAdjust, canUndoAuto, changedIds,
   comboPolicies, onComboPolicyChange, onOpenLab,
-  colorAnalysis,
+  colorAnalysis, colorSuccess,
   colorWeights, onColorWeightChange, onColorWeightsReset,
   onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
   colorWindowSize, onColorWindowSizeChange,
@@ -2000,6 +2079,7 @@ function DuplicateAnalysisPanelInner({
             {tab === "color" && (
               <ColorAnalysisSection
                 analysis={colorAnalysis}
+                colorSuccess={colorSuccess ?? null}
                 weights={colorWeights}
                 onWeightChange={onColorWeightChange}
                 onReset={onColorWeightsReset}

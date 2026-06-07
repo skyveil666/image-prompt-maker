@@ -447,3 +447,94 @@ function pickRecommendedColors(biasedColorId: string, ranking: ColorGlobalRankin
 export function getColorMeta(colorId: string): ColorGroup | undefined {
   return COLOR_GROUPS.find((c) => c.id === colorId);
 }
+
+// ── A2-3b: 色の成功率分析（色×評価×時系列）docs/32 §5.5 ───────────────────────
+// 既存 analyzeColors とは独立の加算的派生集計。promptText 由来の色 × resultRatings × createdAt。
+// 成功=評価4-5 / 失敗=評価1-2（評価3=中立は除外）。推移=直近30日 / 90日。急上昇/急下降=30日 vs 31-90日の比率差。
+export interface ColorRateEntry { colorId: string; good: number; bad: number; total: number; rate: number; }
+export interface ColorTrendEntry { colorId: string; count: number; }
+export interface ColorDeltaEntry { colorId: string; recent: number; prev: number; delta: number; }
+export interface ColorSuccessAnalysis {
+  ratedItemCount: number;
+  successTop: ColorTrendEntry[];
+  failTop: ColorTrendEntry[];
+  successRate: ColorRateEntry[];
+  trend30: ColorTrendEntry[];
+  trend90: ColorTrendEntry[];
+  rising: ColorDeltaEntry[];
+  falling: ColorDeltaEntry[];
+}
+
+/** 1アイテムのプロンプトから出現色ID集合（軸問わず・重複除去） */
+function itemColorIds(item: PromptHistoryItem): Set<string> {
+  const ids = new Set<string>();
+  if (!item.promptText) return ids;
+  for (const sent of splitSentences(item.promptText)) {
+    for (const { colorId } of extractFromSentence(sent)) ids.add(colorId);
+  }
+  return ids;
+}
+
+const COLOR_DAY_MS = 86400000;
+
+export function analyzeColorSuccess(items: readonly PromptHistoryItem[], nowMs: number): ColorSuccessAnalysis {
+  const good = new Map<string, number>();
+  const bad = new Map<string, number>();
+  let ratedItemCount = 0;
+  const cnt30 = new Map<string, number>();
+  const cntPrev = new Map<string, number>();
+  const cnt90 = new Map<string, number>();
+
+  for (const it of items) {
+    const colors = itemColorIds(it);
+    if (colors.size === 0) continue;
+
+    const ratings = (it.resultRatings ?? []).filter((r): r is number => typeof r === "number");
+    const goodImgs = ratings.filter((r) => r >= 4).length;
+    const badImgs = ratings.filter((r) => r >= 1 && r <= 2).length;
+    if (goodImgs > 0 || badImgs > 0) ratedItemCount++;
+    for (const id of colors) {
+      if (goodImgs > 0) good.set(id, (good.get(id) ?? 0) + goodImgs);
+      if (badImgs > 0) bad.set(id, (bad.get(id) ?? 0) + badImgs);
+    }
+
+    const age = nowMs - it.createdAt;
+    if (age <= 90 * COLOR_DAY_MS) {
+      for (const id of colors) cnt90.set(id, (cnt90.get(id) ?? 0) + 1);
+      if (age <= 30 * COLOR_DAY_MS) {
+        for (const id of colors) cnt30.set(id, (cnt30.get(id) ?? 0) + 1);
+      } else {
+        for (const id of colors) cntPrev.set(id, (cntPrev.get(id) ?? 0) + 1);
+      }
+    }
+  }
+
+  const top = (m: Map<string, number>, n = 10): ColorTrendEntry[] =>
+    [...m.entries()].map(([colorId, count]) => ({ colorId, count })).sort((a, b) => b.count - a.count).slice(0, n);
+
+  const allIds = new Set<string>([...good.keys(), ...bad.keys()]);
+  const successRate: ColorRateEntry[] = [...allIds].map((colorId) => {
+    const g = good.get(colorId) ?? 0;
+    const b = bad.get(colorId) ?? 0;
+    const total = g + b;
+    return { colorId, good: g, bad: b, total, rate: total > 0 ? Math.round((g / total) * 100) : 0 };
+  }).filter((e) => e.total >= 2).sort((a, b) => b.rate - a.rate || b.total - a.total);
+
+  const sum = (m: Map<string, number>) => [...m.values()].reduce((s, v) => s + v, 0);
+  const tot30 = sum(cnt30) || 1;
+  const totPrev = sum(cntPrev) || 1;
+  const deltaIds = new Set<string>([...cnt30.keys(), ...cntPrev.keys()]);
+  const deltas: ColorDeltaEntry[] = [...deltaIds].map((colorId) => {
+    const recent = Math.round(((cnt30.get(colorId) ?? 0) / tot30) * 100);
+    const prev = Math.round(((cntPrev.get(colorId) ?? 0) / totPrev) * 100);
+    return { colorId, recent, prev, delta: recent - prev };
+  });
+  const rising = [...deltas].filter((d) => d.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 6);
+  const falling = [...deltas].filter((d) => d.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 6);
+
+  return {
+    ratedItemCount,
+    successTop: top(good), failTop: top(bad), successRate,
+    trend30: top(cnt30, 8), trend90: top(cnt90, 8), rising, falling,
+  };
+}

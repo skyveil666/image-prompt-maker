@@ -89,4 +89,12 @@ A1評価OK。重複分析を IPM の最重要機能として強化。複合構�
 - **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離＋スクショ＝色相分布(青34%/紫34%/黒26%/茶6%)・色別ランキング・軸別全幅・神引き色・未開拓 全表示。データ不変。
 **残**: A2-3b 評価別色（高評価/低評価＝resultRatings由来）＋30/90日推移（createdAt窓・新集計）→ A2-4 評価集計（期間別/推移/月別）。
 
-**End of Doc 32（A1／A2-1a/1b/2/3a 実装・検証済み・未コミット／A2-3b・A2-4 未着手）**
+### 5.5 A2-3b 実装・検証済み（2026-06-07／未コミット）
+**ユーザー指定**: 単純出現数でなく成功率分析。成功色TOP10(評価4-5)/失敗色TOP10(評価1-2)/色別成功率(成功数・失敗数・率%)/30日推移/90日推移/急上昇色/急下降色（未開拓・神引き候補色は A2-3a 済み）。サイズは大型維持。
+- `colorAnalyzer.ts`: `analyzeColorSuccess(items, nowMs)` 追加（既存 analyzeColors と独立・加算的）。色＝promptText由来（itemColorIds）、評価＝resultRatings（4-5=成功/1-2=失敗・3中立除外）、推移＝createdAt窓（30日/90日）、急上昇/下降＝30日 vs 31-90日 の比率差。`ColorSuccessAnalysis` 型。
+- `App.tsx`: `colorSuccess` memo（historyItemsForColor）＋panel へ供給。
+- `DuplicateAnalysisPanel` ColorAnalysisSection: 🏆成功率分析（成功色/失敗色TOP・色別成功率バー[緑=成功/赤=失敗]・30/90日推移・急上昇/急下降）。大型維持。
+- **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離（評価付き色データ24件投入）＋スクショ＝成功色(青9/紫3/緑3/白3)・失敗色・色別成功率(青100% 9/0)・30/90日・急上昇/急下降 全表示。既存ロジック・データ不変。
+**残**: A2-4 評価集計（期間別7/30/90/全期間＋推移＋月別評価）。
+
+**End of Doc 32（A1／A2-1a/1b/2/3a/3b 実装・検証済み・未コミット／A2-4 未着手）**

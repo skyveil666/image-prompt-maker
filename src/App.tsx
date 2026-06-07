@@ -99,7 +99,7 @@ import { buildFavoriteProfile, type FavoriteProfile } from "./lib/favoriteProfil
 import { analyzeAgent, type AgentActionId } from "./lib/aiAgent";
 import { BoostControls } from "./components/BoostControls";
 import type { ZozoTrend } from "./lib/zozoTrend";
-import { analyzeColors, type ColorAnalysis } from "./lib/colorAnalyzer";
+import { analyzeColors, analyzeColorSuccess, type ColorAnalysis, type ColorSuccessAnalysis } from "./lib/colorAnalyzer";
 import {
   loadAllFeatures, buildAnalysis as buildImageAnalysis,
   runProgressiveAnalysis, primaryResultImage,
@@ -1005,6 +1005,12 @@ export default function App() {
     if (recentItems.length === 0) return null;
     return analyzeColors(recentItems, colorWindowSize);
   }, [recentItems, colorWindowSize]);
+
+  // ── 🎨 色 成功率分析（A2-3b）：色×評価×時系列（成功率/推移/急上昇・急下降）──
+  const colorSuccess: ColorSuccessAnalysis | null = useMemo(() => {
+    if (historyItemsForColor.length === 0) return null;
+    return analyzeColorSuccess(historyItemsForColor, Date.now());
+  }, [historyItemsForColor]);
 
   // ── 📸 画像分析：直近90日×特徴キャッシュから集計 ──
   const imageAnalysis: ImageAnalysisResult | null = useMemo(() => {
@@ -2757,6 +2763,7 @@ export default function App() {
                   comboPolicies={comboPolicies}
                   onComboPolicyChange={handleComboPolicyChange}
                   colorAnalysis={colorAnalysis}
+                  colorSuccess={colorSuccess}
                   colorWeights={colorWeights}
                   onColorWeightChange={handleColorWeightChange}
                   onColorWeightsReset={handleColorWeightsReset}
