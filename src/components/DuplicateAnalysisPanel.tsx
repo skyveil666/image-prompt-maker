@@ -1036,12 +1036,13 @@ function AgentSection({
       <div>
         <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">現在の傾向</div>
         <p className="text-[13px] text-slate-100 leading-relaxed px-1">{agent.trendSummary}</p>
+        <p className="text-[10px] text-slate-400/70 px-1 mt-0.5">※ 重複回避・未開拓発見・神引き候補を優先（好みは任意）。発見性・意外性が評価軸です。</p>
       </div>
 
-      {/* 問題点 */}
+      {/* 🔴 問題 */}
       {agent.problems.length > 0 && (
         <div>
-          <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">問題点</div>
+          <div className="text-[12px] font-bold mb-1 px-1 text-rose-300">🔴 問題</div>
           <ul className="space-y-1">
             {agent.problems.map((p, i) => (
               <li key={i} className={["text-[12px] leading-snug px-2 py-1.5 rounded-md border", sevCls(p.severity)].join(" ")}>
@@ -1052,21 +1053,35 @@ function AgentSection({
         </div>
       )}
 
-      {/* 次におすすめ */}
+      {/* 🟡 原因 */}
+      {agent.causes.length > 0 && (
+        <div>
+          <div className="text-[12px] font-bold mb-1 px-1 text-amber-300">🟡 原因</div>
+          <ul className="space-y-1">
+            {agent.causes.map((c, i) => (
+              <li key={i} className="text-[12px] leading-snug px-2 py-1.5 rounded-md border border-amber-400/35 bg-amber-500/8 text-amber-100/90">
+                {c.text}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 🔵 改善案 */}
       <div>
-        <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">次におすすめ</div>
-        <ul className="space-y-0.5">
+        <div className="text-[12px] font-bold mb-1 px-1 text-sky-300">🔵 改善案（発見志向）</div>
+        <ul className="space-y-1">
           {agent.recommendations.map((r, i) => (
-            <li key={i} className="text-[12px] text-emerald-200/90 leading-snug px-1">
+            <li key={i} className="text-[12px] text-sky-100/90 leading-snug px-2 py-1.5 rounded-md border border-sky-400/30 bg-sky-500/8">
               ・{r}
             </li>
           ))}
         </ul>
       </div>
 
-      {/* 提案アクション */}
+      {/* 🟢 推奨アクション */}
       <div>
-        <div className="text-[11px] text-slate-400 font-bold uppercase tracking-wider mb-1">提案アクション（押した時だけ反映）</div>
+        <div className="text-[12px] font-bold mb-1 px-1 text-emerald-300">🟢 推奨アクション（押した時だけ反映）</div>
         <div className="flex flex-wrap gap-1.5">
           {agent.actions.map((a) => (
             <button

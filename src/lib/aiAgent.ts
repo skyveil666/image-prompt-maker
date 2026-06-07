@@ -44,6 +44,8 @@ export interface AgentInput {
   windLevel: number;
   /** 元画像があるか */
   hasImage: boolean;
+  /** P3a 発見層の候補語（神引き候補発見の素材）。任意。 */
+  discoveryCandidates?: { term: string; count: number }[];
 }
 
 // ── 出力 ─────────────────────────────────────────────────────────────────────
@@ -76,7 +78,9 @@ export interface AgentAnalysis {
   trendSummary: string;
   /** 「問題点」リスト */
   problems: AgentObservation[];
-  /** 「次におすすめ」具体提案（箇条書き、短文） */
+  /** 「原因」リスト（なぜそうなっているか）。発見志向の4ブロック化で追加。 */
+  causes: AgentObservation[];
+  /** 「改善案」具体提案（箇条書き、短文。発見志向：重複回避→未開拓→神引き候補→好み(任意)） */
   recommendations: string[];
   /** 提案アクションボタン（最大6） */
   actions: AgentAction[];
@@ -236,8 +240,40 @@ export function analyzeAgent(input: AgentInput): AgentAnalysis {
     }
   }
 
-  // ── 次におすすめ（箇条書き）──
+  // ── 原因（なぜそうなっているか）── 発見志向の4ブロック化で追加
+  const causes: AgentObservation[] = [];
+  if ((topMotifs[0]?.totalCount ?? 0) >= 30 || dupHigh) {
+    causes.push({ severity: "medium", text: "上位モチーフ・構成を繰り返し選び、未開拓ジャンルをほとんど試していないためです。" });
+  }
+  if (imageAnalysis?.clusters?.[0] && imageAnalysis.clusters[0].size >= 3) {
+    causes.push({ severity: "medium", text: "プロンプト文言を変えても構図・要素の核が同じため、生成画像が似たままになっています。" });
+  }
+  if (colorAnalysis && colorAnalysis.biasWarnings.length > 0) {
+    causes.push({ severity: "low", text: "特定の色（軸）に集中しているため、全体の色傾向が偏っています。" });
+  }
+  if (hasMotifControls && !policyApplied) {
+    causes.push({ severity: "medium", text: "重複制御を設定しても「提案を反映」未押下のため、生成に伝わっていません。" });
+  }
+  if (causes.length === 0) {
+    causes.push({ severity: "low", text: "大きな偏りはありません。意外性を狙うなら未開拓方向を試すと新規性が上がります。" });
+  }
+
+  // ── 改善案（発見志向：神引き候補→未開拓→重複回避→…→好み(任意)）──
   const recommendations: string[] = [];
+
+  // 神引き候補発見（未開拓＋低出現＋発見層候補）＝発見志向の主役
+  {
+    const lowOcc = topMotifs.filter((m) => m.totalCount > 0).slice(-3).reverse().map((m) => m.motif.label);
+    const discTerms = (input.discoveryCandidates ?? []).slice(0, 3).map((c) => c.term);
+    const seeds = [...new Set([
+      ...untapped.slice(0, 2).map((g) => g.label),
+      ...lowOcc.slice(0, 2),
+      ...discTerms.slice(0, 2),
+    ].filter(Boolean))];
+    if (seeds.length > 0) {
+      recommendations.push(`🎲 神引き候補（未踏・意外性高）：${seeds.slice(0, 4).join("・")} を試す`);
+    }
+  }
 
   if (top3Names.length > 0 && untapped.length > 0) {
     recommendations.push(
@@ -248,9 +284,6 @@ export function analyzeAgent(input: AgentInput): AgentAnalysis {
     recommendations.push(
       `頻出構成「${topCombo.motifLabels.join(" ＋ ")}」を「🚫 今後出さない」または「🎭 別ジャンル化」に設定`
     );
-  }
-  if (favoriteProfile && favoriteProfile.traitPhrases.length > 0 && !favoriteEnabled) {
-    recommendations.push("お気に入り傾向ONで、好みの方向へ寄せた案を生成");
   }
   if (windLevel === 0 && (scopes.includes("hair") || scopes.includes("outfit"))) {
     recommendations.push("風レベル2〜3を追加して、髪や衣装に自然な動きを足す");
@@ -328,8 +361,12 @@ export function analyzeAgent(input: AgentInput): AgentAnalysis {
     }
   }
 
+  // お気に入り寄せ（任意・最下部）＝発見志向のため低優先
+  if (favoriteProfile && favoriteProfile.traitPhrases.length > 0 && !favoriteEnabled) {
+    recommendations.push("（任意）お気に入り傾向ONで好みへ寄せる ※新規性・意外性は下がるため、神引き狙いはOFF推奨");
+  }
   if (recommendations.length === 0) {
-    recommendations.push("現状の設定は安定しています。このまま生成して問題ありません。");
+    recommendations.push("現状は安定。意外性を狙うなら未開拓方向を1つ試すと新規性が上がります。");
   }
 
   // ── アクションボタン（最大6）──
@@ -364,9 +401,9 @@ export function analyzeAgent(input: AgentInput): AgentAnalysis {
   if (favoriteProfile && favoriteProfile.favoriteCount > 0 && !favoriteEnabled) {
     actions.push({
       id: "favorite_bias",
-      label: "⭐ お気に入り寄せ",
-      description: "お気に入り傾向ONで、好みの方向に少し寄せる",
-      priority: "medium",
+      label: "⭐ お気に入り寄せ（任意）",
+      description: "好みへ寄せる（発見志向では低優先・新規性は下がる）",
+      priority: "low",
     });
   }
   // ⑤ シンプル化
@@ -386,7 +423,7 @@ export function analyzeAgent(input: AgentInput): AgentAnalysis {
     priority: "low",
   });
 
-  return { trendSummary, problems, recommendations, actions };
+  return { trendSummary, problems, causes, recommendations, actions };
 }
 
 // ── 補助：scope ラベル ───────────────────────────────────────────────────────

@@ -1405,11 +1405,12 @@ export default function App() {
     historyAnalysis, colorAnalysis, imageAnalysis, ratingAnalysis, policyApplied,
     windLevel,
     hasImage: !!imageDataUrl,
+    discoveryCandidates,
   }), [
     scopes, bodyPoseLock, colorMoodLock, compositionLock, faceLock,
     activeWorldPresets, activeGodModes, activeBoosts, viralMode,
     favoriteProfile, favoriteLearnEnabled, historyAnalysis, colorAnalysis, imageAnalysis, ratingAnalysis, policyApplied,
-    windLevel, imageDataUrl,
+    windLevel, imageDataUrl, discoveryCandidates,
   ]);
 
   // ── 重複分析：自動調整ハンドラ（showPresetToast に依存するためここに配置） ──
