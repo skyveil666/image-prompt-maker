@@ -173,6 +173,10 @@ interface Props {
   onForbiddenTokensChange: (tokens: string[]) => void;
   onSnsSelect?: (t: SnsType) => void;
   onCultureSelect?: (t: CultureType) => void;
+  /** 📈 SNS向けおまかせ（一発ランダム）。QuickActionsから移設・内部は handleSnsSingle のまま不変 */
+  onSnsRandom?: () => void;
+  /** 🌐 カルチャーおまかせ（一発ランダム）。QuickActionsから移設・内部は handleCultureSingle のまま不変 */
+  onCultureRandom?: () => void;
 }
 
 type Updater = <K extends keyof DetailSettings>(
@@ -1767,12 +1771,24 @@ const SNS_OPTIONS: Array<{ type: SnsType; hint: string }> = [
   { type: "global",      hint: "海外SNSで受ける国際的な美意識。普遍的な美しさ・高品質感・インターナショナルな雰囲気" },
 ];
 
-function SnsTabContent({ onSelect }: { onSelect?: (t: SnsType) => void }) {
+function SnsTabContent({ onSelect, onRandom }: { onSelect?: (t: SnsType) => void; onRandom?: () => void }) {
   return (
     <div>
-      <p className="text-[11px] text-text-muted/65 mb-3 leading-relaxed">
+      <p className="text-[11px] text-text-muted/65 mb-2 leading-relaxed">
         SNS媒体・用途に合わせたビジュアル補正を適用します。選択するとすぐに設定が変わります。
       </p>
+      {onRandom && (
+        <div className="mb-3">
+          <button
+            type="button"
+            onClick={onRandom}
+            title="SNS向けビジュアル補正をランダムに追加（最大2コンボ）"
+            className="rounded-lg px-3 py-1.5 text-[12px] font-bold border border-pink-400/55 bg-pink-400/15 text-pink-100 hover:bg-pink-400/25 hover:border-pink-400/80 transition leading-none whitespace-nowrap"
+          >
+            🎲 SNS向けおまかせ
+          </button>
+        </div>
+      )}
       <div className="flex flex-wrap gap-1.5">
         {SNS_OPTIONS.map(({ type, hint }) => (
           <button
@@ -1821,7 +1837,7 @@ const CULTURE_GLOBAL: Array<{ type: CultureType; hint: string }> = [
   { type: "sao_paulo",    hint: "サンパウロのアーバンアート。巨大なグラフィティ・熱帯の色彩・ブラジルのストリートカルチャー"         },
 ];
 
-function CultureTabContent({ onSelect }: { onSelect?: (t: CultureType) => void }) {
+function CultureTabContent({ onSelect, onRandom }: { onSelect?: (t: CultureType) => void; onRandom?: () => void }) {
   const btnCls = "rounded-lg px-3 py-1.5 text-[12px] font-semibold border border-cyan-400/30 bg-cyan-400/8 text-cyan-200 hover:bg-cyan-400/15 hover:border-cyan-400/55 transition leading-none whitespace-nowrap";
   const groupLabel = (emoji: string, name: string) => (
     <div className="mt-3 mb-1.5 text-[10px] font-bold text-cyan-300/50 uppercase tracking-widest leading-none">
@@ -1833,6 +1849,18 @@ function CultureTabContent({ onSelect }: { onSelect?: (t: CultureType) => void }
       <p className="text-[11px] text-text-muted/65 mb-1 leading-relaxed">
         都市・文化圏の世界観を選択して適用します。選択するとすぐに設定が変わります。
       </p>
+      {onRandom && (
+        <div className="mt-2 mb-1">
+          <button
+            type="button"
+            onClick={onRandom}
+            title="都市・文化圏の世界観をランダムに追加（最大2コンボ）"
+            className="rounded-lg px-3 py-1.5 text-[12px] font-bold border border-cyan-400/55 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/25 hover:border-cyan-400/80 transition leading-none whitespace-nowrap"
+          >
+            🎲 カルチャーおまかせ
+          </button>
+        </div>
+      )}
       {groupLabel("🌏", "アジア")}
       <div className="flex flex-wrap gap-1.5">
         {CULTURE_ASIA.map(({ type, hint }) => (
@@ -1884,6 +1912,8 @@ export function DetailsCard({
   onForbiddenTokensChange,
   onSnsSelect,
   onCultureSelect,
+  onSnsRandom,
+  onCultureRandom,
 }: Props) {
   const scopeKeyOf = (t: TabId): string => (t === "big_object" ? "bigObject" : t);
   const isScopeTab = (t: TabId): boolean => !(EXTRA_TAB_IDS as string[]).includes(t);
@@ -2000,8 +2030,8 @@ export function DetailsCard({
       case "artStyle":      return <ArtStyleTabContent artStyle={artStyle} onArtStyleChange={onArtStyleChange} />;
       case "colorStrategy": return <ColorStrategyTabContent moods={moods} autoMoodCategories={autoMoodCategories} onMoodsChange={onMoodsChange} colorStrategy={colorStrategy} onColorStrategyChange={onColorStrategyChange} />;
       case "ng":            return <NgTabContent extraInstructions={extraInstructions} onExtraInstructionsChange={onExtraInstructionsChange} ngList={ngList} onNgListChange={onNgListChange} forbiddenTokens={forbiddenTokens} onForbiddenTokensChange={onForbiddenTokensChange} />;
-      case "sns":           return <SnsTabContent onSelect={onSnsSelect} />;
-      case "culture":       return <CultureTabContent onSelect={onCultureSelect} />;
+      case "sns":           return <SnsTabContent onSelect={onSnsSelect} onRandom={onSnsRandom} />;
+      case "culture":       return <CultureTabContent onSelect={onCultureSelect} onRandom={onCultureRandom} />;
       default:              return null;
     }
   };

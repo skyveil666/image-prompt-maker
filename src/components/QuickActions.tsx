@@ -1,17 +1,22 @@
 /**
- * QuickActions — クイック操作バー（カテゴリ別5行レイアウト）
+ * QuickActions — クイック操作バー（カテゴリ別レイアウト）
  *
  * ┌─ 世界観 ──────────────────────────────────────────────────────────────────┐
  * │ 👗Y2K  🚀Y3K  🏙街  🎬映画  🌸和風  🖤ゴシック  📢広告  ✨幻想  📺レトロ │
  * ├─ 演出 ────────────────────────────────────────────────────────────────────┤
  * │ 🌀前景盛り  🧬微機械化  🧊清潔感                                         │
- * ├─ 神引き ───────────────────────────────────────────────────────────────────┤
- * │ 👑ノーマル 🎲カオス 🧥衣装 🌍背景 📷構図 🎨色 🌌世界観 [▼ もっと]        │
- * ├─ 生成補助 ────────────────────────────────────────────────────────────────┤
- * │ 🔥バズり  🧪量産回避  🎭ギャップ化  🎲おまかせ  🔄別案  📈SNSバズ  🌐カルチャー │
+ * ├─ 映え ────────────────────────────────────────────────────────────────────┤
+ * │ 🔥バズ最適化[▼バズモード/映え補正]   🎯顔映え                            │
+ * ├─ 変化 ────────────────────────────────────────────────────────────────────┤
+ * │ 👑神引き[▼おまかせ/カオス/大きく変える/軸別]   🔄別案                     │
+ * ├─ 回避 ────────────────────────────────────────────────────────────────────┤
+ * │ 🛡テンプレ回避[▼テンプレ回避/被り回避/AIっぽさチェック]                  │
  * ├─ ツール ──────────────────────────────────────────────────────────────────┤
- * │ 🚫量産AI検知  ⭐お気に入り  📅履歴  ↩戻る                                │
+ * │ ⭐お気に入り  📅履歴  ↩戻る  ↺プリセット解除                            │
  * └───────────────────────────────────────────────────────────────────────────┘
+ *
+ * 注: 📈SNSバズ / 🌐カルチャー は詳細設定(DetailsCard)の SNS / カルチャー タブ内
+ *     「おまかせ」ボタンへ移設済み（1b）。内部関数名・フラグ・生成ロジックは不変。
  */
 
 import { useState } from "react";
@@ -47,8 +52,6 @@ interface QuickActionsProps {
   onRandom:           () => void;
   onVariant:          () => void;
   onUndo:             () => void;
-  onSnsSingle:        () => void;
-  onCultureSingle:    () => void;
   onMassProductionCheck: () => void;
   // 世界観・演出・神引き・生成補助 トグル（マルチセレクト）
   onWorldPresetToggle: (preset: WorldPreset) => void;
@@ -65,8 +68,6 @@ interface QuickActionsProps {
   activeGodModes?:      string[];
   activeBoosts?:        string[];
   activeAssistModes?:   string[];
-  activeSnsLabels?:     string[];
-  activeCultureLabels?: string[];
   // リセット
   onResetAll: () => void;
   // ツール
@@ -182,11 +183,8 @@ export function QuickActions({
   activeGodModes      = [],
   activeBoosts        = [],
   activeAssistModes   = [],
-  activeSnsLabels     = [],
-  activeCultureLabels = [],
   onViral, onViralOff,
   onRandom, onVariant, onUndo,
-  onSnsSingle, onCultureSingle,
   onMassProductionCheck,
   onWorldPresetToggle, onEffectToggle,
   onGodToggle, onAssistToggle, onBoostToggle,
@@ -194,11 +192,19 @@ export function QuickActions({
   onResetAll,
   onToggleFavPanel, onShowCalendar,
 }: QuickActionsProps) {
-  // 神引きはドロップダウンに統合（種類が多く常時展開すると煩雑なため）
+  // 映え／変化／回避 はそれぞれ展開パネル（ポップオーバー）に統合（種類が多く常時展開すると煩雑なため）
   const [godOpen, setGodOpen] = useState(false);
+  const [buzzOpen, setBuzzOpen] = useState(false);
+  const [avoidOpen, setAvoidOpen] = useState(false);
   const activeGodChips = activeGodModes.map((m) =>
     m === "chaos" && chaosLabel ? `🎲 ${chaosLabel}` : (GOD_DISPLAY[m] ?? m)
   );
+  // 「変化」グループのアクティブ表示（神引きモード＋雰囲気を逆に＋世界観を一新）
+  const changeChips: string[] = [
+    ...activeGodChips,
+    activeAssistModes.includes("gap") ? "🎭 逆に" : null,
+    activeBoosts.includes("other_world") ? "🌀 別世界" : null,
+  ].filter((x): x is string => x !== null);
 
   return (
     <div className="card !py-3 !px-4 space-y-2.5">
@@ -239,16 +245,50 @@ export function QuickActions({
 
       <div className="border-t border-white/5" />
 
-      {/* ══════ 👑 神引き（ドロップダウン統合） ══════ */}
-      <CategoryRow label="神引き">
+      {/* ══════ 映え ══════ */}
+      <CategoryRow label="映え">
+        {/* 🔥 バズ最適化（▼で「バズモード」「映え補正」を格納。旧 🔥バズり＋🧲バズ寄せ を統合表示） */}
+        <button
+          type="button"
+          onClick={() => setBuzzOpen((v) => !v)}
+          disabled={disabled}
+          title="SNS映え方向への補正をまとめた設定。クリックで展開（バズモード／映え補正）"
+          className={[
+            "rounded-lg px-3 py-1.5 text-[13px] font-semibold border leading-none whitespace-nowrap transition",
+            (viralMode || activeBoosts.includes("buzz"))
+              ? "border-rose-500/70 bg-gradient-to-r from-rose-500 to-fuchsia-500 text-white shadow-[0_0_14px_rgba(244,63,94,0.4)]"
+              : "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20 hover:border-rose-500/70",
+            "disabled:opacity-40 disabled:cursor-not-allowed",
+          ].join(" ")}
+        >
+          🔥 バズ最適化 {buzzOpen ? "▲" : "▼"}
+        </button>
+        <TagBtn label="🎯 顔映え"   title="顔は絶対に変更しない。光・構図・背景・前景を最適化して顔を引き立てる（複数選択可）"                  onClick={() => onBoostToggle?.("face_pop")} disabled={disabled} variant="rose" active={activeBoosts.includes("face_pop")} />
+        {/* 展開：バズモード（旧バズり）＋映え補正（旧バズ寄せ） */}
+        {buzzOpen && (
+          <div className="w-full mt-1.5 p-2 rounded-lg border border-rose-500/20 bg-rose-500/5 flex flex-wrap gap-1.5">
+            <span className="w-full text-[10px] text-rose-300/60 leading-none mb-0.5">
+              ※ SNSで映える方向へ寄せる補正です。
+            </span>
+            <TagBtn label={viralMode ? "🔥 バズモード ON" : "🔥 バズモード"} title={viralMode ? "一発バズりモードをOFF（設定は維持）" : "SNS映えスタイルに補正モードをON（設定のみ）"} onClick={viralMode ? onViralOff : onViral} active={viralMode} variant="rose" disabled={disabled} />
+            <TagBtn label="🧲 映え補正（構図・色・前景）" title="SNS映えする構図・色・前景に寄せる。明暗差・顔周りの視線誘導・印象的な背景・強い一要素（複数選択可）" onClick={() => onBoostToggle?.("buzz")} disabled={disabled} variant="rose" active={activeBoosts.includes("buzz")} />
+          </div>
+        )}
+      </CategoryRow>
+
+      <div className="border-t border-white/5" />
+
+      {/* ══════ 変化 ══════ */}
+      <CategoryRow label="変化">
+        {/* 👑 神引き（▼で おまかせ・カオス・大きく変える・軸別 を格納） */}
         <button
           type="button"
           onClick={() => setGodOpen((v) => !v)}
           disabled={disabled}
-          title="神引き＝変更対象と詳細を自動で埋める強力プリセット。クリックで種類を展開"
+          title="神引き＝変更対象と詳細を自動で埋める強力プリセット。おまかせ・大きく変えるもここに。クリックで展開"
           className={[
             "rounded-lg px-3 py-1.5 text-[12px] font-bold border leading-none whitespace-nowrap transition",
-            activeGodChips.length > 0
+            changeChips.length > 0
               ? "border-amber-400/65 bg-amber-400/15 text-amber-100 shadow-[0_0_8px_-2px_rgba(251,191,36,0.5)]"
               : "border-amber-400/30 bg-transparent text-amber-300/70 hover:text-amber-200 hover:border-amber-400/55",
             "disabled:opacity-40 disabled:cursor-not-allowed",
@@ -256,24 +296,28 @@ export function QuickActions({
         >
           👑 神引き {godOpen ? "▲" : "▼"}
         </button>
-        {/* アクティブな神引きをチップ表示（閉じていても何が効いているか分かる） */}
-        {activeGodChips.map((label, i) => (
+        {/* アクティブを チップ表示（閉じていても何が効いているか分かる） */}
+        {changeChips.map((label, i) => (
           <span key={i} className="inline-flex items-center text-[11px] font-semibold px-2 py-0.5 rounded border border-amber-400/45 bg-amber-400/10 text-amber-100 leading-none">
             {label}
           </span>
         ))}
-        {activeGodChips.length === 0 && (
-          <span className="text-[11px] text-text-muted/40 self-center">未選択</span>
-        )}
+        <TagBtn label="🔄 別案"      title="現在の画像と設定を保持したまま雰囲気をひと揺らしして再生成"       onClick={onVariant} disabled={disabled || !canVariant} variant="cyan" />
 
-        {/* 展開：全11種をまとめて表示 */}
+        {/* 📈SNSバズ・🌐カルチャーは詳細設定(DetailsCard)のSNS/カルチャータブ内「おまかせ」へ移設済み（1b） */}
+
+        {/* 展開：おまかせ・カオス・大きく変える（変化アクション）＋ 神引き軸別（既存・不変） */}
         {godOpen && (
           <div className="w-full mt-1.5 p-2 rounded-lg border border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1.5">
             <span className="w-full text-[10px] text-amber-300/60 leading-none mb-0.5">
-              ※ 神引きは「変更対象・詳細設定を自動で埋める」プリセットです。押すと該当の変更対象が自動でONになります。
+              ※ 神引き＝変更対象・詳細を自動で埋めるプリセット。おまかせ・大きく変えるも含みます。押すと該当の変更対象が自動でONになります。
             </span>
-            <TagBtn label="👑 ノーマル"   title="全スコープON・最大インパクトで設定を適用（設定のみ）"                                              onClick={() => onGodToggle("normal")}      disabled={disabled} variant="gold" active={activeGodModes.includes("normal")} />
+            <TagBtn label="🎲 おまかせ"  title="変更範囲・雰囲気・案数をすべてランダムに決めて設定適用"            onClick={onRandom}  disabled={disabled} variant="default" />
             <TagBtn label={chaosLabel ? `🎲 ${chaosLabel}` : "🎲 カオス"} title="普段あり得ない世界観を3〜4軸強制融合。毎回前例のない組み合わせを生成" onClick={() => onGodToggle("chaos")}       disabled={disabled} variant="gold" active={activeGodModes.includes("chaos")} />
+            <TagBtn label="🎭 雰囲気を逆に" title="現在の雰囲気と逆方向へ振る。かわいい→ダーク等の映えるギャップを毎回ランダム"                          onClick={() => onAssistToggle("gap")}         disabled={disabled} variant="amber" active={activeAssistModes.includes("gap")} />
+            <TagBtn label="🌀 世界観を一新" title="顔・同一性は維持したまま、変更対象の軸を前回と全く違う世界観へ大胆に変化（複数選択可）"                onClick={() => onBoostToggle?.("other_world")} disabled={disabled} variant="amber" active={activeBoosts.includes("other_world")} />
+            <div className="w-full border-t border-amber-400/10 my-0.5" />
+            <TagBtn label="👑 ノーマル"   title="全スコープON・最大インパクトで設定を適用（設定のみ）"                                              onClick={() => onGodToggle("normal")}      disabled={disabled} variant="gold" active={activeGodModes.includes("normal")} />
             <TagBtn label="🧥 衣装"       title="衣装スコープのみ変更。顔・背景・ポーズ・カメラは固定。毎回異なる高品質な衣装（最大2コンボ）"        onClick={() => onGodToggle("outfit")}      disabled={disabled} variant="gold" active={activeGodModes.includes("outfit")} />
             <TagBtn label="🌍 背景"       title="人物固定。温室・美術館・地下図書館など珍しい背景を毎回ランダム（最大2コンボ）"                       onClick={() => onGodToggle("bg")}          disabled={disabled} variant="gold" active={activeGodModes.includes("bg")} />
             <TagBtn label="📷 構図"       title="カメラ視点・フレーミングを強変更。超寄り・魚眼・ドローン・肩越しなど。顔固定"                       onClick={() => onGodToggle("composition")} disabled={disabled} variant="gold" active={activeGodModes.includes("composition")} />
@@ -289,36 +333,44 @@ export function QuickActions({
 
       <div className="border-t border-white/5" />
 
-      {/* ══════ 生成補助 ══════ */}
-      <CategoryRow label="生成補助">
-        {/* A. 強化系 */}
-        <TagBtn label={viralMode ? "🔥 バズりON" : "🔥 バズり"} title={viralMode ? "一発バズりモードをOFF（設定は維持）" : "SNS映えスタイルに補正モードをON（設定のみ）"} onClick={viralMode ? onViralOff : onViral} active={viralMode} variant="rose" disabled={disabled} />
-        <TagBtn label="🧲 バズ寄せ" title="SNS映えする構図・色・前景に寄せる。明暗差・顔周りの視線誘導・印象的な背景・強い一要素（複数選択可）" onClick={() => onBoostToggle?.("buzz")}     disabled={disabled} variant="rose" active={activeBoosts.includes("buzz")} />
-        <TagBtn label="🎯 顔映え"   title="顔は絶対に変更しない。光・構図・背景・前景を最適化して顔を引き立てる（複数選択可）"                  onClick={() => onBoostToggle?.("face_pop")} disabled={disabled} variant="rose" active={activeBoosts.includes("face_pop")} />
-
-        {/* 区切り：回避系 */}
-        <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
-        <TagBtn label={avoidCliche ? "🛡 量産回避ON" : "🛡 量産回避"} title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避ける常時補正（既定ON・サーバ側で全案に効く）" onClick={() => onAvoidClicheChange?.(!avoidCliche)} disabled={disabled} variant="amber" active={avoidCliche} />
-        <TagBtn label="🔁 被り回避"  title="直近の生成と似た背景・衣装・色・前景・カメラ・世界観を避ける（複数選択可）"                          onClick={() => onBoostToggle?.("avoid_overlap")} disabled={disabled} variant="amber" active={activeBoosts.includes("avoid_overlap")} />
-        <TagBtn label="🎭 ギャップ化" title="現在の雰囲気と逆方向へ振る。かわいい→ダーク等の映えるギャップを毎回ランダム"                          onClick={() => onAssistToggle("gap")}         disabled={disabled} variant="amber" active={activeAssistModes.includes("gap")} />
-        <TagBtn label="🌀 別世界"    title="顔・同一性は維持したまま、変更対象の軸を前回と全く違う世界観へ大胆に変化（複数選択可）"                onClick={() => onBoostToggle?.("other_world")} disabled={disabled} variant="amber" active={activeBoosts.includes("other_world")} />
-
-        {/* 区切り：SNS / 文化 */}
-        <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
-        <TagBtn label="📈 SNSバズ"   title="SNS向けビジュアル補正をランダム追加（最大2コンボ。詳細設定の「SNS」でも選択可）"           onClick={onSnsSingle}     disabled={disabled} variant="rose"  active={activeSnsLabels.length > 0} />
-        <TagBtn label="🌐 カルチャー" title="都市・文化圏の世界観をランダム追加（最大2コンボ。詳細設定の「カルチャー」でも選択可）"     onClick={onCultureSingle} disabled={disabled} variant="teal"  active={activeCultureLabels.length > 0} />
-
-        {/* 区切り：操作系 */}
-        <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
-        <TagBtn label="🎲 おまかせ"  title="変更範囲・雰囲気・案数をすべてランダムに決めて設定適用"            onClick={onRandom}  disabled={disabled} variant="default" />
-        <TagBtn label="🔄 別案"      title="現在の画像と設定を保持したまま雰囲気をひと揺らしして再生成"       onClick={onVariant} disabled={disabled || !canVariant} variant="cyan" />
+      {/* ══════ 回避 ══════ */}
+      <CategoryRow label="回避">
+        {/* 🛡 テンプレ回避（▼で テンプレ回避・被り回避・AIっぽさチェック。旧🛡量産回避＝同一フラグを「テンプレ回避」に統一表示） */}
+        <button
+          type="button"
+          onClick={() => setAvoidOpen((v) => !v)}
+          disabled={disabled}
+          title="AIっぽさ・直近との被りを避ける設定とチェック。クリックで展開"
+          className={[
+            "rounded-lg px-3 py-1.5 text-[13px] font-semibold border leading-none whitespace-nowrap transition",
+            (avoidCliche || activeBoosts.includes("avoid_overlap"))
+              ? "border-amber-400/80 bg-amber-400/20 text-amber-100 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
+              : "border-amber-400/40 bg-amber-400/8 text-amber-200 hover:bg-amber-400/15 hover:border-amber-400/70",
+            "disabled:opacity-40 disabled:cursor-not-allowed",
+          ].join(" ")}
+        >
+          🛡 テンプレ回避 {avoidOpen ? "▲" : "▼"}
+        </button>
+        {avoidCliche && (
+          <span className="text-[11px] text-amber-300/70 font-semibold self-center ml-0.5">既定ON</span>
+        )}
+        {/* 展開：テンプレ回避（旧量産回避）＋被り回避＋AIっぽさチェック（旧量産AI検知・解析のみ） */}
+        {avoidOpen && (
+          <div className="w-full mt-1.5 p-2 rounded-lg border border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1.5">
+            <span className="w-full text-[10px] text-amber-300/60 leading-none mb-0.5">
+              ※ AIっぽい量産パターンや直近との被りを避けます。「AIっぽさチェック」は生成を変えず解析のみ。
+            </span>
+            <TagBtn label={avoidCliche ? "🛡 テンプレ回避 ON" : "🛡 テンプレ回避"} title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避ける常時補正（既定ON・サーバ側で全案に効く）" onClick={() => onAvoidClicheChange?.(!avoidCliche)} disabled={disabled} variant="amber" active={avoidCliche} />
+            <TagBtn label="🔁 被り回避"  title="直近の生成と似た背景・衣装・色・前景・カメラ・世界観を避ける（複数選択可）"                          onClick={() => onBoostToggle?.("avoid_overlap")} disabled={disabled} variant="amber" active={activeBoosts.includes("avoid_overlap")} />
+            <TagBtn label="🔎 AIっぽさチェック" title="生成済みプロンプトを解析して量産AIパターンを検出。高リスクなら自動で新構成へ変換（生成は変えず解析のみ）" onClick={onMassProductionCheck} disabled={disabled} variant="rose" />
+          </div>
+        )}
       </CategoryRow>
 
       <div className="border-t border-white/5" />
 
       {/* ══════ ツール ══════ */}
       <CategoryRow label="ツール">
-        <TagBtn label="🚫 量産AI検知" title="生成済みプロンプトを解析して量産AIパターンを検出。高リスクなら自動で新構成へ変換" onClick={onMassProductionCheck} variant="rose"    />
         <TagBtn label="⭐ お気に入り" title="お気に入り登録したプロンプトを右パネルで表示"                                    onClick={onToggleFavPanel}      variant="amber"  active={favPanelOpen} />
         <TagBtn label="📅 履歴"       title="月ごとのカレンダーで履歴を確認"                                                onClick={onShowCalendar}        variant="sky"    />
         <TagBtn label="↩ 戻る"        title={canUndo ? "1つ前の生成結果に戻す" : "戻れる履歴がありません"}                  onClick={onUndo}                variant="default" disabled={disabled || !canUndo} />

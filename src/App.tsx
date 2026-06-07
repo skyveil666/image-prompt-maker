@@ -2708,13 +2708,9 @@ export default function App() {
                 avoidCliche={avoidCliche}
                 onAvoidClicheChange={setAvoidCliche}
                 onAssistToggle={handleAssistToggle}
-                onSnsSingle={handleSnsSingle}
-                onCultureSingle={handleCultureSingle}
                 activeGodModes={activeGodModes}
                 activeBoosts={activeBoosts}
                 activeAssistModes={activeAssistModes}
-                activeSnsLabels={activeSnsTypes.map(getSnsLabel)}
-                activeCultureLabels={activeCultureTypes.map(getCultureLabel)}
                 onResetAll={handleResetAll}
               />
 
@@ -2947,6 +2943,8 @@ export default function App() {
                 onForbiddenTokensChange={setForbiddenTokens}
                 onSnsSelect={handleSns}
                 onCultureSelect={handleCulture}
+                onSnsRandom={handleSnsSingle}
+                onCultureRandom={handleCultureSingle}
               />
 
 
