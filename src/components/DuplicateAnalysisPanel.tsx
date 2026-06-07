@@ -21,7 +21,7 @@ import { getLevel, levelMeta, LEVEL_META, countLevels, getComboPolicy, countComb
 import type { MotifCombo } from "../lib/historyAnalyzer";
 import type { AgentAnalysis, AgentActionId } from "../lib/aiAgent";
 import type { ImageAnalysisResult } from "../lib/imageAnalyzer";
-import type { RatingAnalysis, RatingTrends, RatingPeriodKey } from "../lib/ratingAnalyzer";
+import type { RatingAnalysis, RatingTrends, RatingPeriodKey, SuccessRankings, ElementRankEntry, ComboRankEntry, CaseRankEntry } from "../lib/ratingAnalyzer";
 import { type PreferenceProfile } from "../lib/preferenceProfile";
 import type { ColorAnalysis, ColorAxis, ColorSuccessAnalysis } from "../lib/colorAnalyzer";
 import type { CandidateMotif } from "../lib/discoveryMotifs";
@@ -111,6 +111,8 @@ interface Props {
   ratingAnalysis:       RatingAnalysis | null;
   /** 評価集計 強化（②）：期間別/軸別/カテゴリ別成功率/月別/推移（表示専用） */
   ratingTrends?:        RatingTrends | null;
+  /** 成功/失敗ランキング（③）：構成/要素横断/案単位（表示専用） */
+  successRankings?:     SuccessRankings | null;
   /** 実 Gemini 分析の結果プロファイル（誘導表示の「分析済み/未分析」判定にのみ使用） */
   preferenceProfile:    PreferenceProfile | null;
   /** サンプル可能件数（評価が1つでも付いている画像数） */
@@ -607,6 +609,180 @@ function AxisPrefRow({ stat }: { stat: { jp: string; emoji: string; good: number
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── セクション：🏆 成功/失敗ランキング（③）勝ちパターン/神引き候補発見 ──
+
+/** 成功率の横棒（率帯で緑/橙/赤） */
+function RankBar({ rate }: { rate: number }) {
+  const pct = Math.round(rate * 100);
+  const color = rate >= 0.66 ? "bg-emerald-400/80" : rate >= 0.4 ? "bg-amber-400/75" : "bg-rose-400/75";
+  return (
+    <div className="flex-1 h-2 rounded-full bg-white/8 overflow-hidden min-w-[36px]">
+      <div className={`h-full ${color} transition-all`} style={{ width: `${pct}%` }} />
+    </div>
+  );
+}
+
+function ComboRankList({ entries, tone }: { entries: ComboRankEntry[]; tone: "success" | "fail" }) {
+  if (entries.length === 0) return <p className="text-[11px] text-slate-500 px-1 py-1">該当なし（最小サンプル未満）。</p>;
+  return (
+    <ol className="space-y-1">
+      {entries.map((c, i) => (
+        <li key={c.key} className="flex items-start gap-2 rounded-md border border-white/8 bg-white/3 px-2 py-1.5">
+          <span className="text-[10px] text-slate-500 tabular-nums w-5 text-right shrink-0 pt-0.5">{i + 1}</span>
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-x-0.5 gap-y-0.5">
+              {c.parts.map((p, j) => (
+                <span key={j} className="text-[11px] text-slate-200">
+                  <span className="text-slate-500">{p.axisJp}:</span>{p.valueJp}
+                  {j < c.parts.length - 1 && <span className="text-slate-600 mx-0.5">×</span>}
+                </span>
+              ))}
+            </div>
+            <RankBar rate={c.rate} />
+          </div>
+          <span className="text-[11px] tabular-nums w-[72px] text-right shrink-0 pt-0.5">
+            <span className={tone === "success" ? "text-emerald-200 font-bold" : "text-rose-200 font-bold"}>{Math.round(c.rate * 100)}%</span>
+            <br /><span className="text-slate-500 text-[10px]">{c.good}/{c.total}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function ElementRankList({ entries, tone }: { entries: ElementRankEntry[]; tone: "success" | "fail" }) {
+  if (entries.length === 0) return <p className="text-[11px] text-slate-500 px-1 py-1">該当なし（最小サンプル未満）。</p>;
+  return (
+    <ol className="space-y-1">
+      {entries.map((e, i) => (
+        <li key={e.key} className="flex items-center gap-2 rounded-md border border-white/8 bg-white/3 px-2 py-1">
+          <span className="text-[10px] text-slate-500 tabular-nums w-5 text-right shrink-0">{i + 1}</span>
+          <span className="text-[11px] text-slate-200 w-28 truncate shrink-0" title={`${e.axisJp} ${e.valueJp}`}>
+            {e.emoji} <span className="text-slate-500">{e.axisJp}</span> {e.valueJp}
+          </span>
+          <RankBar rate={e.rate} />
+          <span className="text-[11px] tabular-nums w-[70px] text-right shrink-0">
+            <span className={`font-bold ${tone === "success" ? "text-emerald-200" : "text-rose-200"}`}>{Math.round(e.rate * 100)}%</span>
+            <span className="text-slate-500"> {e.good}/{e.total}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function CaseRankList({ entries, tone }: { entries: CaseRankEntry[]; tone: "success" | "fail" }) {
+  if (entries.length === 0) return <p className="text-[11px] text-slate-500 px-1 py-1">該当なし。</p>;
+  return (
+    <ol className="space-y-1">
+      {entries.map((c, i) => (
+        <li key={c.id || i} className="rounded-md border border-white/8 bg-white/3 px-2 py-1.5">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-[10px] text-slate-500 tabular-nums w-5 text-right shrink-0">{i + 1}</span>
+            <span className={`text-[12px] font-bold tabular-nums ${tone === "success" ? "text-emerald-200" : "text-rose-200"}`}>★{c.avg.toFixed(2)}</span>
+            <span className="text-[10px] text-emerald-200/70">👍{c.good}</span>
+            <span className="text-[10px] text-rose-200/70">👎{c.bad}</span>
+            {c.createdAt != null && <span className="ml-auto text-[9px] text-slate-500">{new Date(c.createdAt).toLocaleDateString("ja-JP")}</span>}
+          </div>
+          {c.parts.length > 0 && (
+            <div className="flex flex-wrap gap-1 pl-7">
+              {c.parts.slice(0, 6).map((p, j) => (
+                <span key={j} className="text-[10px] text-slate-300 bg-white/5 rounded px-1 py-0.5">{p}</span>
+              ))}
+            </div>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function RankingSection({ rankings, colorSuccess }: { rankings: SuccessRankings | null; colorSuccess: ColorSuccessAnalysis | null }) {
+  if (!rankings) {
+    return (
+      <p className="text-[12px] text-slate-400 px-1 py-3 leading-snug">
+        🏆 まだ評価データがありません。生成結果に 👍/👎（と 背景/衣装/ポーズの軸別評価）を付けると、
+        成功/失敗の<span className="font-bold text-slate-200">構成・要素・案</span>ランキングがここに表示されます。
+      </p>
+    );
+  }
+
+  const { composition, cases, minSample, topN } = rankings;
+
+  // 要素横断：details要素＋色（既存 colorSuccess の色別成功率）を統合して順位付け（再抽出しない）
+  const colorEntries: ElementRankEntry[] = (colorSuccess?.successRate ?? []).map((c) => ({
+    key: `color:${c.colorId}`,
+    axisJp: "色",
+    emoji: "🎨",
+    valueJp: COLOR_GROUPS.find((g) => g.id === c.colorId)?.jp ?? c.colorId,
+    good: c.good, bad: c.bad, total: c.total, rate: c.total > 0 ? c.good / c.total : 0,
+  }));
+  const mergedElements = [...rankings.elements, ...colorEntries].filter((e) => e.total >= minSample);
+  // 成功リストは「成功1件以上」、失敗リストは「失敗1件以上」に限定（100%/0%の混入を防ぐ）
+  const elemSuccess = [...mergedElements].filter((e) => e.good > 0).sort((a, b) => b.rate - a.rate || b.total - a.total).slice(0, topN);
+  const elemFail = [...mergedElements].filter((e) => e.bad > 0).sort((a, b) => a.rate - b.rate || b.total - a.total).slice(0, topN);
+
+  return (
+    <div className="space-y-4 py-2">
+      {/* バナー */}
+      <div className="rounded-lg border border-amber-400/30 bg-amber-500/8 px-3 py-2">
+        <p className="text-[12px] text-amber-100/95 font-bold leading-snug">🏆 成功/失敗ランキング — 勝ちパターン発見・神引き候補発見</p>
+        <p className="text-[10px] text-slate-400 leading-snug mt-0.5">
+          成功＝評価5 / 失敗＝評価2・1（中立3は除外）。最小サンプル {minSample} 件以上を対象・各 TOP{topN}。全期間。
+        </p>
+      </div>
+
+      {/* ①構成（最重視）*/}
+      <div className="space-y-2">
+        <SectionTitle icon="🧩">構成（組合せ）ランキング — 最重要</SectionTitle>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/6 px-2.5 py-2 space-y-1.5">
+            <div className="text-[12px] font-bold text-emerald-200">🏆 成功構成 TOP{topN}</div>
+            <ComboRankList entries={composition.success} tone="success" />
+          </div>
+          <div className="rounded-lg border border-rose-400/25 bg-rose-500/6 px-2.5 py-2 space-y-1.5">
+            <div className="text-[12px] font-bold text-rose-200">💥 失敗構成 TOP{topN}</div>
+            <ComboRankList entries={composition.fail} tone="fail" />
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-500 px-1">※ 背景×衣装×髪型などの組合せ単位の成功率。神引きの“勝ち構成”候補・避けたい“負け構成”。</p>
+      </div>
+
+      {/* ②要素横断 */}
+      <div className="space-y-2">
+        <SectionTitle icon="✨">要素横断ランキング（全軸＋色）</SectionTitle>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/6 px-2.5 py-2 space-y-1.5">
+            <div className="text-[12px] font-bold text-emerald-200">✨ 成功要素 TOP{topN}</div>
+            <ElementRankList entries={elemSuccess} tone="success" />
+          </div>
+          <div className="rounded-lg border border-rose-400/25 bg-rose-500/6 px-2.5 py-2 space-y-1.5">
+            <div className="text-[12px] font-bold text-rose-200">⚠️ 失敗要素 TOP{topN}</div>
+            <ElementRankList entries={elemFail} tone="fail" />
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-500 px-1">※ 全軸（背景/衣装/髪型/カメラ/ライティング）＋色を横断。モチーフは「🔭発見」「重複分析」を参照。</p>
+      </div>
+
+      {/* ③案単位 */}
+      <div className="space-y-2">
+        <SectionTitle icon="📋">案単位ランキング</SectionTitle>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+          <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/6 px-2.5 py-2 space-y-1.5">
+            <div className="text-[12px] font-bold text-emerald-200">📈 成功案 TOP{topN}</div>
+            <CaseRankList entries={cases.success} tone="success" />
+          </div>
+          <div className="rounded-lg border border-rose-400/25 bg-rose-500/6 px-2.5 py-2 space-y-1.5">
+            <div className="text-[12px] font-bold text-rose-200">📉 失敗案 TOP{topN}</div>
+            <CaseRankList entries={cases.fail} tone="fail" />
+          </div>
+        </div>
+        <p className="text-[10px] text-slate-500 px-1">※ 個別生成案を全体評価の平均で順位付け（★＝平均評価）。</p>
+      </div>
     </div>
   );
 }
@@ -2002,7 +2178,7 @@ function DuplicateAnalysisPanelInner({
   onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
   colorWindowSize, onColorWindowSizeChange,
   imageAnalysis, onStartImageAnalysis, imageAnalyzeProgress, onCancelImageAnalysis,
-  ratingAnalysis, ratingTrends,
+  ratingAnalysis, ratingTrends, successRankings,
   preferenceProfile, profileSampleCount,
   agent, onAgentAction,
   onAutoFix, onReroll, onResetBias, onDismiss, asModal, onCenterClose,
@@ -2017,7 +2193,7 @@ function DuplicateAnalysisPanelInner({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [asModal, onCenterClose]);
-  const [tab, setTab] = useState<"dup" | "discovery" | "agent" | "color" | "image" | "pref" | "skyveil">("dup");
+  const [tab, setTab] = useState<"dup" | "discovery" | "agent" | "color" | "image" | "pref" | "rank" | "skyveil">("dup");
   // 🔭発見タブ（未開拓発見担当）
   const [discSearch, setDiscSearch] = useState("");
   const [discCount, setDiscCount] = useState<number>(20);
@@ -2293,6 +2469,23 @@ function DuplicateAnalysisPanelInner({
             </button>
             <button
               type="button"
+              onClick={() => setTab("rank")}
+              className={[
+                "text-[12px] font-bold px-2.5 py-1 rounded-md transition leading-none flex items-center gap-1",
+                tab === "rank"
+                  ? "bg-amber-500/20 text-amber-100 border border-amber-400/45"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
+              ].join(" ")}
+            >
+              🏆 成功/失敗
+              {successRankings && successRankings.composition.success.length > 0 && (
+                <span className="text-[9px] text-amber-200/70 leading-none">
+                  ({successRankings.composition.success.length + successRankings.composition.fail.length})
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
               onClick={() => setTab("skyveil")}
               className={[
                 "text-[12px] font-bold px-2.5 py-1 rounded-md transition leading-none flex items-center gap-1",
@@ -2327,6 +2520,11 @@ function DuplicateAnalysisPanelInner({
                 profile={preferenceProfile}
                 profileSampleCount={profileSampleCount}
               />
+            )}
+
+            {/* === 🏆 成功/失敗ランキングタブ（③・勝ちパターン/神引き候補発見）=== */}
+            {tab === "rank" && (
+              <RankingSection rankings={successRankings ?? null} colorSuccess={colorSuccess ?? null} />
             )}
 
             {/* === 🧬 skyveil好みAI タブ（好み最適化担当・生成に影響＝発見系とは別系統）=== */}

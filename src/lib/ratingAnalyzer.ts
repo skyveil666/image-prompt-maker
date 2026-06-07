@@ -619,3 +619,184 @@ export function analyzeRatingTrends(
 
   return { periods, monthly, trend, totalRated: periods.all.rated };
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+//  ③ 成功/失敗ランキング — 構成（組合せ）/ 要素横断 / 案単位
+//  目的：勝ちパターン発見・神引き候補発見。成功=評価5 / 失敗=評価2・1（中立3は除外）。
+//  ※ 表示専用。保存データ・既存集計・好み学習・生成には一切影響しない。
+//  ※ 要素横断の「色」は表示側で既存 colorSuccess（色別成功率）と統合する（再抽出しない）。
+// ════════════════════════════════════════════════════════════════════════════
+
+export interface ComboPart { axisJp: string; valueJp: string; }
+
+/** 構成（組合せ）単位の成功率エントリ */
+export interface ComboRankEntry {
+  key: string;
+  size: number;
+  parts: ComboPart[];
+  good: number;
+  bad: number;
+  total: number;
+  /** good/(good+bad)。0-1 */
+  rate: number;
+}
+
+/** 要素横断（単一要素）の成功率エントリ */
+export interface ElementRankEntry {
+  key: string;
+  axisJp: string;
+  valueJp: string;
+  emoji: string;
+  good: number;
+  bad: number;
+  total: number;
+  /** 0-1 */
+  rate: number;
+}
+
+/** 案（個別生成）単位の成功度エントリ */
+export interface CaseRankEntry {
+  id: string;
+  promptText: string;
+  /** 主要要素ラベル（絵文字＋値） */
+  parts: string[];
+  createdAt: number | null;
+  good: number;
+  bad: number;
+  rated: number;
+  /** 全体評価の平均 */
+  avg: number;
+}
+
+export interface SuccessRankings {
+  composition: { success: ComboRankEntry[]; fail: ComboRankEntry[] };
+  /** details軸の全要素（色は表示側で colorSuccess と統合してから順位付け） */
+  elements: ElementRankEntry[];
+  cases: { success: CaseRankEntry[]; fail: CaseRankEntry[] };
+  minSample: number;
+  topN: number;
+  totalRated: number;
+}
+
+const RANK_AXES: { axis: RatingAxis; jp: string; emoji: string }[] = [
+  { axis: "background", jp: "背景", emoji: "🏞" },
+  { axis: "outfit", jp: "衣装", emoji: "👗" },
+  { axis: "hair", jp: "髪型", emoji: "💇" },
+  { axis: "camera", jp: "カメラ", emoji: "📷" },
+  { axis: "lighting", jp: "ライティング", emoji: "💡" },
+];
+
+/** 配列から k 個の組合せを列挙（入力順を保持） */
+function combosOf<T>(arr: readonly T[], k: number): T[][] {
+  const n = arr.length;
+  const res: T[][] = [];
+  if (k > n || k <= 0) return res;
+  const idx = Array.from({ length: k }, (_, i) => i);
+  for (;;) {
+    res.push(idx.map((i) => arr[i]));
+    let i = k - 1;
+    while (i >= 0 && idx[i] === n - k + i) i--;
+    if (i < 0) break;
+    idx[i]++;
+    for (let j = i + 1; j < k; j++) idx[j] = idx[j - 1] + 1;
+  }
+  return res;
+}
+
+/**
+ * 成功/失敗ランキングを算出（全期間）。
+ * @param items 履歴アイテム（全件）
+ * @param opts.minSample 構成/要素の最小サンプル数（既定3）
+ * @param opts.topN 各ランキングの上限件数（既定20）
+ */
+export function analyzeSuccessRankings(
+  items: readonly PromptHistoryItem[],
+  opts?: { minSample?: number; topN?: number },
+): SuccessRankings {
+  const minSample = opts?.minSample ?? 3;
+  const topN = opts?.topN ?? 20;
+
+  const elemTally = new Map<string, { axisJp: string; valueJp: string; emoji: string; good: number; bad: number }>();
+  const comboTally = new Map<string, { parts: ComboPart[]; size: number; good: number; bad: number }>();
+  const caseTally = new Map<string, { promptText: string; parts: string[]; createdAt: number | null; good: number; bad: number; sum: number; rated: number }>();
+  let totalRated = 0;
+
+  for (const item of items) {
+    const present: { axis: RatingAxis; axisJp: string; valueJp: string; emoji: string; value: string }[] = [];
+    for (const a of RANK_AXES) {
+      const v = pickAxis(item, a.axis);
+      if (!v || SKIP_VALUES.has(v)) continue;
+      present.push({ axis: a.axis, axisJp: a.jp, emoji: a.emoji, value: v, valueJp: labelFor(a.axis, v) });
+    }
+    const partsLabels = present.map((p) => `${p.emoji}${p.valueJp}`);
+
+    const images = getResultImages(item);
+    let iGood = 0, iBad = 0, iSum = 0, iRated = 0;
+    for (let i = 0; i < images.length; i++) {
+      const r = getRatingAt(item, i);
+      if (r == null) continue;
+      const b = rtBucket(r);
+      iRated++; iSum += r; totalRated++;
+      if (b === "good") iGood++; else if (b === "bad") iBad++;
+      if (b === "normal") continue; // 中立は成功/失敗の集計に寄与させない
+
+      // 要素横断（単一要素）
+      for (const p of present) {
+        const key = `${p.axis}:${p.value}`;
+        let e = elemTally.get(key);
+        if (!e) { e = { axisJp: p.axisJp, valueJp: p.valueJp, emoji: p.emoji, good: 0, bad: 0 }; elemTally.set(key, e); }
+        if (b === "good") e.good++; else e.bad++;
+      }
+      // 構成（2要素・3要素の組合せ）
+      for (const k of [2, 3]) {
+        for (const combo of combosOf(present, k)) {
+          const key = combo.map((p) => `${p.axis}:${p.value}`).join("|");
+          let c = comboTally.get(key);
+          if (!c) { c = { parts: combo.map((p) => ({ axisJp: p.axisJp, valueJp: p.valueJp })), size: k, good: 0, bad: 0 }; comboTally.set(key, c); }
+          if (b === "good") c.good++; else c.bad++;
+        }
+      }
+    }
+    if (iRated > 0) {
+      const id = (item as { id?: string }).id ?? item.promptText ?? "";
+      caseTally.set(id, {
+        promptText: item.promptText ?? "",
+        parts: partsLabels,
+        createdAt: rtCreatedAt(item),
+        good: iGood, bad: iBad, sum: iSum, rated: iRated,
+      });
+    }
+  }
+
+  // 要素横断（details軸の全件。色は表示側で統合）
+  const elements: ElementRankEntry[] = [...elemTally.entries()].map(([key, e]) => {
+    const total = e.good + e.bad;
+    return { key, axisJp: e.axisJp, valueJp: e.valueJp, emoji: e.emoji, good: e.good, bad: e.bad, total, rate: total > 0 ? e.good / total : 0 };
+  });
+
+  // 構成
+  const eligibleCombos: ComboRankEntry[] = [...comboTally.entries()]
+    .map(([key, c]) => {
+      const total = c.good + c.bad;
+      return { key, size: c.size, parts: c.parts, good: c.good, bad: c.bad, total, rate: total > 0 ? c.good / total : 0 };
+    })
+    .filter((c) => c.total >= minSample);
+  // 成功リストは「成功1件以上」、失敗リストは「失敗1件以上」に限定（100%/0%の混入を防ぐ）
+  const compSuccess = [...eligibleCombos].filter((c) => c.good > 0).sort((a, b) => b.rate - a.rate || b.total - a.total).slice(0, topN);
+  const compFail = [...eligibleCombos].filter((c) => c.bad > 0).sort((a, b) => a.rate - b.rate || b.total - a.total).slice(0, topN);
+
+  // 案単位
+  const allCases: CaseRankEntry[] = [...caseTally.entries()].map(([id, c]) => ({
+    id, promptText: c.promptText, parts: c.parts, createdAt: c.createdAt,
+    good: c.good, bad: c.bad, rated: c.rated, avg: c.rated > 0 ? c.sum / c.rated : 0,
+  }));
+  const caseSuccess = [...allCases].filter((c) => c.good > 0).sort((a, b) => b.avg - a.avg || b.rated - a.rated).slice(0, topN);
+  const caseFail = [...allCases].filter((c) => c.bad > 0).sort((a, b) => a.avg - b.avg || b.rated - a.rated).slice(0, topN);
+
+  return {
+    composition: { success: compSuccess, fail: compFail },
+    elements,
+    cases: { success: caseSuccess, fail: caseFail },
+    minSample, topN, totalRated,
+  };
+}

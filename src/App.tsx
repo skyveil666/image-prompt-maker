@@ -106,8 +106,8 @@ import {
   type ImageAnalysisResult, type ImageFeature,
 } from "./lib/imageAnalyzer";
 import {
-  analyzeRatings, buildRatingBiasPayload, analyzeRatingTrends,
-  type RatingAnalysis, type RatingTrends,
+  analyzeRatings, buildRatingBiasPayload, analyzeRatingTrends, analyzeSuccessRankings,
+  type RatingAnalysis, type RatingTrends, type SuccessRankings,
 } from "./lib/ratingAnalyzer";
 import { SkyveilBar } from "./components/SkyveilBar";
 import {
@@ -1017,6 +1017,13 @@ export default function App() {
     if (historyItemsForColor.length === 0) return null;
     const t = analyzeRatingTrends(historyItemsForColor, Date.now());
     return t.totalRated > 0 ? t : null;
+  }, [historyItemsForColor]);
+
+  // ── 🏆 成功/失敗ランキング（③）：構成/要素横断/案単位（表示専用・勝ちパターン発見） ──
+  const successRankings: SuccessRankings | null = useMemo(() => {
+    if (historyItemsForColor.length === 0) return null;
+    const r = analyzeSuccessRankings(historyItemsForColor);
+    return r.totalRated > 0 ? r : null;
   }, [historyItemsForColor]);
 
   // ── 📸 画像分析：直近90日×特徴キャッシュから集計 ──
@@ -2790,6 +2797,7 @@ export default function App() {
                   onCancelImageAnalysis={cancelImageAnalysis}
                   ratingAnalysis={ratingAnalysis}
                   ratingTrends={ratingTrends}
+                  successRankings={successRankings}
                   preferenceProfile={preferenceProfile}
                   profileSampleCount={profileSampleCount}
                   agent={agentAnalysis}

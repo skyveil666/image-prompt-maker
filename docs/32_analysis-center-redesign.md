@@ -123,6 +123,18 @@ A1評価OK。重複分析を IPM の最重要機能として強化。複合構�
 - `DuplicateAnalysisPanel.tsx`: `ratingTrends` prop → `PreferenceReportSection` → `RatingTrendsSection`（期間タブ件数付き／選択期間サマリ：成功率・平均・成功-中立-失敗バー／📊推移DeltaPill／🎯軸別👍👎(期間) RateBar／🧩カテゴリ別成功率(期間) 軸別カード＋値別🟢best/🔻worst<50%／🗓月別評価 棒+成功率%+平均）。RateBar/DeltaPill ヘルパ追加。
 - **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離（合成64件・複数月・カテゴリ別成功率を意図設計）＝期間タブ 7(8)/30(28)/90(88)/全(128)・成功率68%平均3.82・推移▼-1%/▼-0.11・軸別👍👎(背景64%/衣装75%/ポーズ67%)・カテゴリ別(衣装ゴシック0%・アイドル/ドレス/Y2K=100%、髪型ゴシックロリ0% 等)・月別2026-02〜06。コンソール0エラー。データ不変。
 
-**残**: ③成功/失敗ランキング。
+### 5.9 ③成功/失敗ランキング（2026-06-07／未コミット）
+分析センターに**8タブ目「🏆 成功/失敗」**を新設。目的＝**勝ちパターン発見・神引き候補発見**。
+成功=評価5 / 失敗=評価2・1（中立3は除外）。優先順位＝**構成（最重視）→ 要素横断 → 案単位**。
+- `ratingAnalyzer.ts`: `analyzeSuccessRankings(items, {minSample,topN})` 追加（**表示専用**・全期間・既定 minSample3/topN20）。型 SuccessRankings/ComboRankEntry/ElementRankEntry/CaseRankEntry/ComboPart。
+  - **構成**：details5軸の2要素・3要素組合せ（`combosOf`）を成功率で集計。成功構成TOP20（good>0・率降順）/失敗構成TOP20（bad>0・率昇順）。
+  - **要素横断**：details5軸の単一要素を集計（色は表示側で統合）。
+  - **案単位**：個別案を全体評価の平均で集計。成功案TOP20（good>0）/失敗案TOP20（bad>0）。
+  - 成功/失敗リストは **good>0 / bad>0 でフィルタ**＝100%/0%の逆混入を防止。
+- `App.tsx`: `successRankings` memo → center に供給。
+- `DuplicateAnalysisPanel.tsx`: `successRankings` prop ＋ 「🏆 成功/失敗(N)」タブ ＋ `RankingSection`（バナー／🧩構成成功・失敗カード／✨要素横断＝**details要素＋既存 colorSuccess.successRate を統合**して順位付け／📋案単位 ★平均・👍👎・日付・要素チップ）。ヘルパ RankBar/ComboRankList/ElementRankList/CaseRankList。色再抽出はせず colorSuccess を再利用。
+- **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離（合成140件）＝成功構成「背景:雨の駅×衣装:アイドル 100% 14/14」等、失敗構成「未来的×ゴシック×アップ 0% 0/8」等（2・3要素）、要素横断 成功(全軸＋🎨色 100%群)・失敗(🎨赤系/未来的/ゴシック 0%)、案単位 ★平均＋チップ。フィルタ後 0%/100%の逆混入なし。コンソール0エラー。データ不変。
 
-**End of Doc 32（分析センター司令塔: 重複(+複合構成)/🔭発見/AI(発見志向)/色(成功率)/画像/評価集計/skyveil好みAI）**
+**①②③ 完了** — 残: P3b（昇格/userMotifs）、docs/29 §3 安定化、スコア式微調整、空気感(mood)軸（②保留分）。
+
+**End of Doc 32（分析センター司令塔: 重複(+複合構成)/🔭発見/AI(発見志向)/色(成功率)/画像/評価集計/🏆成功失敗/skyveil好みAI）**
