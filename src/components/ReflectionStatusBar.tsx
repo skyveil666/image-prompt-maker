@@ -19,21 +19,21 @@ import type { FavoriteProfile } from "../lib/favoriteProfile";
 // ── ラベル ──────────────────────────────────────────────────────────────────
 const SCOPE_JP: Record<Scope, string> = {
   background: "背景", foreground: "前景演出", pose: "ポーズ", hair: "髪",
-  outfit: "衣装", cosplay: "コスプレ", cyber: "機械化", camera: "カメラ",
+  outfit: "衣装", cosplay: "コスプレ", cyber: "🦾 メカ", camera: "カメラ",
   props: "小物", big_object: "大物", vehicle: "乗り物", myth: "神話",
   lighting: "ライティング", aspect_ratio: "比率",
 };
 
 const GOD_JP: Record<string, string> = {
-  normal: "👑 ノーマル神引き", chaos: "🎲 カオス神引き", composition: "📷 構図神引き",
+  normal: "👑 ノーマル神引き", chaos: "🎲 ぶっ飛び融合神引き", composition: "📷 構図神引き",
   outfit: "🧥 衣装神引き", bg: "🌍 背景神引き", color: "🎨 色神引き",
   world_god: "🌌 世界観神引き", props: "🎁 小物神引き", bigobject: "🏛️ 大物神引き",
   myth: "🐉 神話神引き", movie: "🎬 映画神引き",
 };
 
 const BOOST_JP: Record<string, string> = {
-  avoid_overlap: "🔁 被り回避", other_world: "🎲 別世界",
-  buzz: "🧲 バズ寄せ", face_pop: "🎯 顔映え",
+  avoid_overlap: "🔁 被り回避", other_world: "🌀 世界観を一新",
+  buzz: "🧲 映え補正", face_pop: "🎯 顔映え",
 };
 
 const WORLD_JP: Record<string, string> = {
@@ -273,7 +273,7 @@ export function ReflectionStatusBar(p: Props) {
             {p.viralMode && <Chip tone="assist">🔥 バズり</Chip>}
             {p.activeWorldPresets.map((w, i) => <Chip key={`w${i}`} tone="assist">{WORLD_JP[w] ?? w}</Chip>)}
             {/* 回避系 */}
-            {p.avoidCliche && <Chip tone="avoid">🛡 量産回避</Chip>}
+            {p.avoidCliche && <Chip tone="avoid">🛡 テンプレ回避</Chip>}
             {p.activeBoosts.map((b) => (
               <Chip key={b} tone={b === "avoid_overlap" || b === "other_world" ? "avoid" : "assist"}>
                 {BOOST_JP[b] ?? b}

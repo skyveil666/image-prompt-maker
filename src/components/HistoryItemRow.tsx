@@ -24,7 +24,7 @@ const SCOPE_LABEL: Record<Scope, string> = {
   hair: "髪",
   outfit: "衣装",
   cosplay: "コスプレ",
-  cyber: "機械化",
+  cyber: "🦾 メカ",
   camera: "カメラ",
   props: "持ち物",
   big_object: "大物",

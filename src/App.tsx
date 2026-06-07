@@ -1756,7 +1756,7 @@ export default function App() {
       setActiveGodModes(["chaos"]);
       setScopeFlashKey((k) => k + 1);
       setVariationMemory((prev) => updateMemory(prev, { moods: next.moods, scopes: next.scopes }));
-      showPresetToast(`🎲 カオス神引き: ${label}`, "設定を適用しました。プロンプトを生成してください。");
+      showPresetToast(`🎲 ぶっ飛び融合神引き: ${label}`, "設定を適用しました。プロンプトを生成してください。");
       return;
     }
 
@@ -1893,7 +1893,7 @@ export default function App() {
     setVariationMemory((prev) => updateMemory(prev, { scopes: combined.scopes }));
 
     const EFFECT_DISPLAY: Record<EffectPreset, string> = {
-      fgrich: "🌀 前景盛り", microcyber: "🧬 微機械化", clean: "🧊 清潔感",
+      fgrich: "🌀 前景盛り", microcyber: "🧬 うっすらメカ", clean: "🧊 清潔感",
     };
     const labels = next.map((e) => EFFECT_DISPLAY[e]);
     const msg = next.length === 1
@@ -1927,7 +1927,7 @@ export default function App() {
     setScopeFlashKey((k) => k + 1);
     setVariationMemory((prev) => updateMemory(prev, { moods: combined.moods, scopes: combined.scopes }));
 
-    showPresetToast(`🎭 ギャップ化 を適用しました`, APPLY_HINT);
+    showPresetToast(`🎭 雰囲気を逆に を適用しました`, APPLY_HINT);
   }, [activeAssistModes, buildInputs, variationMemory, showPresetToast]);
 
   // ─── SNSバズ・カルチャー：マルチセレクト（最大2コンボ） ────────────────────────
@@ -2104,7 +2104,7 @@ export default function App() {
   // handleResetGod / handleResetAssist は SelectionSummary（撤去済み）専用だったため削除。
   // 必要なリセットは onResetAll（全リセット）から行われる。
 
-  /** 🚫 量産AI検知：生成済みプロンプトを偏り分析し結果を表示する。 */
+  /** 🔎 AIっぽさチェック：生成済みプロンプトを偏り分析し結果を表示する。 */
   const handleMassProductionCheck = useCallback(() => {
     const texts = items
       .map((item) => item.promptText)

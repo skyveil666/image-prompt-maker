@@ -130,11 +130,11 @@ export function PromptGuardSection({
             ⚠️ 干渉 {validation.warnings.length}件
           </span>
         )}
-        {/* 量産AI度バッジ */}
+        {/* AIっぽさ度バッジ */}
         {massAI.level !== "low" && (
           <span className={["text-[10px] px-1.5 py-0.5 rounded-full border leading-none",
             massAI.level === "danger" ? "border-rose-400/50 bg-rose-500/12 text-rose-200" : "border-orange-400/40 bg-orange-400/10 text-orange-200"].join(" ")}>
-            量産AI:{massAI.level === "danger" ? "危険" : massAI.level === "high" ? "高" : "中"}
+            AIっぽさ:{massAI.level === "danger" ? "危険" : massAI.level === "high" ? "高" : "中"}
           </span>
         )}
         {/* 同一性リスクバッジ */}
@@ -279,7 +279,7 @@ export function PromptGuardSection({
             )}
           </div>
 
-          <GroupHeader icon="📊" label="プロンプト評価スコア" sub="skyveil好み・量産AI回避・バズり余地" />
+          <GroupHeader icon="📊" label="プロンプト評価スコア" sub="skyveil好み・AIっぽさ回避・バズり余地" />
 
           {/* ③ skyveil好みスコア ──────────────────────────────── */}
           <div className={["rounded-lg border bg-bg-panel/30 px-2.5 py-2 space-y-2", tone.ring].join(" ")}>
@@ -293,7 +293,7 @@ export function PromptGuardSection({
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               <SubScore label="同一性安全度" value={score.identitySafety} />
               <SubScore label="ロック遵守度" value={score.lockCompliance} />
-              <SubScore label="量産AI回避度" value={score.aiBiasAvoidance} />
+              <SubScore label="AIっぽさ回避度" value={score.aiBiasAvoidance} />
               <SubScore label="オリジナリティ" value={score.originality} />
               <SubScore label="トレンドバランス" value={score.trendBalance} />
               <SubScore label="バズり余地" value={score.buzzPotential} />
@@ -350,10 +350,10 @@ export function PromptGuardSection({
             )}
           </div>
 
-          {/* ⑥ 量産AI回避メーター ─────────────────────────────── */}
+          {/* ⑥ AIっぽさ回避メーター ─────────────────────────────── */}
           <div className="rounded-lg border border-bg-border bg-bg-panel/30 px-2.5 py-2 space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold text-text-base">量産AI回避メーター</span>
+              <span className="text-[11px] font-bold text-text-base">AIっぽさ回避メーター</span>
               <span className={["text-[12px] font-bold ml-auto", MASS_TONE[massAI.level]].join(" ")}>{massAILevelLabel(massAI.level)}</span>
             </div>
             <div className="flex flex-wrap gap-x-3 gap-y-0.5">
@@ -582,10 +582,10 @@ function PostReadyScore({ snsBuzz, skyveilFit, massAvoid, identitySafe }: {
       </span>
       <Item label="SNS映え"    v={snsBuzz}      tip="SNSで目を引く度合い（高いほどバズりやすい）" />
       <Item label="skyveil適性" v={skyveilFit}   tip="あなたの好み傾向との一致度（skyveil好み）" />
-      <Item label="量産AI回避"  v={massAvoid}    tip="ありがちな量産AI表現を避けられている度合い" />
+      <Item label="AIっぽさ回避"  v={massAvoid}    tip="ありがちなAIっぽい表現を避けられている度合い" />
       <Item label="同一性安全"  v={identitySafe} tip="顔・人物の同一性が崩れにくい度合い（最重視）" />
       <span className={["ml-auto text-[11px] font-bold px-2 py-0.5 rounded-full border leading-none cursor-help", verdict.cls].join(" ")}
-        title="判定基準：同一性安全≥70・skyveil適性≥70・量産AI回避≥55・SNS映え≥50 をすべて満たすと『投稿OK』。">
+        title="判定基準：同一性安全≥70・skyveil適性≥70・AIっぽさ回避≥55・SNS映え≥50 をすべて満たすと『投稿OK』。">
         {verdict.label}
       </span>
     </div>
@@ -607,7 +607,7 @@ function GroupHeader({ icon, label, sub }: { icon: string; label: string; sub: s
 const SUBSCORE_TIPS: Record<string, string> = {
   "同一性安全度": "顔・人物の同一性が崩れにくいか（保護が効いているほど高い）",
   "ロック遵守度": "変更対象外の軸に触れていないか（守るものを守れているほど高い）",
-  "量産AI回避度": "ありがちな量産AI表現を避けられているか",
+  "AIっぽさ回避度": "ありがちなAIっぽい表現を避けられているか",
   "オリジナリティ": "独自性・新規性の高さ",
   "トレンドバランス": "流行を取り入れつつ偏りすぎていないか",
   "バズり余地": "SNSで伸びる余地・インパクト",

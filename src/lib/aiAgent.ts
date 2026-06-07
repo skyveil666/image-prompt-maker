@@ -90,7 +90,7 @@ export interface AgentAnalysis {
 
 const SCOPE_LABEL: Record<Scope, string> = {
   background: "背景", foreground: "前景演出", pose: "ポーズ", hair: "髪",
-  outfit: "衣装", cosplay: "コスプレ", cyber: "機械化", camera: "カメラ",
+  outfit: "衣装", cosplay: "コスプレ", cyber: "🦾 メカ", camera: "カメラ",
   props: "持ち物", big_object: "大物", vehicle: "乗り物", myth: "神話",
   lighting: "ライティング", aspect_ratio: "比率",
 };

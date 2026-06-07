@@ -199,7 +199,7 @@ const SCOPE_META: Record<Scope, ScopeMeta> = {
   hair:         { label: "髪",         color: "text-fuchsia-200", activeBorder: "border-fuchsia-400/80",  activeBg: "bg-fuchsia-500/20",  activeShadow: "shadow-[0_0_10px_rgba(232,121,249,0.25)]"  },
   outfit:       { label: "衣装",       color: "text-sky-200",     activeBorder: "border-sky-400/80",      activeBg: "bg-sky-500/20",      activeShadow: "shadow-[0_0_10px_rgba(56,189,248,0.25)]"   },
   cosplay:      { label: "コスプレ",   color: "text-orange-200",  activeBorder: "border-orange-400/80",   activeBg: "bg-orange-500/20",   activeShadow: "shadow-[0_0_10px_rgba(251,146,60,0.25)]"   },
-  cyber:        { label: "機械化",     color: "text-teal-200",    activeBorder: "border-teal-400/80",     activeBg: "bg-teal-500/20",     activeShadow: "shadow-[0_0_10px_rgba(45,212,191,0.25)]"   },
+  cyber:        { label: "🦾 メカ",     color: "text-teal-200",    activeBorder: "border-teal-400/80",     activeBg: "bg-teal-500/20",     activeShadow: "shadow-[0_0_10px_rgba(45,212,191,0.25)]"   },
   pose:         { label: "ポーズ",     color: "text-amber-200",   activeBorder: "border-amber-400/80",    activeBg: "bg-amber-500/20",    activeShadow: "shadow-[0_0_10px_rgba(251,191,36,0.25)]"   },
   camera:       { label: "カメラ",     color: "text-cyan-200",    activeBorder: "border-cyan-400/80",     activeBg: "bg-cyan-500/20",     activeShadow: "shadow-[0_0_10px_rgba(34,211,238,0.25)]"   },
   props:        { label: "持ち物",     color: "text-rose-200",    activeBorder: "border-rose-400/80",     activeBg: "bg-rose-500/20",     activeShadow: "shadow-[0_0_10px_rgba(251,113,133,0.25)]"  },

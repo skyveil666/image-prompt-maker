@@ -257,7 +257,7 @@ export function TextureSliders({
             warnTitle="カメラ/アスペクト比変更範囲と競合します"
           />
           <ProtectChip
-            label="量産回避"
+            label="テンプレ回避"
             value={avoidCliche}
             onChange={onAvoidClicheChange}
             amber

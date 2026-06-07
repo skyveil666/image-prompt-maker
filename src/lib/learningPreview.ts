@@ -38,7 +38,7 @@ export interface LearningApplyPreviewResult {
 
 const SCOPE_LABEL: Record<string, string> = {
   background: "背景", foreground: "前景演出", pose: "ポーズ", hair: "髪", outfit: "衣装",
-  cosplay: "コスプレ", cyber: "機械化", camera: "カメラ", props: "小物", big_object: "大物",
+  cosplay: "コスプレ", cyber: "🦾 メカ", camera: "カメラ", props: "小物", big_object: "大物",
   vehicle: "乗り物", myth: "神話/幻獣", lighting: "ライティング", aspect_ratio: "アスペクト比",
 };
 

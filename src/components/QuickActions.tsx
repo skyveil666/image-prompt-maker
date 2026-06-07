@@ -30,7 +30,7 @@ export type FashionPreset = WorldPreset;
 
 /** 神引きモードの短い表示ラベル（アクティブチップ用） */
 const GOD_DISPLAY: Record<string, string> = {
-  normal: "👑 ノーマル", chaos: "🎲 カオス", outfit: "🧥 衣装", bg: "🌍 背景",
+  normal: "👑 ノーマル", chaos: "🎲 ぶっ飛び融合", outfit: "🧥 衣装", bg: "🌍 背景",
   composition: "📷 構図", color: "🎨 色", world_god: "🌌 世界観",
   props: "🎁 小物", bigobject: "🏛️ 大物", myth: "🐉 神話", movie: "🎬 映画",
 };
@@ -203,7 +203,7 @@ export function QuickActions({
   const changeChips: string[] = [
     ...activeGodChips,
     activeAssistModes.includes("gap") ? "🎭 逆に" : null,
-    activeBoosts.includes("other_world") ? "🌀 別世界" : null,
+    activeBoosts.includes("other_world") ? "🌀 世界観を一新" : null,
   ].filter((x): x is string => x !== null);
 
   return (
@@ -234,7 +234,7 @@ export function QuickActions({
       {/* ══════ 演出 / 効果 ══════ */}
       <CategoryRow label="演出">
         <TagBtn label="🌀 前景盛り" title="人物の前面に演出を追加。花びら・光・蝶・ガラス片・霧など毎回ランダムに選ぶ（最大2選択）"      onClick={() => onEffectToggle("fgrich")}     disabled={disabled} variant="cyan"   active={activeEffectTypes.includes("fgrich")} />
-        <TagBtn label="🧬 微機械化" title="ガチサイボーグ禁止。目元・頬・首元など一部にだけ上品な未来感アクセサリーを追加（最大2選択）"   onClick={() => onEffectToggle("microcyber")} disabled={disabled} variant="indigo" active={activeEffectTypes.includes("microcyber")} />
+        <TagBtn label="🧬 うっすらメカ" title="ガチサイボーグ禁止。目元・頬・首元など一部にだけ上品な未来感アクセサリーを追加（最大2選択）"   onClick={() => onEffectToggle("microcyber")} disabled={disabled} variant="indigo" active={activeEffectTypes.includes("microcyber")} />
         <TagBtn label="🧊 清潔感"   title="上品でクリーン。白・シルバー・透明感・高級広告・Appleっぽい仕上がり（最大2選択）"             onClick={() => onEffectToggle("clean")}      disabled={disabled} variant="sky"    active={activeEffectTypes.includes("clean")} />
         {activeEffectTypes.length > 1 && (
           <span className="text-[11px] text-cyan-300/70 font-semibold self-center ml-1">
@@ -313,7 +313,7 @@ export function QuickActions({
               ※ 神引き＝変更対象・詳細を自動で埋めるプリセット。おまかせ・大きく変えるも含みます。押すと該当の変更対象が自動でONになります。
             </span>
             <TagBtn label="🎲 おまかせ"  title="変更範囲・雰囲気・案数をすべてランダムに決めて設定適用"            onClick={onRandom}  disabled={disabled} variant="default" />
-            <TagBtn label={chaosLabel ? `🎲 ${chaosLabel}` : "🎲 カオス"} title="普段あり得ない世界観を3〜4軸強制融合。毎回前例のない組み合わせを生成" onClick={() => onGodToggle("chaos")}       disabled={disabled} variant="gold" active={activeGodModes.includes("chaos")} />
+            <TagBtn label={chaosLabel ? `🎲 ${chaosLabel}` : "🎲 ぶっ飛び融合"} title="普段あり得ない世界観を3〜4軸強制融合。毎回前例のない組み合わせを生成" onClick={() => onGodToggle("chaos")}       disabled={disabled} variant="gold" active={activeGodModes.includes("chaos")} />
             <TagBtn label="🎭 雰囲気を逆に" title="現在の雰囲気と逆方向へ振る。かわいい→ダーク等の映えるギャップを毎回ランダム"                          onClick={() => onAssistToggle("gap")}         disabled={disabled} variant="amber" active={activeAssistModes.includes("gap")} />
             <TagBtn label="🌀 世界観を一新" title="顔・同一性は維持したまま、変更対象の軸を前回と全く違う世界観へ大胆に変化（複数選択可）"                onClick={() => onBoostToggle?.("other_world")} disabled={disabled} variant="amber" active={activeBoosts.includes("other_world")} />
             <div className="w-full border-t border-amber-400/10 my-0.5" />

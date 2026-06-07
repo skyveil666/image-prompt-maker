@@ -32,7 +32,7 @@ const SCOPE_OPTIONS: { id: Scope; label: string; hint: string }[] = [
   { id: "hair",         label: "髪",         hint: "髪型・髪色のみ" },
   { id: "outfit",       label: "衣装",       hint: "服飾のみ" },
   { id: "cosplay",      label: "コスプレ",   hint: "コスプレ衣装・小物・スタイル" },
-  { id: "cyber",        label: "機械化",     hint: "体の一部をSF的に機械化・デジタル化" },
+  { id: "cyber",        label: "🦾 メカ",    hint: "体の一部をSF的にメカ化・デジタル化" },
   { id: "camera",       label: "カメラ",     hint: "視点・構図のみ変更" },
   { id: "props",        label: "小物",       hint: "刀・小物・SNS映えアイテム追加" },
   { id: "big_object",   label: "🧸 大物",    hint: "人物より大きい大道具・巨大オブジェ・大型アート作品を配置" },
