@@ -16,7 +16,7 @@
  *   - 高評価=5, 普通=3, 低評価=2/1
  */
 import type { PromptHistoryItem } from "../types";
-import { getRatingAt, getResultImages, getAxisRatingAt, type RatingAxisKey } from "./history";
+import { getRatingAt, getResultImages, getAxisRatingAt, AXIS_RATING_META, type RatingAxisKey } from "./history";
 
 /** 「好み分析レポート」を有効化する閾値（評価サンプル合計） */
 export const PREFERENCE_REPORT_THRESHOLD = 30;
@@ -352,4 +352,270 @@ export function buildRatingBiasPayload(
       },
     }),
   };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  評価集計 強化（②）— 期間別 / 軸別👍👎 / カテゴリ別成功率 / 月別 / 推移
+//  ※ analyzeRatings（好み学習・サーバ送信）は不変。本セクションは表示専用の追加集計。
+//    成功/失敗の基準は色成功率分析と統一：全体評価 5=成功 / 3=中立 / 2・1=失敗。
+// ════════════════════════════════════════════════════════════════════════════
+
+export type RatingPeriodKey = "d7" | "d30" | "d90" | "all";
+
+/** 軸別👍👎（背景/衣装/ポーズ・直接評価データ）の期間集計 */
+export interface AxisGoodBadStat {
+  axis: RatingAxisKey;
+  jp: string;
+  emoji: string;
+  good: number;
+  bad: number;
+  total: number;
+  /** good/(good+bad) */
+  goodRatio: number;
+}
+
+/** カテゴリ値別の成功率（全体評価×details軸出現から派生） */
+export interface CatSuccessEntry {
+  value: string;
+  jp: string;
+  good: number;
+  bad: number;
+  total: number;
+  /** good/(good+bad) */
+  rate: number;
+}
+
+/** details軸（背景/衣装/髪型/カメラ/ライティング）別の成功率集計 */
+export interface AxisSuccessStat {
+  axis: RatingAxis;
+  jp: string;
+  emoji: string;
+  good: number;
+  bad: number;
+  total: number;
+  rate: number;
+  /** 成功率の高いカテゴリ値（total>=2） */
+  best: CatSuccessEntry[];
+  /** 成功率の低いカテゴリ値（total>=2） */
+  worst: CatSuccessEntry[];
+}
+
+export interface RatingPeriodStat {
+  key: RatingPeriodKey;
+  label: string;
+  rated: number;
+  good: number;
+  normal: number;
+  bad: number;
+  /** 全体評価の平均（rated>0 のとき） */
+  avg: number;
+  /** 成功率 good/(good+bad) */
+  rate: number;
+  axisGoodBad: AxisGoodBadStat[];
+  axisSuccess: AxisSuccessStat[];
+}
+
+export interface MonthlyRatingStat {
+  /** "YYYY-MM" */
+  month: string;
+  count: number;
+  good: number;
+  normal: number;
+  bad: number;
+  avg: number;
+  rate: number;
+}
+
+export interface RatingTrend {
+  recentAvg: number;
+  prevAvg: number;
+  deltaAvg: number;
+  recentRate: number;
+  prevRate: number;
+  deltaRate: number;
+  recentN: number;
+  prevN: number;
+}
+
+export interface RatingTrends {
+  periods: Record<RatingPeriodKey, RatingPeriodStat>;
+  monthly: MonthlyRatingStat[];
+  trend: RatingTrend;
+  totalRated: number;
+}
+
+const RT_DAY_MS = 86_400_000;
+const RATING_PERIODS: { key: RatingPeriodKey; label: string; maxAgeDays: number | null }[] = [
+  { key: "d7", label: "直近7日", maxAgeDays: 7 },
+  { key: "d30", label: "直近30日", maxAgeDays: 30 },
+  { key: "d90", label: "直近90日", maxAgeDays: 90 },
+  { key: "all", label: "全期間", maxAgeDays: null },
+];
+
+function rtBucket(r: number): "good" | "normal" | "bad" {
+  if (r === 5) return "good";
+  if (r === 3) return "normal";
+  return "bad"; // 1, 2
+}
+
+function rtCreatedAt(item: PromptHistoryItem): number | null {
+  const t = (item as { createdAt?: number }).createdAt;
+  return typeof t === "number" && Number.isFinite(t) ? t : null;
+}
+
+function computePeriodStat(
+  key: RatingPeriodKey,
+  label: string,
+  items: readonly PromptHistoryItem[],
+): RatingPeriodStat {
+  let rated = 0, good = 0, normal = 0, bad = 0, sum = 0;
+
+  const axisGB: Record<RatingAxisKey, { good: number; bad: number }> = {
+    bg: { good: 0, bad: 0 }, outfit: { good: 0, bad: 0 }, pose: { good: 0, bad: 0 },
+  };
+  const catTally: Record<RatingAxis, Map<string, { good: number; bad: number }>> = {
+    background: new Map(), outfit: new Map(), hair: new Map(), camera: new Map(), lighting: new Map(),
+  };
+
+  for (const item of items) {
+    const images = getResultImages(item);
+    for (let i = 0; i < images.length; i++) {
+      // 軸別👍👎（直接評価データ）
+      for (const ax of ["bg", "outfit", "pose"] as RatingAxisKey[]) {
+        const v = getAxisRatingAt(item, ax, i);
+        if (v === 5) axisGB[ax].good++;
+        else if (v === 1) axisGB[ax].bad++;
+      }
+      // 全体評価
+      const r = getRatingAt(item, i);
+      if (r == null) continue;
+      rated++; sum += r;
+      const b = rtBucket(r);
+      if (b === "good") good++;
+      else if (b === "normal") normal++;
+      else bad++;
+      // カテゴリ別成功率（中立=3 は寄与させない）
+      if (b !== "normal") {
+        for (const ax of Object.keys(catTally) as RatingAxis[]) {
+          const val = pickAxis(item, ax);
+          if (!val || SKIP_VALUES.has(val)) continue;
+          let e = catTally[ax].get(val);
+          if (!e) { e = { good: 0, bad: 0 }; catTally[ax].set(val, e); }
+          if (b === "good") e.good++; else e.bad++;
+        }
+      }
+    }
+  }
+
+  const axisGoodBad: AxisGoodBadStat[] = (["bg", "outfit", "pose"] as RatingAxisKey[]).map((ax) => {
+    const g = axisGB[ax].good, bd = axisGB[ax].bad, total = g + bd;
+    return {
+      axis: ax, jp: AXIS_RATING_META[ax].jp, emoji: AXIS_RATING_META[ax].emoji,
+      good: g, bad: bd, total, goodRatio: total > 0 ? g / total : 0,
+    };
+  });
+
+  const axisSuccess: AxisSuccessStat[] = (Object.keys(catTally) as RatingAxis[]).map((ax) => {
+    const meta = AXIS_META[ax];
+    let g = 0, bd = 0;
+    const cats: CatSuccessEntry[] = [];
+    for (const [value, c] of catTally[ax].entries()) {
+      const total = c.good + c.bad;
+      g += c.good; bd += c.bad;
+      cats.push({ value, jp: labelFor(ax, value), good: c.good, bad: c.bad, total, rate: total > 0 ? c.good / total : 0 });
+    }
+    const total = g + bd;
+    const eligible = cats.filter((c) => c.total >= 2);
+    const best = [...eligible].sort((a, b2) => b2.rate - a.rate || b2.total - a.total).slice(0, 5);
+    const worst = [...eligible].sort((a, b2) => a.rate - b2.rate || b2.total - a.total).slice(0, 5);
+    return { axis: ax, jp: meta.jp, emoji: meta.emoji, good: g, bad: bd, total, rate: total > 0 ? g / total : 0, best, worst };
+  });
+
+  return {
+    key, label, rated, good, normal, bad,
+    avg: rated > 0 ? sum / rated : 0,
+    rate: (good + bad) > 0 ? good / (good + bad) : 0,
+    axisGoodBad, axisSuccess,
+  };
+}
+
+function computeWindow(
+  items: readonly PromptHistoryItem[], nowMs: number, fromDays: number, toDays: number,
+): { n: number; avg: number; rate: number } {
+  let n = 0, good = 0, bad = 0, sum = 0;
+  for (const item of items) {
+    const t = rtCreatedAt(item);
+    if (t == null) continue;
+    const age = (nowMs - t) / RT_DAY_MS;
+    if (age < fromDays || age >= toDays) continue;
+    const images = getResultImages(item);
+    for (let i = 0; i < images.length; i++) {
+      const r = getRatingAt(item, i);
+      if (r == null) continue;
+      n++; sum += r;
+      const b = rtBucket(r);
+      if (b === "good") good++; else if (b === "bad") bad++;
+    }
+  }
+  return { n, avg: n > 0 ? sum / n : 0, rate: (good + bad) > 0 ? good / (good + bad) : 0 };
+}
+
+/**
+ * 評価集計の強化版（表示専用）。
+ * 期間別（7/30/90/全期間）× 軸別👍👎（背景/衣装/ポーズ）× カテゴリ別成功率
+ * （背景/衣装/髪型/カメラ/ライティング）＋ 月別推移 ＋ 直近トレンド を一括算出。
+ *
+ * @param items 履歴アイテム（全件）
+ * @param nowMs 現在時刻（Date.now()）— 期間フィルタの基準
+ */
+export function analyzeRatingTrends(
+  items: readonly PromptHistoryItem[], nowMs: number,
+): RatingTrends {
+  const periods = {} as Record<RatingPeriodKey, RatingPeriodStat>;
+  for (const p of RATING_PERIODS) {
+    const filtered = p.maxAgeDays == null
+      ? items
+      : items.filter((it) => {
+          const t = rtCreatedAt(it);
+          return t != null && (nowMs - t) <= p.maxAgeDays! * RT_DAY_MS;
+        });
+    periods[p.key] = computePeriodStat(p.key, p.label, filtered);
+  }
+
+  // 月別
+  const byMonth = new Map<string, { count: number; good: number; normal: number; bad: number; sum: number }>();
+  for (const item of items) {
+    const t = rtCreatedAt(item);
+    if (t == null) continue;
+    const d = new Date(t);
+    const month = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const images = getResultImages(item);
+    for (let i = 0; i < images.length; i++) {
+      const r = getRatingAt(item, i);
+      if (r == null) continue;
+      let m = byMonth.get(month);
+      if (!m) { m = { count: 0, good: 0, normal: 0, bad: 0, sum: 0 }; byMonth.set(month, m); }
+      m.count++; m.sum += r;
+      const b = rtBucket(r);
+      if (b === "good") m.good++; else if (b === "normal") m.normal++; else m.bad++;
+    }
+  }
+  const monthly: MonthlyRatingStat[] = [...byMonth.entries()]
+    .map(([month, m]) => ({
+      month, count: m.count, good: m.good, normal: m.normal, bad: m.bad,
+      avg: m.count > 0 ? m.sum / m.count : 0,
+      rate: (m.good + m.bad) > 0 ? m.good / (m.good + m.bad) : 0,
+    }))
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  // 推移（直近30日 vs 31〜60日前）
+  const recent = computeWindow(items, nowMs, 0, 30);
+  const prev = computeWindow(items, nowMs, 30, 60);
+  const trend: RatingTrend = {
+    recentAvg: recent.avg, prevAvg: prev.avg, deltaAvg: recent.avg - prev.avg,
+    recentRate: recent.rate, prevRate: prev.rate, deltaRate: recent.rate - prev.rate,
+    recentN: recent.n, prevN: prev.n,
+  };
+
+  return { periods, monthly, trend, totalRated: periods.all.rated };
 }

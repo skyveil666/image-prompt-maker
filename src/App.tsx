@@ -106,8 +106,8 @@ import {
   type ImageAnalysisResult, type ImageFeature,
 } from "./lib/imageAnalyzer";
 import {
-  analyzeRatings, buildRatingBiasPayload,
-  type RatingAnalysis,
+  analyzeRatings, buildRatingBiasPayload, analyzeRatingTrends,
+  type RatingAnalysis, type RatingTrends,
 } from "./lib/ratingAnalyzer";
 import { SkyveilBar } from "./components/SkyveilBar";
 import {
@@ -1010,6 +1010,13 @@ export default function App() {
   const colorSuccess: ColorSuccessAnalysis | null = useMemo(() => {
     if (historyItemsForColor.length === 0) return null;
     return analyzeColorSuccess(historyItemsForColor, Date.now());
+  }, [historyItemsForColor]);
+
+  // ── ⭐ 評価集計 強化（②）：期間別/軸別👍👎/カテゴリ別成功率/月別/推移（表示専用） ──
+  const ratingTrends: RatingTrends | null = useMemo(() => {
+    if (historyItemsForColor.length === 0) return null;
+    const t = analyzeRatingTrends(historyItemsForColor, Date.now());
+    return t.totalRated > 0 ? t : null;
   }, [historyItemsForColor]);
 
   // ── 📸 画像分析：直近90日×特徴キャッシュから集計 ──
@@ -2782,6 +2789,7 @@ export default function App() {
                   imageAnalyzeProgress={imageAnalyzeProgress}
                   onCancelImageAnalysis={cancelImageAnalysis}
                   ratingAnalysis={ratingAnalysis}
+                  ratingTrends={ratingTrends}
                   preferenceProfile={preferenceProfile}
                   profileSampleCount={profileSampleCount}
                   agent={agentAnalysis}

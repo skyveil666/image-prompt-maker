@@ -112,6 +112,17 @@ A1評価OK。重複分析を IPM の最重要機能として強化。複合構�
 - **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離＋スクショ＝7タブ目「🔭発見(30)」・バナー・新語候補(glow particles/glorptone/wibblecore aesthetic/zandarpunk…)・🚫無視・件数/検索。データ不変。
 - 注: 旧 `AnalysisLabPanel` は休眠（左メニューはセンターへ再配線済み）。重複する発見タブは将来撤去候補。
 
-**残**: ②評価集計強化（期間別7/30/90/全期間＋推移＋月別）→ ③成功/失敗ランキング。
+### 5.8 ②評価集計強化（2026-06-07／未コミット）
+評価集計タブ（PreferenceReportSection）に**期間別・推移・軸別・カテゴリ別成功率・月別**を追加。
+評価軸データの実態＝**軸別👍👎は背景/衣装/ポーズの3軸のみ保存**＋画像ごとの全体評価(5/3/2/1)。
+→ 髪型/カメラ/ライティング等は「全体評価×カテゴリ出現」の**カテゴリ別成功率で派生**（色味は色分析タブの成功率分析で既出のため誘導）。空気感はmoodデータ分散のため将来課題。
+- `ratingAnalyzer.ts`: `analyzeRatingTrends(items, nowMs)` 追加（**表示専用**・既存 analyzeRatings/好み学習/サーバ送信は不変）。
+  - 成功/失敗基準を色成功率と統一＝**全体評価 5=成功 / 3=中立 / 2・1=失敗**。
+  - 期間別 7/30/90/全期間（createdAt窓・累積）× 軸別👍👎(bg/outfit/pose) × カテゴリ別成功率（details軸: 背景/衣装/髪型/カメラ/ライティング、値別best/worst）。月別(YYYY-MM)平均・成功率。推移＝直近30日 vs 31〜60日前の平均・成功率delta。型: RatingTrends/RatingPeriodKey/AxisGoodBadStat/CatSuccessEntry/AxisSuccessStat/RatingPeriodStat/MonthlyRatingStat/RatingTrend。
+- `App.tsx`: `ratingTrends` memo（analyzeRatingTrends(historyItemsForColor, Date.now())・totalRated>0でnull外）→ center に供給。
+- `DuplicateAnalysisPanel.tsx`: `ratingTrends` prop → `PreferenceReportSection` → `RatingTrendsSection`（期間タブ件数付き／選択期間サマリ：成功率・平均・成功-中立-失敗バー／📊推移DeltaPill／🎯軸別👍👎(期間) RateBar／🧩カテゴリ別成功率(期間) 軸別カード＋値別🟢best/🔻worst<50%／🗓月別評価 棒+成功率%+平均）。RateBar/DeltaPill ヘルパ追加。
+- **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離（合成64件・複数月・カテゴリ別成功率を意図設計）＝期間タブ 7(8)/30(28)/90(88)/全(128)・成功率68%平均3.82・推移▼-1%/▼-0.11・軸別👍👎(背景64%/衣装75%/ポーズ67%)・カテゴリ別(衣装ゴシック0%・アイドル/ドレス/Y2K=100%、髪型ゴシックロリ0% 等)・月別2026-02〜06。コンソール0エラー。データ不変。
+
+**残**: ③成功/失敗ランキング。
 
 **End of Doc 32（分析センター司令塔: 重複(+複合構成)/🔭発見/AI(発見志向)/色(成功率)/画像/評価集計/skyveil好みAI）**

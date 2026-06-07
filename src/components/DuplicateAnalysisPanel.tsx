@@ -21,7 +21,7 @@ import { getLevel, levelMeta, LEVEL_META, countLevels, getComboPolicy, countComb
 import type { MotifCombo } from "../lib/historyAnalyzer";
 import type { AgentAnalysis, AgentActionId } from "../lib/aiAgent";
 import type { ImageAnalysisResult } from "../lib/imageAnalyzer";
-import type { RatingAnalysis } from "../lib/ratingAnalyzer";
+import type { RatingAnalysis, RatingTrends, RatingPeriodKey } from "../lib/ratingAnalyzer";
 import { type PreferenceProfile } from "../lib/preferenceProfile";
 import type { ColorAnalysis, ColorAxis, ColorSuccessAnalysis } from "../lib/colorAnalyzer";
 import type { CandidateMotif } from "../lib/discoveryMotifs";
@@ -109,6 +109,8 @@ interface Props {
   // ── 💡 評価集計（軸別👍👎）。skyveil好みの分析・反映操作は SkyveilBar に一本化（M-3） ──
   /** 評価分析（軸別👍👎の集計を含む） */
   ratingAnalysis:       RatingAnalysis | null;
+  /** 評価集計 強化（②）：期間別/軸別/カテゴリ別成功率/月別/推移（表示専用） */
+  ratingTrends?:        RatingTrends | null;
   /** 実 Gemini 分析の結果プロファイル（誘導表示の「分析済み/未分析」判定にのみ使用） */
   preferenceProfile:    PreferenceProfile | null;
   /** サンプル可能件数（評価が1つでも付いている画像数） */
@@ -287,9 +289,10 @@ function LevelControl({
 // このタブは画像評価の実数集計の表示に役割特化する。
 
 function PreferenceReportSection({
-  ratingAnalysis, profile, profileSampleCount,
+  ratingAnalysis, ratingTrends, profile, profileSampleCount,
 }: {
   ratingAnalysis: RatingAnalysis | null;
+  ratingTrends: RatingTrends | null;
   /** 「分析済み/未分析」の誘導表示にのみ使用（操作は SkyveilBar へ） */
   profile: PreferenceProfile | null;
   profileSampleCount: number;
@@ -348,9 +351,226 @@ function PreferenceReportSection({
         </div>
       )}
 
+      {/* ②評価集計 強化：期間別 / 推移 / 軸別👍👎 / カテゴリ別成功率 / 月別 */}
+      {ratingTrends && <RatingTrendsSection trends={ratingTrends} />}
+
       <p className="text-[10px] text-slate-400 px-1 leading-snug border-t border-white/5 pt-2">
         ※ 評価は画像単位で IndexedDB に保存されます。再クリックで評価を変えられます。
       </p>
+    </div>
+  );
+}
+
+// ── セクション：⭐ 評価集計 強化（②）期間別/推移/軸別/カテゴリ別成功率/月別 ──
+
+const RT_PERIOD_TABS: { key: RatingPeriodKey; label: string }[] = [
+  { key: "d7", label: "7日" },
+  { key: "d30", label: "30日" },
+  { key: "d90", label: "90日" },
+  { key: "all", label: "全期間" },
+];
+
+/** 成功率の横棒（緑）＋数値。大型・全幅。 */
+function RateBar({ rate, good, bad, height = "h-3" }: { rate: number; good: number; bad: number; height?: string }) {
+  const pct = Math.round(rate * 100);
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`flex-1 ${height} rounded-full bg-white/8 overflow-hidden`}>
+        <div className="h-full bg-emerald-400/75 transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-[11px] text-slate-300 tabular-nums w-[88px] text-right shrink-0">
+        {pct}% <span className="text-emerald-200/70">{good}</span><span className="text-slate-500">/</span><span className="text-rose-200/70">{bad}</span>
+      </span>
+    </div>
+  );
+}
+
+function DeltaPill({ delta, unit = "" }: { delta: number; unit?: string }) {
+  const up = delta > 0.0001, down = delta < -0.0001;
+  const cls = up ? "text-emerald-300 bg-emerald-500/12 border-emerald-400/30"
+    : down ? "text-rose-300 bg-rose-500/12 border-rose-400/30"
+      : "text-slate-400 bg-white/5 border-white/10";
+  const arrow = up ? "▲" : down ? "▼" : "→";
+  const sign = up ? "+" : "";
+  return (
+    <span className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${cls}`}>
+      {arrow} {sign}{unit === "%" ? Math.round(delta * 100) : delta.toFixed(2)}{unit}
+    </span>
+  );
+}
+
+function RatingTrendsSection({ trends }: { trends: RatingTrends }) {
+  const [pk, setPk] = useState<RatingPeriodKey>("d30");
+  const p = trends.periods[pk];
+  const tr = trends.trend;
+  const monthly = trends.monthly.slice(-12); // 直近12ヶ月
+  const maxMonthCount = Math.max(1, ...monthly.map((m) => m.count));
+
+  return (
+    <div className="space-y-3 pt-1">
+      <SectionTitle icon="📈">評価集計（期間別・推移・月別）</SectionTitle>
+
+      {/* 期間タブ */}
+      <div className="flex items-center gap-1.5 flex-wrap px-1">
+        {RT_PERIOD_TABS.map((t) => {
+          const active = pk === t.key;
+          const n = trends.periods[t.key].rated;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setPk(t.key)}
+              className={`rounded-md px-2.5 py-1 text-[12px] font-bold border transition-colors ${
+                active
+                  ? "bg-emerald-500/20 border-emerald-400/50 text-emerald-100"
+                  : "bg-white/4 border-white/10 text-slate-300 hover:bg-white/8"
+              }`}
+            >
+              {t.label}<span className="ml-1 text-[10px] font-normal opacity-70">({n})</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 選択期間サマリ */}
+      <div className="rounded-lg border border-white/12 bg-white/4 px-3 py-2.5 space-y-2">
+        {p.rated === 0 ? (
+          <p className="text-[12px] text-slate-400">この期間の評価データはありません。</p>
+        ) : (
+          <>
+            <div className="flex items-end gap-4 flex-wrap">
+              <div>
+                <div className="text-[10px] text-slate-400">成功率（評価5 / 評価1・2）</div>
+                <div className="text-[26px] font-black text-emerald-200 leading-none tabular-nums">
+                  {Math.round(p.rate * 100)}<span className="text-[15px]">%</span>
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400">平均評価</div>
+                <div className="text-[20px] font-bold text-slate-100 leading-none tabular-nums">{p.avg.toFixed(2)}</div>
+              </div>
+              <div className="text-[11px] text-slate-300 ml-auto text-right leading-relaxed">
+                評価枚数 <span className="font-bold text-slate-100">{p.rated}</span><br />
+                <span className="text-emerald-200">成功 {p.good}</span> ・ <span className="text-slate-400">中立 {p.normal}</span> ・ <span className="text-rose-200">失敗 {p.bad}</span>
+              </div>
+            </div>
+            <div className="flex h-3 rounded-full overflow-hidden bg-white/8">
+              <div className="bg-emerald-400/75" style={{ width: `${(p.good / p.rated) * 100}%` }} />
+              <div className="bg-slate-400/40" style={{ width: `${(p.normal / p.rated) * 100}%` }} />
+              <div className="bg-rose-400/70" style={{ width: `${(p.bad / p.rated) * 100}%` }} />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 推移（直近30日 vs 前30日）*/}
+      <div className="rounded-lg border border-sky-400/25 bg-sky-500/8 px-3 py-2.5">
+        <div className="flex items-center gap-2 flex-wrap mb-1.5">
+          <span className="text-[12px] font-bold text-sky-100">📊 直近の推移</span>
+          <span className="text-[10px] text-slate-400">直近30日 vs 前30日（31〜60日前）</span>
+        </div>
+        {tr.recentN === 0 && tr.prevN === 0 ? (
+          <p className="text-[11px] text-slate-400">推移を出すには 60日以内の評価が必要です。</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-300">
+                成功率 <DeltaPill delta={tr.deltaRate} unit="%" />
+              </div>
+              <div className="text-[13px] tabular-nums text-slate-200">
+                {Math.round(tr.recentRate * 100)}% <span className="text-slate-500">←</span> <span className="text-slate-400">{Math.round(tr.prevRate * 100)}%</span>
+              </div>
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-300">
+                平均評価 <DeltaPill delta={tr.deltaAvg} />
+              </div>
+              <div className="text-[13px] tabular-nums text-slate-200">
+                {tr.recentAvg.toFixed(2)} <span className="text-slate-500">←</span> <span className="text-slate-400">{tr.prevAvg.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 軸別👍👎（背景/衣装/ポーズ・直接評価データ・選択期間）*/}
+      {p.axisGoodBad.some((a) => a.total > 0) && (
+        <div className="rounded-lg border border-white/12 bg-white/3 px-3 py-2.5 space-y-2">
+          <div className="text-[12px] font-bold text-slate-200">🎯 軸別👍👎（{RT_PERIOD_TABS.find((t) => t.key === pk)?.label}）</div>
+          {p.axisGoodBad.map((a) => (
+            <div key={a.axis} className="space-y-1">
+              <div className="flex items-center gap-2 text-[12px]">
+                <span className="font-bold text-slate-200 w-20 shrink-0">{a.emoji} {a.jp}</span>
+                {a.total === 0
+                  ? <span className="text-[11px] text-slate-500">評価なし</span>
+                  : <RateBar rate={a.goodRatio} good={a.good} bad={a.bad} />}
+              </div>
+            </div>
+          ))}
+          <p className="text-[10px] text-slate-500">※ 軸別👍👎は専用の評価データ（実数）です。</p>
+        </div>
+      )}
+
+      {/* カテゴリ別成功率（背景/衣装/髪型/カメラ/ライティング・全体評価から派生・選択期間）*/}
+      {p.axisSuccess.some((a) => a.total > 0) && (
+        <div className="space-y-2">
+          <div className="text-[12px] font-bold text-slate-200 px-1">🧩 カテゴリ別 成功率（{RT_PERIOD_TABS.find((t) => t.key === pk)?.label}）</div>
+          <p className="text-[10px] text-slate-400 px-1 -mt-1">全体評価（5=成功 / 2・1=失敗）× 各カテゴリ出現から派生。色味は「色分析」タブの成功率分析を参照。</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+            {p.axisSuccess.filter((a) => a.total > 0).map((a) => (
+              <div key={a.axis} className="rounded-lg border border-white/12 bg-white/3 px-3 py-2 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[12px] font-bold text-slate-200">{a.emoji} {a.jp}</span>
+                  <span className="ml-auto text-[11px] text-slate-300 tabular-nums">
+                    成功率 <span className="font-bold text-emerald-200">{Math.round(a.rate * 100)}%</span>
+                    <span className="text-slate-500"> （{a.good}/{a.good + a.bad}）</span>
+                  </span>
+                </div>
+                {a.best.length > 0 && (
+                  <div className="space-y-0.5">
+                    {a.best.map((c) => (
+                      <div key={`b-${c.value}`} className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-300 w-24 truncate shrink-0" title={c.jp}>🟢 {c.jp}</span>
+                        <RateBar rate={c.rate} good={c.good} bad={c.bad} height="h-2" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {a.worst.length > 0 && a.worst.some((c) => c.rate < 0.5) && (
+                  <div className="space-y-0.5 border-t border-white/8 pt-1">
+                    {a.worst.filter((c) => c.rate < 0.5).slice(0, 3).map((c) => (
+                      <div key={`w-${c.value}`} className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400 w-24 truncate shrink-0" title={c.jp}>🔻 {c.jp}</span>
+                        <RateBar rate={c.rate} good={c.good} bad={c.bad} height="h-2" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 月別評価 */}
+      {monthly.length > 0 && (
+        <div className="rounded-lg border border-white/12 bg-white/3 px-3 py-2.5 space-y-1.5">
+          <div className="text-[12px] font-bold text-slate-200">🗓 月別評価（直近{monthly.length}ヶ月）</div>
+          <div className="space-y-1">
+            {monthly.map((m) => (
+              <div key={m.month} className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-300 tabular-nums w-16 shrink-0">{m.month}</span>
+                <div className="flex-1 h-3 rounded bg-white/6 overflow-hidden relative">
+                  <div className="h-full bg-sky-400/30" style={{ width: `${(m.count / maxMonthCount) * 100}%` }} />
+                </div>
+                <span className="text-[10px] text-slate-400 tabular-nums w-12 text-right shrink-0">{m.count}枚</span>
+                <span className="text-[11px] tabular-nums w-14 text-right shrink-0 text-emerald-200">{Math.round(m.rate * 100)}%</span>
+                <span className="text-[10px] text-slate-400 tabular-nums w-16 text-right shrink-0">平均{m.avg.toFixed(2)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-500">※ 棒＝月の評価枚数・％＝成功率（評価5）・平均＝全体評価平均。</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1782,7 +2002,7 @@ function DuplicateAnalysisPanelInner({
   onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
   colorWindowSize, onColorWindowSizeChange,
   imageAnalysis, onStartImageAnalysis, imageAnalyzeProgress, onCancelImageAnalysis,
-  ratingAnalysis,
+  ratingAnalysis, ratingTrends,
   preferenceProfile, profileSampleCount,
   agent, onAgentAction,
   onAutoFix, onReroll, onResetBias, onDismiss, asModal, onCenterClose,
@@ -2103,6 +2323,7 @@ function DuplicateAnalysisPanelInner({
             {tab === "pref" && (
               <PreferenceReportSection
                 ratingAnalysis={ratingAnalysis}
+                ratingTrends={ratingTrends ?? null}
                 profile={preferenceProfile}
                 profileSampleCount={profileSampleCount}
               />
