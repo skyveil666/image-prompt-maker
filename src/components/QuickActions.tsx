@@ -52,7 +52,8 @@ interface QuickActionsProps {
   onRandom:           () => void;
   onVariant:          () => void;
   onUndo:             () => void;
-  onMassProductionCheck: () => void;
+  /** 🔎 AIっぽさ確認：分析センターを開く誘導（生成画面では分析実行しない） */
+  onOpenAnalysisCenter: () => void;
   // 世界観・演出・神引き・生成補助 トグル（マルチセレクト）
   onWorldPresetToggle: (preset: WorldPreset) => void;
   onEffectToggle:      (effect: EffectPreset) => void;
@@ -185,7 +186,7 @@ export function QuickActions({
   activeAssistModes   = [],
   onViral, onViralOff,
   onRandom, onVariant, onUndo,
-  onMassProductionCheck,
+  onOpenAnalysisCenter,
   onWorldPresetToggle, onEffectToggle,
   onGodToggle, onAssistToggle, onBoostToggle,
   avoidCliche = true, onAvoidClicheChange,
@@ -358,11 +359,11 @@ export function QuickActions({
         {avoidOpen && (
           <div className="w-full mt-1.5 p-2 rounded-lg border border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1.5">
             <span className="w-full text-[10px] text-amber-300/60 leading-none mb-0.5">
-              ※ AIっぽい量産パターンや直近との被りを避けます。「AIっぽさチェック」は生成を変えず解析のみ。
+              ※ AIっぽい量産パターンや直近との被りを避けます。「AIっぽさ確認」を押すと分析センターで確認できます（生成画面では分析実行しません）。
             </span>
             <TagBtn label={avoidCliche ? "🛡 テンプレ回避 ON" : "🛡 テンプレ回避"} title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避ける常時補正（既定ON・サーバ側で全案に効く）" onClick={() => onAvoidClicheChange?.(!avoidCliche)} disabled={disabled} variant="amber" active={avoidCliche} />
             <TagBtn label="🔁 被り回避"  title="直近の生成と似た背景・衣装・色・前景・カメラ・世界観を避ける（複数選択可）"                          onClick={() => onBoostToggle?.("avoid_overlap")} disabled={disabled} variant="amber" active={activeBoosts.includes("avoid_overlap")} />
-            <TagBtn label="🔎 AIっぽさチェック" title="生成済みプロンプトを解析して量産AIパターンを検出。高リスクなら自動で新構成へ変換（生成は変えず解析のみ）" onClick={onMassProductionCheck} disabled={disabled} variant="rose" />
+            <TagBtn label="🔎 AIっぽさ確認" title="分析センターを開いて、AIっぽさ（量産パターン）・テンプレ回避を確認します（生成画面では分析を実行しません）" onClick={onOpenAnalysisCenter} disabled={disabled} variant="rose" />
           </div>
         )}
       </CategoryRow>

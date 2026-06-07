@@ -64,8 +64,8 @@ interface Props {
   comboPolicies:     ComboPolicyMap;
   /** コンボごとのポリシー変更ハンドラ */
   onComboPolicyChange: (comboKey: string, policy: ComboPolicy) => void;
-  /** 🔬 分析ラボ（詳細探索の別画面）を開く（任意）。 */
-  onOpenLab?: () => void;
+  /** 🔎 AIっぽさ（量産パターン）を再チェック（分析センター内で実行・生成は変えない）。任意。 */
+  onRunBiasCheck?: () => void;
 
   // ── 🎨 色分析（生成制御センター） ──
   /** 色分析結果（履歴×ウィンドウサイズで集計） */
@@ -2172,7 +2172,7 @@ function DuplicateAnalysisPanelInner({
   levels, policyApplied,
   onLevelChange, onApplyPolicies, onUnapplyPolicies, onResetPolicies, onBulkLevel, onClearNg,
   onAutoAdjust, onUndoAutoAdjust, canUndoAuto, changedIds,
-  comboPolicies, onComboPolicyChange, onOpenLab,
+  comboPolicies, onComboPolicyChange, onRunBiasCheck,
   colorAnalysis, colorSuccess, skyveilSlot, candidates = [], onIgnoreTerm,
   colorWeights, onColorWeightChange, onColorWeightsReset,
   onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
@@ -2610,18 +2610,18 @@ function DuplicateAnalysisPanelInner({
             {/* === 重複分析タブ === */}
             {tab === "dup" && <>
 
-            {/* 📊 分析センター入口（詳細探索：全件/件数/フィルタ/検索/ソート/一括編集/🔭発見/未開拓度は独立画面） */}
-            {onOpenLab && (
-              <div className="flex items-center justify-between gap-2 rounded-lg border border-violet-400/40 bg-violet-500/10 px-3 py-2">
-                <span className="text-[11px] text-violet-100/90 leading-snug">
-                  ここは概要（上位のみ）。全件・カテゴリ別・検索・並べ替え・一括編集・🔭発見・未開拓度は分析センターで。
-                </span>
-                <button type="button" onClick={onOpenLab}
-                  className="shrink-0 text-[12px] font-bold px-3 py-1.5 rounded-lg border border-violet-400/55 bg-violet-500/20 text-violet-50 hover:bg-violet-500/30 transition">
-                  📊 分析センターを開く
+            {/* 📋 読み取り専用の総括＋🔎 AIっぽさ再チェック（実行はここ・生成画面はバッジ/誘導のみ） */}
+            <div className="flex items-center justify-between gap-2 rounded-lg border border-violet-400/40 bg-violet-500/10 px-3 py-2">
+              <span className="text-[11px] text-violet-100/90 leading-snug">
+                📋 ここは<strong>読み取り専用</strong>の集計です。好み等は<strong>自動反映されません</strong>。反映は<strong>生成画面</strong>から。
+              </span>
+              {onRunBiasCheck && (
+                <button type="button" onClick={onRunBiasCheck}
+                  className="shrink-0 text-[12px] font-bold px-3 py-1.5 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 hover:bg-rose-500/25 transition">
+                  🔎 AIっぽさを再チェック
                 </button>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* AIコメント — トップに目立つように */}
             {ha && <AiCommentSection comment={ha.aiComment} />}

@@ -46,7 +46,6 @@ import { analyzeFullHistory, filterRecentWindow, WINDOW_DAYS, type FullHistoryAn
 import { DuplicateAnalysisPanel } from "./components/DuplicateAnalysisPanel";
 import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
 import { CompareModeView } from "./components/CompareModeView";
-import { AnalysisLabPanel } from "./components/AnalysisLabPanel";
 import { detectCandidateMotifs, addIgnoredTerm, loadIgnoredTerms } from "./lib/discoveryMotifs";
 import {
   loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
@@ -216,8 +215,7 @@ export default function App() {
   }, [referenceNote]);
   /** Compare Mode（参照↔生成 比較ビュー）の開閉。Reference Picker の「🆚 比較」から開く。 */
   const [compareOpen, setCompareOpen] = useState(false);
-  /** 分析ラボ（頻出要素/頻出構成/発見の詳細・全幅ビュー）。分析センター内から開く（A1b で統合予定）。 */
-  const [analysisLabOpen, setAnalysisLabOpen] = useState(false);
+  // 分析ラボ（孤立入口）は撤去（#4）。詳細探索は分析センターの重複分析/🔭発見タブに集約。
   /** 📊 分析センター（全画面モーダル・docs/32）。左メニューから開く。 */
   const [analysisCenterOpen, setAnalysisCenterOpen] = useState(false);
   /** P3 発見層：無視した候補語（localStorage 同期）。 */
@@ -2423,11 +2421,21 @@ export default function App() {
             faceLock={faceLock}
             risk={liveIdentityRisk}
             analysisSummary={
-              <AnalysisStatusStrip
-                variant="summary"
-                live={analysisLive.state}
-                categories={analysisCategories}
-              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <AnalysisStatusStrip
+                  variant="summary"
+                  live={analysisLive.state}
+                  categories={analysisCategories}
+                />
+                <button
+                  type="button"
+                  onClick={() => setAnalysisCenterOpen(true)}
+                  className="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition leading-none whitespace-nowrap"
+                  title="分析センターを開く（重複分析・AIっぽさ・色・画像・評価集計・発見）"
+                >
+                  🔎 分析センターで見る
+                </button>
+              </div>
             }
             analysisDetail={
               <AnalysisStatusStrip
@@ -2695,7 +2703,7 @@ export default function App() {
                 onRandom={handleRandom}
                 onVariant={handleVariant}
                 onUndo={handleUndo}
-                onMassProductionCheck={handleMassProductionCheck}
+                onOpenAnalysisCenter={() => setAnalysisCenterOpen(true)}
                 onToggleFavPanel={() => setFavPanelOpen((v) => !v)}
                 onShowCalendar={() => {
                   setHistoryFavoritesOnly(false);
@@ -2723,6 +2731,7 @@ export default function App() {
                   asModal
                   onCenterClose={() => setAnalysisCenterOpen(false)}
                   biasResult={massProductionResult}
+                  onRunBiasCheck={handleMassProductionCheck}
                   historyAnalysis={historyAnalysis}
                   levels={levels}
                   policyApplied={policyApplied}
@@ -3191,20 +3200,7 @@ export default function App() {
       {/* 🆚 Compare Mode（参照↔生成 比較・全幅ビュー） */}
       <CompareModeView open={compareOpen} onClose={() => setCompareOpen(false)} />
 
-      {/* 🔬 分析ラボ（重複分析の詳細探索・全幅ビュー） */}
-      <AnalysisLabPanel
-        open={analysisLabOpen}
-        onClose={() => setAnalysisLabOpen(false)}
-        motifCounts={historyAnalysis?.motifCounts ?? []}
-        topCombos={historyAnalysis?.topCombos ?? []}
-        levels={levels}
-        comboPolicies={comboPolicies}
-        onLevelChange={handleLevelChange}
-        onBulkLevel={handleDupBulkLevel}
-        onComboPolicyChange={handleComboPolicyChange}
-        candidates={discoveryCandidates}
-        onIgnoreTerm={handleIgnoreTerm}
-      />
+      {/* 🔬 分析ラボは撤去（#4・孤立入口）。詳細探索は分析センターの重複分析/🔭発見タブへ集約。 */}
 
       {/* 🖌 選択範囲プロンプトモーダル */}
       {selectionModalOpen && imageDataUrl && (
