@@ -2670,39 +2670,7 @@ export default function App() {
               />
 
 
-              {/* 🧬 skyveil好みAI：既存の好み分析を束ねた単一の反映コントロール */}
-              <SkyveilBar
-                enabled={favoriteLearnEnabled}
-                strength={skyveilStrength}
-                profile={skyveilProfile}
-                analyzing={analyzingProfile}
-                sampleCount={profileSampleCount}
-                minSamples={MIN_SAMPLES}
-                oneShotArmed={skyveilOneShot}
-                onToggle={(v) => {
-                  setFavoriteLearnEnabled(v);
-                  if (v) setSkyveilOneShot(false);
-                  showPresetToast(v ? "🧬 skyveil好み反映 ON" : "skyveil好み反映 OFF",
-                    v ? `${skyveilProfile.summary || "好みを次回生成に反映します"}` : "");
-                }}
-                onStrength={(s) => setFavoriteStrength(STRENGTH_TO_FAVORITE[s])}
-                onUpdateAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
-                onOneShot={() => {
-                  setSkyveilOneShot(true);
-                  showPresetToast("✨ 今回だけ skyveil好みを反映します", "次の生成にのみ適用されます。");
-                }}
-                onReset={() => {
-                  setFavoriteLearnEnabled(false);
-                  setSkyveilOneShot(false);
-                  showPresetToast("skyveil好み反映をリセットしました", "");
-                }}
-                profileError={profileError}
-                autoLearnEnabled={autoLearnEnabled}
-                onToggleAutoLearn={handleToggleAutoLearn}
-                onClearProfile={handleClearPreferenceProfile}
-                successPatterns={successPatterns}
-                onApplyPattern={handleApplyPattern}
-              />
+              {/* 🧬 skyveil好みAI はメインから撤去し、分析センターの専用タブへ集約（docs/32 §5.6） */}
 
               <QuickActions
                 viralMode={viralMode}
@@ -2764,6 +2732,40 @@ export default function App() {
                   onComboPolicyChange={handleComboPolicyChange}
                   colorAnalysis={colorAnalysis}
                   colorSuccess={colorSuccess}
+                  skyveilSlot={(
+                    <SkyveilBar
+                      enabled={favoriteLearnEnabled}
+                      strength={skyveilStrength}
+                      profile={skyveilProfile}
+                      analyzing={analyzingProfile}
+                      sampleCount={profileSampleCount}
+                      minSamples={MIN_SAMPLES}
+                      oneShotArmed={skyveilOneShot}
+                      onToggle={(v) => {
+                        setFavoriteLearnEnabled(v);
+                        if (v) setSkyveilOneShot(false);
+                        showPresetToast(v ? "🧬 skyveil好み反映 ON" : "skyveil好み反映 OFF",
+                          v ? `${skyveilProfile.summary || "好みを次回生成に反映します"}` : "");
+                      }}
+                      onStrength={(s) => setFavoriteStrength(STRENGTH_TO_FAVORITE[s])}
+                      onUpdateAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
+                      onOneShot={() => {
+                        setSkyveilOneShot(true);
+                        showPresetToast("✨ 今回だけ skyveil好みを反映します", "次の生成にのみ適用されます。");
+                      }}
+                      onReset={() => {
+                        setFavoriteLearnEnabled(false);
+                        setSkyveilOneShot(false);
+                        showPresetToast("skyveil好み反映をリセットしました", "");
+                      }}
+                      profileError={profileError}
+                      autoLearnEnabled={autoLearnEnabled}
+                      onToggleAutoLearn={handleToggleAutoLearn}
+                      onClearProfile={handleClearPreferenceProfile}
+                      successPatterns={successPatterns}
+                      onApplyPattern={handleApplyPattern}
+                    />
+                  )}
                   colorWeights={colorWeights}
                   onColorWeightChange={handleColorWeightChange}
                   onColorWeightsReset={handleColorWeightsReset}

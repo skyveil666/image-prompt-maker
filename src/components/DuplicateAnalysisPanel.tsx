@@ -9,7 +9,7 @@
  * - 重複リセット / ジャンル分散 / 提案を反映 の3アクション
  */
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { BiasAnalysisResult } from "../lib/biasAnalyzer";
 import { biasRiskLabel, biasRiskTextClass, biasRiskBorderClass } from "../lib/biasAnalyzer";
 import type {
@@ -71,6 +71,8 @@ interface Props {
   colorAnalysis:     ColorAnalysis | null;
   /** A2-3b: 色の成功率分析（色×評価×時系列）。任意。 */
   colorSuccess?:     ColorSuccessAnalysis | null;
+  /** skyveil好みAI タブの中身（SkyveilBar 要素を slot で受け取る・生成影響操作は別系統）。任意。 */
+  skyveilSlot?:      ReactNode;
   /** 色×軸の重み（髪/服/背景それぞれ 0-5） */
   colorWeights:      ColorWeightMap;
   /** 色×軸の重み変更ハンドラ */
@@ -1771,7 +1773,7 @@ function DuplicateAnalysisPanelInner({
   onLevelChange, onApplyPolicies, onUnapplyPolicies, onResetPolicies, onBulkLevel, onClearNg,
   onAutoAdjust, onUndoAutoAdjust, canUndoAuto, changedIds,
   comboPolicies, onComboPolicyChange, onOpenLab,
-  colorAnalysis, colorSuccess,
+  colorAnalysis, colorSuccess, skyveilSlot,
   colorWeights, onColorWeightChange, onColorWeightsReset,
   onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
   colorWindowSize, onColorWindowSizeChange,
@@ -1791,7 +1793,7 @@ function DuplicateAnalysisPanelInner({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [asModal, onCenterClose]);
-  const [tab, setTab] = useState<"dup" | "agent" | "color" | "image" | "pref">("dup");
+  const [tab, setTab] = useState<"dup" | "agent" | "color" | "image" | "pref" | "skyveil">("dup");
 
   // 画像分析タブを開いた時に解析を発火（BUG-18: 一度きりの発火）。
   // onStartImageAnalysis は analysisLive の identity 変化で頻繁に作り直されるため、
@@ -2050,6 +2052,18 @@ function DuplicateAnalysisPanelInner({
                 </span>
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => setTab("skyveil")}
+              className={[
+                "text-[12px] font-bold px-2.5 py-1 rounded-md transition leading-none flex items-center gap-1",
+                tab === "skyveil"
+                  ? "bg-violet-500/20 text-violet-100 border border-violet-400/45"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
+              ].join(" ")}
+            >
+              🧬 skyveil好みAI
+            </button>
           </div>
 
           <div className="px-3 overflow-y-auto max-h-[62vh]">
@@ -2073,6 +2087,16 @@ function DuplicateAnalysisPanelInner({
                 profile={preferenceProfile}
                 profileSampleCount={profileSampleCount}
               />
+            )}
+
+            {/* === 🧬 skyveil好みAI タブ（好み最適化担当・生成に影響＝発見系とは別系統）=== */}
+            {tab === "skyveil" && (
+              <div className="space-y-2 pb-2">
+                <div className="rounded-lg border border-violet-400/45 bg-violet-500/10 px-3 py-2 text-[12px] text-violet-100 leading-snug">
+                  ⚠ これは <strong>好み最適化担当</strong>。下の操作（反映ON/OFF・強度・更新・自動学習・反映リセット・プロフィール削除）は <strong>生成に影響</strong>します。重複分析・🔭発見・神引き候補（＝未開拓発見担当）とは別系統です。
+                </div>
+                {skyveilSlot ?? <p className="text-[12px] text-slate-400 px-1">skyveil好みAI を読み込めませんでした。</p>}
+              </div>
             )}
 
             {/* === 色分析タブ（生成制御センター） === */}
