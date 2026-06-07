@@ -264,10 +264,10 @@ export function AnalysisLabPanel({
       >
         {/* ヘッダ */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-bg-border shrink-0">
-          <span className="text-[15px]">🔬</span>
+          <span className="text-[15px]">📊</span>
           <div className="flex flex-col leading-tight">
-            <span className="text-[14px] font-bold text-text-base">分析ラボ</span>
-            <span className="text-[10px] text-text-muted/70">頻出要素・頻出構成を 件数 / フィルタ / 検索 / ソート / 一括編集 で詳細探索（分析ロジックは不変）</span>
+            <span className="text-[14px] font-bold text-text-base">分析センター</span>
+            <span className="text-[10px] text-text-muted/70">頻出要素・頻出構成・🔭発見を 件数 / フィルタ / 検索 / ソート / 一括編集 で詳細探索（分析ロジックは不変）</span>
           </div>
           <button type="button" onClick={onClose}
             className="ml-auto text-[12px] px-2.5 py-1 rounded border border-bg-border bg-bg-base/60 text-text-muted hover:text-text-base transition">✕ 閉じる</button>

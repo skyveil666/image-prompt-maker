@@ -114,6 +114,10 @@ interface Props {
   onReroll:          () => void;
   onResetBias:       () => void;
   onDismiss:         () => void;
+  /** 全画面モーダル（分析センター）として表示するか。docs/32 A1。 */
+  asModal?:          boolean;
+  /** 全画面モーダルを閉じる（asModal 時の ✕ / Esc）。 */
+  onCenterClose?:    () => void;
 
   // ── 📊 分析対象サマリ（見出しの件数表示用） ──
   analysisStats?: {
@@ -1133,9 +1137,9 @@ function ComboRanking({
 
   return (
     <>
-      <SectionTitle icon="🧩">頻出構成 TOP10（組み合わせ被り）</SectionTitle>
+      <SectionTitle icon="🧩">頻出構成（概要・上位）</SectionTitle>
       <p className="text-[11px] text-slate-400 px-1 pb-1 leading-snug">
-        同じ案内で何度も揃っているモチーフの組み合わせです。「今後出さない」で同時使用を禁止、「別ジャンル化」で出そうな時に別方向へ振り替えます。
+        同じ案内で何度も揃っているモチーフの組み合わせです。「今後出さない」で同時使用を禁止、「別ジャンル化」で出そうな時に別方向へ振り替えます。全件・一括操作は📊分析センターの「頻出構成」タブで。
       </p>
       <div className="space-y-1 px-1">
         {show.map((c, i) => {
@@ -1471,10 +1475,18 @@ function DuplicateAnalysisPanelInner({
   ratingAnalysis,
   preferenceProfile, profileSampleCount,
   agent, onAgentAction,
-  onAutoFix, onReroll, onResetBias, onDismiss,
+  onAutoFix, onReroll, onResetBias, onDismiss, asModal, onCenterClose,
   analysisStats, activeScopes, favoriteProfile, favoriteLearnEnabled,
 }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const isExpanded = asModal ? true : expanded;
+  // 全画面モーダル（分析センター）時は Esc で閉じる
+  useEffect(() => {
+    if (!asModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCenterClose?.(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [asModal, onCenterClose]);
   const [tab, setTab] = useState<"dup" | "agent" | "color" | "image" | "pref">("dup");
 
   // 画像分析タブを開いた時に解析を発火（BUG-18: 一度きりの発火）。
@@ -1484,9 +1496,9 @@ function DuplicateAnalysisPanelInner({
   const startImageRef = useRef(onStartImageAnalysis);
   useEffect(() => { startImageRef.current = onStartImageAnalysis; });
   useEffect(() => {
-    if (tab === "image" && expanded) startImageRef.current();
+    if (tab === "image" && isExpanded) startImageRef.current();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onStartImageAnalysis は ref 経由（ループ防止のため意図的に除外）
-  }, [tab, expanded]);
+  }, [tab, isExpanded]);
 
   // 反映時のサマリー（制御中 = 非4 件数 / NG件数）
   const { controlled: controlledCount, ng: ngCount } = countLevels(levels);
@@ -1554,13 +1566,13 @@ function DuplicateAnalysisPanelInner({
   const skippedAxes = Array.from(new Set(imgSkipped));
 
   return (
-    <div className={["rounded-xl border transition-all", borderCls].join(" ")}>
+    <div className={asModal ? "h-full flex flex-col min-h-0" : ["rounded-xl border transition-all", borderCls].join(" ")}>
 
       {/* ── ヘッダー（常時表示） ─────────────────────────────────── */}
       <div className="px-3.5 py-3 flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <span className="text-[15px] leading-none">🔬</span>
-          <span className="text-[15px] font-bold text-white leading-none">重複分析センター</span>
+          <span className="text-[15px] leading-none">📊</span>
+          <span className="text-[15px] font-bold text-white leading-none">分析センター</span>
           <span className={["text-[13px] font-black leading-none", riskTextCls].join(" ")}>
             {biasRiskLabel(risk)}
           </span>
@@ -1600,20 +1612,22 @@ function DuplicateAnalysisPanelInner({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button type="button" onClick={() => setExpanded((v) => !v)}
-            title={expanded ? "折りたたむ" : "詳細を開く"}
-            className="text-[13px] text-slate-400 hover:text-slate-100 transition px-1 leading-none">
-            {expanded ? "▲" : "▼"}
-          </button>
-          <button type="button" onClick={onDismiss} title="閉じる"
-            className="text-[14px] text-slate-400 hover:text-slate-100 transition leading-none">
-            ✕
+          {!asModal && (
+            <button type="button" onClick={() => setExpanded((v) => !v)}
+              title={expanded ? "折りたたむ" : "詳細を開く"}
+              className="text-[13px] text-slate-400 hover:text-slate-100 transition px-1 leading-none">
+              {expanded ? "▲" : "▼"}
+            </button>
+          )}
+          <button type="button" onClick={asModal ? onCenterClose : onDismiss} title="閉じる"
+            className="text-[13px] px-2 py-1 rounded border border-bg-border bg-bg-base/60 text-slate-400 hover:text-slate-100 transition leading-none">
+            {asModal ? "✕ 閉じる" : "✕"}
           </button>
         </div>
       </div>
 
-      {/* ── コンパクト：今回の偏り上位3件 ─────────────────────── */}
-      {compact3.length > 0 && (
+      {/* ── コンパクト：今回の偏り上位3件（インライン時のみ。全画面では非表示）── */}
+      {!asModal && compact3.length > 0 && (
         <div className="px-3.5 pb-2 flex flex-wrap gap-1.5">
           {compact3.map((m) => (
             <span key={m.motif.id}
@@ -1643,9 +1657,9 @@ function DuplicateAnalysisPanelInner({
         </div>
       )}
 
-      {/* ── 展開パネル ────────────────────────────────────────────── */}
-      {expanded && (
-        <div className="border-t border-white/12">
+      {/* ── 展開パネル（全画面時は flex-1 でスクロール）──────────────── */}
+      {isExpanded && (
+        <div className={asModal ? "flex-1 min-h-0 overflow-y-auto border-t border-white/12" : "border-t border-white/12"}>
           {/* タブスイッチャー */}
           <div className="flex items-center gap-1 px-3 pt-2 pb-1 border-b border-white/8 bg-bg-base/30">
             <button
@@ -1776,15 +1790,15 @@ function DuplicateAnalysisPanelInner({
             {/* === 重複分析タブ === */}
             {tab === "dup" && <>
 
-            {/* 🔬 分析ラボ入口（詳細探索：件数/フィルタ/検索/ソート/一括編集は別画面） */}
+            {/* 📊 分析センター入口（詳細探索：全件/件数/フィルタ/検索/ソート/一括編集/🔭発見/未開拓度は独立画面） */}
             {onOpenLab && (
               <div className="flex items-center justify-between gap-2 rounded-lg border border-violet-400/40 bg-violet-500/10 px-3 py-2">
                 <span className="text-[11px] text-violet-100/90 leading-snug">
-                  ここは概要（TOP10）。全件・カテゴリ別・検索・並べ替え・一括編集は分析ラボで。
+                  ここは概要（上位のみ）。全件・カテゴリ別・検索・並べ替え・一括編集・🔭発見・未開拓度は分析センターで。
                 </span>
                 <button type="button" onClick={onOpenLab}
                   className="shrink-0 text-[12px] font-bold px-3 py-1.5 rounded-lg border border-violet-400/55 bg-violet-500/20 text-violet-50 hover:bg-violet-500/30 transition">
-                  🔬 分析ラボを開く
+                  📊 分析センターを開く
                 </button>
               </div>
             )}
@@ -1792,10 +1806,10 @@ function DuplicateAnalysisPanelInner({
             {/* AIコメント — トップに目立つように */}
             {ha && <AiCommentSection comment={ha.aiComment} />}
 
-            {/* 頻出構成 TOP10（コンボ被り） */}
+            {/* 頻出構成（概要＝上位5件のみ。全件・一括操作は分析センターの「頻出構成」タブで） */}
             {ha && ha.topCombos.length > 0 && (
               <ComboRanking
-                combos={ha.topCombos}
+                combos={ha.topCombos.slice(0, 5)}
                 policies={comboPolicies}
                 onChange={onComboPolicyChange}
               />

@@ -22,6 +22,7 @@ interface Props {
   viralMode: boolean;
   onShowCalendar: () => void;
   onShowFavorites: () => void;
+  onShowAnalysis: () => void;
   onToggleExplorer: () => void;
   explorerOpen: boolean;
   /** 画像がセットされているときに表示する「選択範囲プロンプト」ボタンのコールバック */
@@ -58,6 +59,7 @@ export function ImageSidebar({
   viralMode,
   onShowCalendar,
   onShowFavorites,
+  onShowAnalysis,
   onToggleExplorer,
   explorerOpen,
   onOpenSelectionPrompt,
@@ -240,6 +242,15 @@ export function ImageSidebar({
         >
           <span>⭐</span>
           <span>お気に入り一覧</span>
+        </button>
+        {/* 分析センター（独立画面・全画面） */}
+        <button
+          type="button"
+          onClick={onShowAnalysis}
+          className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold border border-violet-400/50 bg-violet-400/10 text-violet-100 hover:bg-violet-400/20 hover:border-violet-400/80 transition flex items-center justify-center gap-2"
+        >
+          <span>📊</span>
+          <span>分析センター</span>
         </button>
       </div>
 

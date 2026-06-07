@@ -216,8 +216,10 @@ export default function App() {
   }, [referenceNote]);
   /** Compare Mode（参照↔生成 比較ビュー）の開閉。Reference Picker の「🆚 比較」から開く。 */
   const [compareOpen, setCompareOpen] = useState(false);
-  /** 分析ラボ（重複分析の詳細探索・全幅ビュー）の開閉。ダッシュボードの「🔬 分析ラボ」から開く。 */
+  /** 分析ラボ（頻出要素/頻出構成/発見の詳細・全幅ビュー）。分析センター内から開く（A1b で統合予定）。 */
   const [analysisLabOpen, setAnalysisLabOpen] = useState(false);
+  /** 📊 分析センター（全画面モーダル・docs/32）。左メニューから開く。 */
+  const [analysisCenterOpen, setAnalysisCenterOpen] = useState(false);
   /** P3 発見層：無視した候補語（localStorage 同期）。 */
   const [ignoredTerms, setIgnoredTerms] = useState<string[]>(() => loadIgnoredTerms());
   /** Phase D: Compare評価(referenceRecords)を集計した好み素材。マウント＋Compareクローズ（評価後）に再読込。 */
@@ -2514,6 +2516,7 @@ export default function App() {
                 setHistoryFavoritesOnly(true);
                 setView("history");
               }}
+              onShowAnalysis={() => setAnalysisCenterOpen(true)}
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
               onOpenSelectionPrompt={() => setSelectionModalOpen(true)}
@@ -2731,9 +2734,14 @@ export default function App() {
                 onResetAll={handleResetAll}
               />
 
-              {/* 🔬 重複分析センター */}
-              {(massProductionResult || historyAnalysis) && (
+              {/* 📊 分析センター（全画面モーダル 95vw×92vh・docs/32 A1）。左メニューから開く。 */}
+              {analysisCenterOpen && (
+                <div className="fixed inset-0 z-40 bg-black/70 p-2 sm:p-4 grid place-items-center" onClick={() => setAnalysisCenterOpen(false)}>
+                  <div className="w-[95vw] h-[92vh] rounded-xl border border-bg-border bg-bg-panel shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+                  {(massProductionResult || historyAnalysis) ? (
                 <DuplicateAnalysisPanel
+                  asModal
+                  onCenterClose={() => setAnalysisCenterOpen(false)}
                   biasResult={massProductionResult}
                   historyAnalysis={historyAnalysis}
                   levels={levels}
@@ -2747,7 +2755,6 @@ export default function App() {
                   changedIds={changedIds}
                   comboPolicies={comboPolicies}
                   onComboPolicyChange={handleComboPolicyChange}
-                  onOpenLab={() => setAnalysisLabOpen(true)}
                   colorAnalysis={colorAnalysis}
                   colorWeights={colorWeights}
                   onColorWeightChange={handleColorWeightChange}
@@ -2799,6 +2806,15 @@ export default function App() {
                   favoriteProfile={favoriteProfile}
                   favoriteLearnEnabled={favoriteLearnEnabled}
                 />
+                  ) : (
+                    <div className="flex-1 grid place-items-center p-8 text-center text-[13px] text-text-muted gap-3">
+                      <div>分析データがまだありません。画像を生成すると重複分析・評価・発見が集計されます。</div>
+                      <button type="button" onClick={() => setAnalysisCenterOpen(false)}
+                        className="text-[12px] px-3 py-1.5 rounded border border-bg-border bg-bg-base/60 text-text-muted hover:text-text-base">✕ 閉じる</button>
+                    </div>
+                  )}
+                  </div>
+                </div>
               )}
 
               <ControlPanel
