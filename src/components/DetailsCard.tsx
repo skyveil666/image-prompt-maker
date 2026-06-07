@@ -2069,6 +2069,8 @@ export function DetailsCard({
         </div>
       </div>
 
+      <p className="text-[10px] text-text-muted/55 leading-snug mb-2 -mt-1.5">選んだ項目を細かく指定（未指定＝おまかせ）。何を変えるかは「変更対象」、おまかせで引くなら「神引き」</p>
+
       {/* 折りたたみカテゴリ一覧（タブ廃止 → アコーディオン）
           P4: 選択あり（件数>0）のカテゴリを上に安定ソート（元の順序は保持） */}
       <div className="space-y-1.5">

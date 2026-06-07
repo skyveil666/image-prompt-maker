@@ -212,6 +212,7 @@ export function QuickActions({
 
       {/* ══════ 世界観 / ジャンル ══════ */}
       <CategoryRow label="世界観">
+        <span className="w-full text-[10px] text-text-muted/55 leading-snug mb-0.5">最初の方向性（既成ジャンル）を選ぶ</span>
         <TagBtn label="👗 Y2K"       title="2000年代ファッション：ポップ・メタリック・ラインストーン（最大3選択）"                                    onClick={() => onWorldPresetToggle("y2k")}        active={activeWorldPresets.includes("y2k")}        variant="pink"       disabled={disabled} />
         <TagBtn label="🚀 Y3K"       title="近未来ハイファッション：透明素材・シルバー・sci-fi感（最大3選択）"                                         onClick={() => onWorldPresetToggle("y3k")}        active={activeWorldPresets.includes("y3k")}        variant="indigo"     disabled={disabled} />
         <TagBtn label="🏙️ ストリート" title="都会・アーバン・ファッション誌風（最大3選択）"                                                              onClick={() => onWorldPresetToggle("street")}     active={activeWorldPresets.includes("street")}     variant="stone"      disabled={disabled} />
@@ -234,6 +235,7 @@ export function QuickActions({
 
       {/* ══════ 演出 / 効果 ══════ */}
       <CategoryRow label="演出">
+        <span className="w-full text-[10px] text-text-muted/55 leading-snug mb-0.5">作品の雰囲気を足す演出補助（変更対象ではなく、前景/メカ/質感を自動セット）</span>
         <TagBtn label="🌀 前景盛り" title="人物の前面に演出を追加。花びら・光・蝶・ガラス片・霧など毎回ランダムに選ぶ（最大2選択）"      onClick={() => onEffectToggle("fgrich")}     disabled={disabled} variant="cyan"   active={activeEffectTypes.includes("fgrich")} />
         <TagBtn label="🧬 うっすらメカ" title="ガチサイボーグ禁止。目元・頬・首元など一部にだけ上品な未来感アクセサリーを追加（最大2選択）"   onClick={() => onEffectToggle("microcyber")} disabled={disabled} variant="indigo" active={activeEffectTypes.includes("microcyber")} />
         <TagBtn label="🧊 清潔感"   title="上品でクリーン。白・シルバー・透明感・高級広告・Appleっぽい仕上がり（最大2選択）"             onClick={() => onEffectToggle("clean")}      disabled={disabled} variant="sky"    active={activeEffectTypes.includes("clean")} />
@@ -248,6 +250,7 @@ export function QuickActions({
 
       {/* ══════ 映え ══════ */}
       <CategoryRow label="映え">
+        <span className="w-full text-[10px] text-text-muted/55 leading-snug mb-0.5">SNS映え・見栄えの補正（中身は変えない。中身を変えるのは「神引き」）</span>
         {/* 🔥 バズ最適化（▼で「バズモード」「映え補正」を格納。旧 🔥バズり＋🧲バズ寄せ を統合表示） */}
         <button
           type="button"
@@ -281,6 +284,7 @@ export function QuickActions({
 
       {/* ══════ 変化 ══════ */}
       <CategoryRow label="変化">
+        <span className="w-full text-[10px] text-text-muted/55 leading-snug mb-0.5">ランダム性・大きな変化を足す（神引き＝おまかせの司令塔／別案＝近い再生成）</span>
         {/* 👑 神引き（▼で おまかせ・カオス・大きく変える・軸別 を格納） */}
         <button
           type="button"
@@ -337,11 +341,11 @@ export function QuickActions({
             <TagBtn label="🌀 世界観を一新" title="顔・同一性は維持したまま、変更対象の軸を前回と全く違う世界観へ大胆に変化（複数選択可）。※軸別ガチャの「異世界ガチャ」とは別＝今の方向を別物へ振る修飾" onClick={() => onBoostToggle?.("other_world")} disabled={disabled} variant="amber" active={activeBoosts.includes("other_world")} />
 
             {/* ── 軸別ガチャ（その軸だけ引く） ── */}
-            <span className="w-full text-[10px] font-bold text-amber-300/75 uppercase tracking-widest leading-none mt-1 pt-1.5 border-t border-amber-400/10">軸別ガチャ（その軸だけ引く）</span>
+            <span className="w-full text-[10px] font-bold text-amber-300/75 uppercase tracking-widest leading-none mt-1 pt-1.5 border-t border-amber-400/10">軸別ガチャ（1つの軸だけランダム強化・指定は詳細設定で）</span>
             <TagBtn label="🧥 衣装"       title="衣装スコープのみ変更。顔・背景・ポーズ・カメラは固定。毎回異なる高品質な衣装（最大2コンボ）"        onClick={() => onGodToggle("outfit")}      disabled={disabled} variant="gold" active={activeGodModes.includes("outfit")} />
             <TagBtn label="🌍 背景"       title="人物固定。温室・美術館・地下図書館など珍しい背景を毎回ランダム（最大2コンボ）"                       onClick={() => onGodToggle("bg")}          disabled={disabled} variant="gold" active={activeGodModes.includes("bg")} />
             <TagBtn label="📷 構図"       title="カメラ視点・フレーミングを強変更。超寄り・魚眼・ドローン・肩越しなど。顔固定"                       onClick={() => onGodToggle("composition")} disabled={disabled} variant="gold" active={activeGodModes.includes("composition")} />
-            <TagBtn label="🎨 色"         title="色彩・パレット主導の画面設計。8種の色方向から毎回異なる配色（最大2コンボ）"                          onClick={() => onGodToggle("color")}       disabled={disabled} variant="gold" active={activeGodModes.includes("color")} />
+            <TagBtn label="🎨 色"         title="色だけをランダム強化。色彩・パレット主導の画面設計。8種の色方向から毎回異なる配色（最大2コンボ）"                          onClick={() => onGodToggle("color")}       disabled={disabled} variant="gold" active={activeGodModes.includes("color")} />
             <TagBtn label="🌌 異世界ガチャ" title="異世界・異空間を全力で1つ引く。宇宙神社・水没図書館・鏡の宮殿など8方向（最大2コンボ）。※「世界観を一新」とは別＝単発の異空間ガチャ" onClick={() => onGodToggle("world_god")}   disabled={disabled} variant="gold" active={activeGodModes.includes("world_god")} />
             <TagBtn label="🎁 小物"       title="アイテム主導の映え設計。光る蝶・王冠・ガラスの剣・花冠など10種（最大2コンボ）"                       onClick={() => onGodToggle("props")}       disabled={disabled} variant="gold" active={activeGodModes.includes("props")} />
             <TagBtn label="🏛️ 大物"      title="場を支配する大きな物体主導。巨大クリスタル・古代石像・花のインスタレーションなど8種（最大2コンボ）"   onClick={() => onGodToggle("bigobject")}   disabled={disabled} variant="gold" active={activeGodModes.includes("bigobject")} />

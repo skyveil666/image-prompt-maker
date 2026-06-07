@@ -286,6 +286,7 @@ export function ControlPanel({
             </span>
           )}
         </div>
+        <p className="text-[10px] text-text-muted/55 leading-snug mb-1 -mt-0.5">何を変えるかを選ぶ（例：衣装・背景・髪・小物）。細かい指定は下の「詳細設定」、その軸をおまかせで引くなら「神引き」</p>
         <div className="flex flex-wrap items-center gap-1.5">
           {/* 衣装より前の軸 */}
           {SCOPE_OPTIONS.filter((o) => OUTFIT_GROUP_BEFORE.includes(o.id)).map(renderScopeBtn)}
