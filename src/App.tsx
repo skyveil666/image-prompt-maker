@@ -2538,6 +2538,8 @@ export default function App() {
                 setView("history");
               }}
               onShowAnalysis={() => setAnalysisCenterOpen(true)}
+              onToggleRecovery={() => setRecoveryOpen((v) => !v)}
+              recoveryOpen={recoveryOpen}
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
               onOpenSelectionPrompt={() => setSelectionModalOpen(true)}
@@ -2547,16 +2549,8 @@ export default function App() {
 
             <div className="space-y-5 mt-5 lg:mt-0 min-w-0 pb-24">
 
-              {/* 🛟 履歴・お気に入り復旧（緊急対応・読み取り＋非破壊）。入口ボタン＋展開パネル */}
-              <div className="flex justify-between items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setRecoveryOpen((v) => !v)}
-                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-amber-400/45 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20 transition leading-none"
-                  title="IndexedDB に残っている履歴・お気に入りを確認・再読み込み・書き出し/読み込み"
-                >
-                  🛟 履歴・お気に入り復旧 {recoveryOpen ? "▲" : "▼"}
-                </button>
+              {/* 📅 投稿カレンダー（履歴・お気に入り復旧ボタンは左メニュー「お気に入り一覧」付近へ移設） */}
+              <div className="flex justify-end items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setPostCalendarOpen(true)}
@@ -2565,6 +2559,7 @@ export default function App() {
                   📅 1ヶ月投稿カレンダー
                 </button>
               </div>
+              {/* 🛟 復旧パネル本体：トグルは左メニューの「履歴・お気に入り復旧」ボタン。展開はこのメイン列に表示 */}
               {recoveryOpen && (
                 <RecoveryPanel onReloadAll={reloadAllData} onClose={() => setRecoveryOpen(false)} />
               )}
