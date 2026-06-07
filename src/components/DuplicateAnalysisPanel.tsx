@@ -653,6 +653,33 @@ function ColorAnalysisSection({
         </div>
       </div>
 
+      {/* ── 色相分布（全10色を色相順に大型横棒）A2-3a ── */}
+      <div>
+        <SectionTitle icon="🌈">色相分布（全色・色相順）</SectionTitle>
+        {(() => {
+          const max = Math.max(1, ...analysis.globalRanking.map((x) => x.count));
+          return (
+            <div className="space-y-2 px-1">
+              {COLOR_GROUPS.map((g) => {
+                const r = analysis.globalRanking.find((x) => x.colorId === g.id);
+                const count = r?.count ?? 0;
+                const ratio = r?.ratio ?? 0;
+                return (
+                  <div key={g.id} className="flex items-center gap-2.5">
+                    <span className="w-5 h-5 rounded border border-white/25 shrink-0" style={{ backgroundColor: g.swatch }} />
+                    <span className="text-[14px] text-slate-100 w-24 shrink-0">{g.jp}</span>
+                    <div className="flex-1 h-4 rounded bg-white/5 overflow-hidden">
+                      <div className="h-full rounded transition-all" style={{ width: `${Math.round((count / max) * 100)}%`, backgroundColor: g.swatch, opacity: count > 0 ? 0.9 : 0 }} />
+                    </div>
+                    <span className="text-[13px] tabular-nums text-slate-200 w-20 text-right shrink-0">{Math.round(ratio * 100)}%<span className="text-slate-500 ml-1">{count}</span></span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+
       {/* ── 偏り警告 ─────────────────────────────────── */}
       {analysis.biasWarnings.length > 0 && (
         <div className="space-y-1.5">
@@ -699,8 +726,8 @@ function ColorAnalysisSection({
 
       {/* ── 軸別カード ─────────────────────────────────── */}
       <div>
-        <SectionTitle icon="🎯">軸別の色傾向</SectionTitle>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 px-1">
+        <SectionTitle icon="🎯">軸別の色傾向（背景 / 衣装 / 髪 / 差し色 / ライティング）</SectionTitle>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 px-1">
           {analysis.perAxis.map((ax) => (
             <AxisCard key={ax.axis} axis={ax.axis} total={ax.total} byColor={ax.byColor} topColor={ax.topColor} />
           ))}
@@ -730,9 +757,9 @@ function ColorAnalysisSection({
               return (
                 <span
                   key={id}
-                  className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-100 leading-none"
+                  className="inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-full border border-emerald-400/40 bg-emerald-500/10 text-emerald-100 leading-none"
                 >
-                  <span className="w-2 h-2 rounded-sm border border-white/20" style={{ backgroundColor: g.swatch }} />
+                  <span className="w-3 h-3 rounded-sm border border-white/20" style={{ backgroundColor: g.swatch }} />
                   {g.jp}
                 </span>
               );
@@ -740,6 +767,30 @@ function ColorAnalysisSection({
           </div>
         </div>
       )}
+
+      {/* ── 神引き色候補（未開拓＋低出現＝意外性が出る色）A2-3a ── */}
+      {(() => {
+        const lowUsed = analysis.globalRanking.filter((r) => r.count > 0).sort((a, b) => a.count - b.count).slice(0, 4).map((r) => r.colorId);
+        const cand = [...new Set([...analysis.unexploredColors, ...lowUsed])].slice(0, 8);
+        if (cand.length === 0) return null;
+        return (
+          <div>
+            <SectionTitle icon="🎲">神引き色候補（未開拓・低出現＝意外性）</SectionTitle>
+            <div className="flex flex-wrap gap-1.5 px-1">
+              {cand.map((id) => {
+                const g = COLOR_GROUPS.find((c) => c.id === id);
+                if (!g) return null;
+                return (
+                  <span key={id} className="inline-flex items-center gap-1.5 text-[13px] px-2.5 py-1 rounded-full border border-fuchsia-400/40 bg-fuchsia-500/10 text-fuchsia-100 leading-none">
+                    <span className="w-3 h-3 rounded-sm border border-white/20" style={{ backgroundColor: g.swatch }} />
+                    {g.jp}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── 色×軸重みグリッド（生成制御の主役） ─────────── */}
       <ColorWeightGrid weights={weights} onWeightChange={onWeightChange} onReset={onReset}
