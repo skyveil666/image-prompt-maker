@@ -25,9 +25,9 @@ const SCOPE_JP: Record<Scope, string> = {
 };
 
 const GOD_JP: Record<string, string> = {
-  normal: "👑 ノーマル神引き", chaos: "🎲 ぶっ飛び融合神引き", composition: "📷 構図神引き",
+  normal: "👑 強力おまかせ", chaos: "🎲 ぶっ飛び融合神引き", composition: "📷 構図神引き",
   outfit: "🧥 衣装神引き", bg: "🌍 背景神引き", color: "🎨 色神引き",
-  world_god: "🌌 世界観神引き", props: "🎁 小物神引き", bigobject: "🏛️ 大物神引き",
+  world_god: "🌌 異世界ガチャ", props: "🎁 小物神引き", bigobject: "🏛️ 大物神引き",
   myth: "🐉 神話神引き", movie: "🎬 映画神引き",
 };
 
