@@ -24,6 +24,7 @@ import type { ImageAnalysisResult } from "../lib/imageAnalyzer";
 import type { RatingAnalysis } from "../lib/ratingAnalyzer";
 import { type PreferenceProfile } from "../lib/preferenceProfile";
 import type { ColorAnalysis, ColorAxis, ColorSuccessAnalysis } from "../lib/colorAnalyzer";
+import type { CandidateMotif } from "../lib/discoveryMotifs";
 import { COLOR_GROUPS, COLOR_AXES } from "../lib/colorAnalyzer";
 import type { ColorWeight, ColorWeightMap, ColorAxisCtrl } from "../lib/colorPolicy";
 import { WEIGHT_META, COLOR_AXIS_CTRL, getColorEntry, countWeights } from "../lib/colorPolicy";
@@ -73,6 +74,9 @@ interface Props {
   colorSuccess?:     ColorSuccessAnalysis | null;
   /** skyveil好みAI タブの中身（SkyveilBar 要素を slot で受け取る・生成影響操作は別系統）。任意。 */
   skyveilSlot?:      ReactNode;
+  /** 🔭発見タブ：監視外の頻出新語候補（未開拓発見担当）。任意。 */
+  candidates?:       CandidateMotif[];
+  onIgnoreTerm?:     (term: string) => void;
   /** 色×軸の重み（髪/服/背景それぞれ 0-5） */
   colorWeights:      ColorWeightMap;
   /** 色×軸の重み変更ハンドラ */
@@ -1773,7 +1777,7 @@ function DuplicateAnalysisPanelInner({
   onLevelChange, onApplyPolicies, onUnapplyPolicies, onResetPolicies, onBulkLevel, onClearNg,
   onAutoAdjust, onUndoAutoAdjust, canUndoAuto, changedIds,
   comboPolicies, onComboPolicyChange, onOpenLab,
-  colorAnalysis, colorSuccess, skyveilSlot,
+  colorAnalysis, colorSuccess, skyveilSlot, candidates = [], onIgnoreTerm,
   colorWeights, onColorWeightChange, onColorWeightsReset,
   onColorAutoAdjust, onColorUndoAdjust, canColorUndo, colorChangedKeys,
   colorWindowSize, onColorWindowSizeChange,
@@ -1793,7 +1797,10 @@ function DuplicateAnalysisPanelInner({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [asModal, onCenterClose]);
-  const [tab, setTab] = useState<"dup" | "agent" | "color" | "image" | "pref" | "skyveil">("dup");
+  const [tab, setTab] = useState<"dup" | "discovery" | "agent" | "color" | "image" | "pref" | "skyveil">("dup");
+  // 🔭発見タブ（未開拓発見担当）
+  const [discSearch, setDiscSearch] = useState("");
+  const [discCount, setDiscCount] = useState<number>(20);
 
   // 画像分析タブを開いた時に解析を発火（BUG-18: 一度きりの発火）。
   // onStartImageAnalysis は analysisLive の identity 変化で頻繁に作り直されるため、
@@ -1967,7 +1974,7 @@ function DuplicateAnalysisPanelInner({
       {isExpanded && (
         <div className={asModal ? "flex-1 min-h-0 overflow-y-auto border-t border-white/12" : "border-t border-white/12"}>
           {/* タブスイッチャー */}
-          <div className="flex items-center gap-1 px-3 pt-2 pb-1 border-b border-white/8 bg-bg-base/30">
+          <div className="flex items-center gap-1 flex-wrap px-3 pt-2 pb-1 border-b border-white/8 bg-bg-base/30">
             <button
               type="button"
               onClick={() => setTab("dup")}
@@ -1979,6 +1986,18 @@ function DuplicateAnalysisPanelInner({
               ].join(" ")}
             >
               🔬 重複分析
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("discovery")}
+              className={[
+                "text-[12px] font-bold px-2.5 py-1 rounded-md transition leading-none flex items-center gap-1",
+                tab === "discovery"
+                  ? "bg-emerald-500/20 text-emerald-100 border border-emerald-400/45"
+                  : "text-slate-400 hover:text-slate-100 hover:bg-white/5 border border-transparent",
+              ].join(" ")}
+            >
+              🔭 発見（{candidates.length}）
             </button>
             <button
               type="button"
@@ -2098,6 +2117,59 @@ function DuplicateAnalysisPanelInner({
                 {skyveilSlot ?? <p className="text-[12px] text-slate-400 px-1">skyveil好みAI を読み込めませんでした。</p>}
               </div>
             )}
+
+            {/* === 🔭 発見タブ（未開拓発見担当・監視外の頻出新語）=== */}
+            {tab === "discovery" && (() => {
+              const q = discSearch.trim().toLowerCase();
+              const filtered = q ? candidates.filter((c) => c.term.includes(q)) : candidates;
+              const shown = discCount === Infinity ? filtered : filtered.slice(0, discCount);
+              return (
+                <div className="space-y-2 pb-2">
+                  <div className="rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-3 py-2 text-[12px] text-emerald-100 leading-snug">
+                    🔭 <strong>未開拓発見担当</strong>。監視外で頻出し始めた新語＝新ジャンル/神引き候補。好み最適化（skyveil好みAI）とは別系統です。🚫無視でノイズ除去。
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap px-1">
+                    <label className="flex items-center gap-1 text-[10px] text-slate-400">件数
+                      <select value={String(discCount)} onChange={(e) => setDiscCount(Number(e.target.value))}
+                        className="rounded border border-white/15 bg-bg-base/60 text-[11px] text-slate-100 px-1.5 py-1 focus:outline-none">
+                        {[20, 50, 100, Infinity].map((n) => <option key={n} value={String(n)}>{n === Infinity ? "全件" : n}</option>)}
+                      </select>
+                    </label>
+                    <input value={discSearch} onChange={(e) => setDiscSearch(e.target.value)} placeholder="🔎 候補語を検索"
+                      className="flex-1 min-w-[140px] rounded border border-white/15 bg-bg-base/60 text-[12px] text-slate-100 px-2 py-1 focus:outline-none" />
+                    <span className="text-[10px] text-slate-400/70 tabular-nums">{filtered.length}件中 {shown.length}件</span>
+                  </div>
+                  <div className="px-1 max-h-[52vh] overflow-y-auto">
+                    <table className="w-full text-[12px]">
+                      <thead className="sticky top-0 bg-bg-panel">
+                        <tr className="text-slate-400/80 border-b border-white/10">
+                          <th className="text-left font-semibold px-2 py-1">候補語</th>
+                          <th className="text-right font-semibold px-2 py-1 w-14">出現</th>
+                          <th className="text-left font-semibold px-2 py-1">サンプル文脈</th>
+                          <th className="text-right font-semibold px-2 py-1 w-16">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {shown.map((c) => (
+                          <tr key={c.term} className="border-b border-white/5">
+                            <td className="px-2 py-1.5 text-slate-100 font-medium">{c.term}</td>
+                            <td className="px-2 py-1.5 text-right tabular-nums text-slate-200">{c.count}</td>
+                            <td className="px-2 py-1.5 text-slate-400/70"><span title={c.sampleContexts.join(" / ")}>{c.sampleContexts[0] ?? "—"}</span></td>
+                            <td className="px-2 py-1.5 text-right">
+                              <button type="button" onClick={() => onIgnoreTerm?.(c.term)} title="今後の候補から無視"
+                                className="text-[10px] px-1.5 py-0.5 rounded border border-white/15 text-slate-400 hover:text-rose-300 hover:border-rose-400/40 transition">🚫 無視</button>
+                            </td>
+                          </tr>
+                        ))}
+                        {shown.length === 0 && (
+                          <tr><td colSpan={4} className="px-2 py-6 text-center text-[12px] text-slate-500">候補がありません（履歴が少ない／すべて監視済み・無視済み）。</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* === 色分析タブ（生成制御センター） === */}
             {tab === "color" && (

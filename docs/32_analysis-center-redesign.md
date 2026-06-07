@@ -105,4 +105,13 @@ A1評価OK。重複分析を IPM の最重要機能として強化。複合構�
 
 **残**: A1b（🔭発見タブのセンター統合＝現状ラボは休眠）／A2-4（評価集計 期間別7/30/90/全期間＋推移＋月別）。多数の未push（ahead 9: P3a〜skyveil統合）。
 
-**End of Doc 32（分析センター: 重複(+複合構成)/AI(発見志向)/色(成功率)/画像/評価集計/skyveil好みAI 統合・未コミット）**
+### 5.7 ①発見タブ統合（2026-06-07／未コミット・push済みベースの上）
+頻出要素/頻出構成は既に重複分析タブへ移行済みのため、①＝**🔭発見（監視外の頻出新語候補）をセンタータブ化**。
+- `DuplicateAnalysisPanel`: タブ union に `discovery` 追加＋「🔭 発見（N）」ボタン（重複分析の隣・タブバー flex-wrap）。タブ内＝**未開拓発見担当バナー**（好み最適化＝skyveil好みAI とは別系統）＋候補テーブル（候補語/出現/サンプル文脈/🚫無視）＋件数20/50/100/全件・検索。`CandidateMotif` 型 import。
+- `App.tsx`: center に `candidates={discoveryCandidates}`/`onIgnoreTerm={handleIgnoreTerm}` 供給。
+- **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離＋スクショ＝7タブ目「🔭発見(30)」・バナー・新語候補(glow particles/glorptone/wibblecore aesthetic/zandarpunk…)・🚫無視・件数/検索。データ不変。
+- 注: 旧 `AnalysisLabPanel` は休眠（左メニューはセンターへ再配線済み）。重複する発見タブは将来撤去候補。
+
+**残**: ②評価集計強化（期間別7/30/90/全期間＋推移＋月別）→ ③成功/失敗ランキング。
+
+**End of Doc 32（分析センター司令塔: 重複(+複合構成)/🔭発見/AI(発見志向)/色(成功率)/画像/評価集計/skyveil好みAI）**

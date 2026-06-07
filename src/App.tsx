@@ -2732,6 +2732,8 @@ export default function App() {
                   onComboPolicyChange={handleComboPolicyChange}
                   colorAnalysis={colorAnalysis}
                   colorSuccess={colorSuccess}
+                  candidates={discoveryCandidates}
+                  onIgnoreTerm={handleIgnoreTerm}
                   skyveilSlot={(
                     <SkyveilBar
                       enabled={favoriteLearnEnabled}
