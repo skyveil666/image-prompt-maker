@@ -49,6 +49,12 @@ const STOPWORDS = new Set<string>([
   "画像", "背景", "衣装", "髪型", "ポーズ", "変更", "維持", "保持", "禁止", "完全", "場合",
   "表情", "人物", "雰囲気", "以下", "参照", "適用", "生成", "編集", "以上", "など", "この",
   "その", "する", "して", "ない", "もの", "よう", "それ", "ため",
+  // Layer2: 定型スキャフォールド語（docs/30 §7。前提/固定/品質/人体補正/NG品質文 等）
+  "前提", "固定", "同一性", "輪郭", "質感", "アスペクト比", "比率", "品質", "高解像度",
+  "解像度", "人体補正", "補正", "手", "片手", "5本指", "指", "崩れ", "防止", "保護",
+  "架空", "キャラクター", "外観", "造形", "目", "鼻", "口", "肌", "配置",
+  "anatomically", "correct", "hands", "hand", "fingers", "finger", "resolution",
+  "preserve", "maintain", "keep", "identity", "face", "facial", "consistent", "consistency",
 ]);
 
 // 区切り（日本語句読点・記号・空白・括弧）。
@@ -80,6 +86,28 @@ function acceptTerm(term: string): boolean {
     if (STOPWORDS.has(a) && STOPWORDS.has(b)) return false; // 両方汎用語の bi-gram は捨てる
   }
   return true;
+}
+
+// ── Layer1: 構造ブロック除去（可変セクションのみ抽出）docs/30 §7 ───────────────
+// 生成プロンプトの【可変＝創作】セクションだけを候補対象にする。固定/保護/品質セクションは捨てる。
+const VARIABLE_SECTION_KEYS = [
+  "変更", "雰囲気", "スタイル", "世界観", "色", "絵柄", "演出", "前景", "小物",
+  "カメラ", "ライティング", "光", "背景", "衣装", "髪", "ポーズ", "コスプレ",
+  "機械", "乗り物", "神話", "大物", "構図", "トレンド",
+];
+const SECTION_RE = /【([^】]+)】([\s\S]*?)(?=【[^】]+】|$)/gu;
+
+/** 生成プロンプトから可変セクションのみ抽出。【】が無ければ全文を返す（旧/プレーン互換）。 */
+function extractVariableText(promptText: string): string {
+  const kept: string[] = [];
+  let found = false;
+  SECTION_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = SECTION_RE.exec(promptText)) !== null) {
+    found = true;
+    if (VARIABLE_SECTION_KEYS.some((k) => m![1].includes(k))) kept.push(m[2]);
+  }
+  return found ? kept.join(" \n ") : promptText;
 }
 
 // ── 無視リスト（localStorage） ───────────────────────────────────────────────
@@ -165,10 +193,16 @@ export function detectCandidateMotifs(
     return c;
   };
 
+  // Layer3: 文書頻度カットオフ（全件の閾値超に出る語＝定型とみなし除外）。履歴が薄い時は無効化。
+  const total = items.length;
+  const dfCutoff = total >= 10 ? 0.75 : 1.1;
+
   const agg = new Map<string, { count: number; lastSeen: number; ctx: string[] }>();
   for (const it of items) {
+    // Layer1: 可変セクションのみを対象に（固定/保護/品質セクションを除去）
+    const varText = extractVariableText(it.promptText);
     const seenInItem = new Set<string>(); // 同一プロンプト内の二重計上を防ぐ
-    for (const term of tokenize(it.promptText)) {
+    for (const term of tokenize(varText)) {
       if (seenInItem.has(term)) continue;
       if (!acceptTerm(term)) continue;
       if (ignored.has(term)) continue;
@@ -178,7 +212,7 @@ export function detectCandidateMotifs(
       cur.count++;
       if (it.createdAt > cur.lastSeen) cur.lastSeen = it.createdAt;
       if (cur.ctx.length < 2) {
-        const snippet = it.promptText.replace(/\s+/g, " ").trim().slice(0, 60);
+        const snippet = varText.replace(/\s+/g, " ").trim().slice(0, 60);
         if (snippet && !cur.ctx.includes(snippet)) cur.ctx.push(snippet);
       }
       agg.set(term, cur);
@@ -186,7 +220,7 @@ export function detectCandidateMotifs(
   }
 
   return [...agg.entries()]
-    .filter(([, v]) => v.count >= minCount)
+    .filter(([, v]) => v.count >= minCount && v.count / total < dfCutoff)
     .map(([term, v]) => ({ term, count: v.count, lastSeen: v.lastSeen, sampleContexts: v.ctx }))
     .sort((a, b) => b.count - a.count || b.lastSeen - a.lastSeen)
     .slice(0, topN);
