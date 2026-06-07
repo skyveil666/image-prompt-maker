@@ -67,4 +67,9 @@ A1評価OK。重複分析を IPM の最重要機能として強化。複合構�
 **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離＋スクショ＝件数セレクタ2つ・全件でTOP5廃止（10件中10件/13件中13件）・出現率順(17%→15%→10%…)・%表示・スクロール2箇所。データ不変。
 **残**: A2-1b 複合構成分析（itemMotifSets加算＋サイズ別＋ドリルダウン）→ A2-2 AI4ブロック → A2-3 色 → A2-4 評価集計。
 
-**End of Doc 32（A1／A2-1a 実装・検証済み・未コミット／A2-1b以降 未着手）**
+### 5.2 A2-1b 実装・検証済み（2026-06-07／未コミット）
+- `historyAnalyzer`: `FullHistoryAnalysis.itemMotifSets: string[][]` を加算（window各itemの検出motif id配列）。既存ロジック不変。
+- `DuplicateAnalysisPanel`: `CompositionAnalysis`（＋`kCombinations`）を新設し重複分析タブ（頻出構成の直後）に配置。**ドリルダウン**（背景→共起衣装→共起髪型・カテゴリ進行・行クリックで段階フィルタ・共起なしは明示）＋**サイズ別**（1/2/3要素ランキング・出現率%）。`useMemo` 追加 import。
+- **検証**: tsc -b ✅ / vite build ✅ / Playwright隔離＋スクショ＝複合構成分析セクション表示・ドリルダウン（背景クリックで段階）・サイズ別（1要素 ドレス全般33%/2要素 黒系衣装＋黒ゴシック17%/3要素 三連）すべて出現率付き。データ不変。
+
+**End of Doc 32（A1／A2-1a／A2-1b 実装・検証済み・未コミット／A2-2以降 未着手）**

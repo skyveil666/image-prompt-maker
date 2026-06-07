@@ -9,7 +9,7 @@
  * - 重複リセット / ジャンル分散 / 提案を反映 の3アクション
  */
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { BiasAnalysisResult } from "../lib/biasAnalyzer";
 import { biasRiskLabel, biasRiskTextClass, biasRiskBorderClass } from "../lib/biasAnalyzer";
 import type {
@@ -1118,6 +1118,137 @@ function ComboPolicyBtn({
   );
 }
 
+// ── セクション：複合構成分析（サイズ別＋ドリルダウン）docs/32 A2-1b ──────────────
+function kCombinations(arr: string[], k: number): string[][] {
+  if (k <= 0 || k > arr.length) return [];
+  if (k === 1) return arr.map((x) => [x]);
+  const out: string[][] = [];
+  const rec = (start: number, combo: string[]) => {
+    if (combo.length === k) { out.push(combo.slice()); return; }
+    for (let i = start; i < arr.length; i++) { combo.push(arr[i]); rec(i + 1, combo); combo.pop(); }
+  };
+  rec(0, []);
+  return out;
+}
+
+function CompositionAnalysis({
+  itemSets, motifCounts, windowSize,
+}: {
+  itemSets: string[][];
+  motifCounts: MotifCount[];
+  windowSize: number;
+}) {
+  const [mode, setMode] = useState<"drill" | "size">("drill");
+  const [bg, setBg] = useState<string | null>(null);
+  const [outfit, setOutfit] = useState<string | null>(null);
+  const rate = (n: number) => (windowSize > 0 ? Math.round((n / windowSize) * 100) : 0);
+
+  const idToMotif = useMemo(() => {
+    const m = new Map<string, { label: string; category: string }>();
+    for (const mc of motifCounts) m.set(mc.motif.id, { label: mc.motif.label, category: mc.motif.category });
+    return m;
+  }, [motifCounts]);
+  const labelOf = (id: string) => idToMotif.get(id)?.label ?? id;
+
+  // サイズ別ランキング（1/2/3要素・出現数降順 top8）
+  const bySize = useMemo(() => {
+    const rank = (size: number) => {
+      const counter = new Map<string, { ids: string[]; count: number }>();
+      for (const set of itemSets) {
+        if (set.length < size) continue;
+        for (const combo of kCombinations(set, size)) {
+          const ids = [...combo].sort();
+          const key = ids.join("|");
+          const e = counter.get(key) ?? { ids, count: 0 };
+          e.count++; counter.set(key, e);
+        }
+      }
+      return [...counter.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+    };
+    return { one: rank(1), two: rank(2), three: rank(3) };
+  }, [itemSets]);
+
+  // ドリルダウン：カテゴリ進行（背景→衣装→髪）。required を全て含む item 内の category 共起を集計。
+  const rankByCat = (category: string, required: string[]) => {
+    const counter = new Map<string, number>();
+    for (const set of itemSets) {
+      if (!required.every((r) => set.includes(r))) continue;
+      for (const id of set) {
+        if (required.includes(id)) continue;
+        if (idToMotif.get(id)?.category !== category) continue;
+        counter.set(id, (counter.get(id) ?? 0) + 1);
+      }
+    }
+    return [...counter.entries()].map(([id, count]) => ({ id, count })).sort((a, b) => b.count - a.count).slice(0, 8);
+  };
+  const bgRank = useMemo(() => rankByCat("背景", []), [itemSets, idToMotif]);
+  const outfitRank = useMemo(() => (bg ? rankByCat("衣装", [bg]) : []), [itemSets, idToMotif, bg]);
+  const hairRank = useMemo(() => (bg && outfit ? rankByCat("髪", [bg, outfit]) : []), [itemSets, idToMotif, bg, outfit]);
+
+  if (itemSets.length === 0) return null;
+
+  const rowEl = (key: string, label: string, count: number, active?: boolean, onClick?: () => void) => (
+    <button key={key} type="button" disabled={!onClick} onClick={onClick}
+      className={["w-full flex items-center justify-between gap-2 px-2 py-1 rounded border text-left transition",
+        active ? "border-violet-400/70 bg-violet-500/20 text-violet-50"
+        : onClick ? "border-white/10 bg-white/4 text-slate-200 hover:border-violet-400/40 hover:bg-violet-500/10 cursor-pointer"
+        : "border-white/8 bg-white/3 text-slate-300"].join(" ")}>
+      <span className="text-[11px] truncate">{label}</span>
+      <span className="text-[11px] tabular-nums shrink-0">{rate(count)}%<span className="text-slate-400 ml-1">{count}</span></span>
+    </button>
+  );
+
+  return (
+    <>
+      <SectionTitle icon="🧬">複合構成分析</SectionTitle>
+      <p className="text-[10.5px] text-slate-400 px-1 pb-1 leading-snug">
+        いつもの「組み合わせの連鎖」を可視化。ドリルダウンは 背景→共起する衣装→共起する髪型 と段階的に辿れます。
+      </p>
+      <div className="flex items-center gap-1 px-1 pb-1.5">
+        {([["drill", "ドリルダウン（背景→衣装→髪）"], ["size", "サイズ別（1/2/3要素）"]] as [typeof mode, string][]).map(([k, lbl]) => (
+          <button key={k} type="button" onClick={() => setMode(k)}
+            className={["text-[11px] px-2 py-1 rounded border transition",
+              mode === k ? "border-violet-400/70 bg-violet-500/20 text-violet-50 font-semibold" : "border-white/12 bg-white/3 text-slate-400 hover:text-slate-100"].join(" ")}>
+            {lbl}
+          </button>
+        ))}
+      </div>
+
+      {mode === "drill" && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 px-1 pb-1">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold text-sky-300/90">① 背景</p>
+            {bgRank.length === 0 && <p className="text-[10px] text-slate-500">データなし</p>}
+            {bgRank.map((r) => rowEl(r.id, labelOf(r.id), r.count, bg === r.id, () => { setBg(bg === r.id ? null : r.id); setOutfit(null); }))}
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold text-violet-300/90">② ＋衣装 {!bg && <span className="text-slate-500 font-normal">（背景を選択）</span>}</p>
+            {bg && outfitRank.length === 0 && <p className="text-[10px] text-slate-500">共起なし</p>}
+            {outfitRank.map((r) => rowEl(r.id, labelOf(r.id), r.count, outfit === r.id, () => setOutfit(outfit === r.id ? null : r.id)))}
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold text-fuchsia-300/90">③ ＋髪型 {!(bg && outfit) && <span className="text-slate-500 font-normal">（衣装を選択）</span>}</p>
+            {bg && outfit && hairRank.length === 0 && <p className="text-[10px] text-slate-500">共起なし</p>}
+            {hairRank.map((r) => rowEl(r.id, labelOf(r.id), r.count))}
+          </div>
+        </div>
+      )}
+
+      {mode === "size" && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 px-1 pb-1">
+          {([["1要素", bySize.one], ["2要素", bySize.two], ["3要素", bySize.three]] as [string, { ids: string[]; count: number }[]][]).map(([title, list]) => (
+            <div key={title} className="space-y-1">
+              <p className="text-[10px] font-bold text-slate-300">{title}</p>
+              {list.length === 0 && <p className="text-[10px] text-slate-500">データなし</p>}
+              {list.map((c) => rowEl(c.ids.join("|"), c.ids.map(labelOf).join(" ＋ "), c.count))}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 function ComboRanking({
   combos, policies, onChange, windowSize,
 }: {
@@ -1841,6 +1972,15 @@ function DuplicateAnalysisPanelInner({
                 windowSize={ha.windowSize}
                 policies={comboPolicies}
                 onChange={onComboPolicyChange}
+              />
+            )}
+
+            {/* 🧬 複合構成分析（サイズ別＋ドリルダウン・docs/32 A2-1b） */}
+            {ha && ha.itemMotifSets && ha.itemMotifSets.length > 0 && (
+              <CompositionAnalysis
+                itemSets={ha.itemMotifSets}
+                motifCounts={ha.motifCounts}
+                windowSize={ha.windowSize}
               />
             )}
 

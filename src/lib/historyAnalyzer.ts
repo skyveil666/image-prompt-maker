@@ -103,6 +103,8 @@ export interface FullHistoryAnalysis {
   aiComment: string;
   /** 頻出『構成』（2〜3モチーフの組み合わせ）TOP10 */
   topCombos: MotifCombo[];
+  /** 複合構成分析用：window 各アイテムの検出 motif id 配列（docs/32 A2-1b。UIで派生集計）。 */
+  itemMotifSets: string[][];
 }
 
 /** 2〜3モチーフの同時出現（構成） */
@@ -593,6 +595,7 @@ export function analyzeFullHistory(
     untappedGenres,
     aiComment,
     topCombos,
+    itemMotifSets: window.map((it) => Array.from(itemMotifIds.get(it.id) ?? [])),
   };
 }
 
