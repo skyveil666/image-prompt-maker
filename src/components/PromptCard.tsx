@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PromptHistoryItem, FailureMemo } from "../types";
+import type { PromptHistoryItem, FailureMemo, ResultAnalysis } from "../types";
 import { makeThumbnail } from "../lib/imageThumb";
+import { analyzeResultViaBackend } from "../lib/backendClient";
 import { FavoriteButton } from "./FavoriteButton";
 import {
   getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES,
@@ -108,6 +109,14 @@ interface SlotProps {
   axisRatings: Record<RatingAxisKey, (number | null)[]>;
   /** 軸別評価の設定（null=解除） */
   onSetAxisRating: (axis: RatingAxisKey, index: number, value: number | null) => void;
+  /** AI仮評価（画像ごと・null=未分析） */
+  resultAiAnalysis: (ResultAnalysis | null)[];
+  /** AI分析を実行（その画像を Gemini Vision 分析） */
+  onAnalyze: (index: number) => void;
+  /** 分析中の画像index（ローディング表示用・null=なし） */
+  analyzingIdx: number | null;
+  /** 分析エラー文（あれば表示） */
+  analyzeError: string | null;
 }
 
 const SLOT_MAX = 3;
@@ -123,12 +132,63 @@ function ratingFrameClass(rating: number | null): string {
   }
 }
 
+// 🤖 AI仮評価パネル（Gemini Vision の ResultAnalysis を表示。ユーザー評価とは分離・確定しない）
+function AiAnalysisPanel({ a }: { a: ResultAnalysis }) {
+  const tone = (t: string) =>
+    ["good", "ok", "strong", "low"].includes(t) ? "text-emerald-200"
+    : ["bad", "risk", "monotone", "high", "no"].includes(t) ? "text-rose-200"
+    : ["caution", "weak", "mid", "complex", "yes"].includes(t) ? "text-amber-200"
+    : "text-sky-200";
+  const row = (label: string, jp: string, t: string) => (
+    <div className="flex items-center gap-1.5">
+      <span className="text-text-muted/65 w-[68px] shrink-0">{label}</span>
+      <span className={`font-semibold ${tone(t)}`}>{jp}</span>
+    </div>
+  );
+  const J = {
+    q: { good: "良い", normal: "普通", bad: "悪い" },
+    safe: { ok: "OK", caution: "注意", risk: "危険" },
+    sch: { monotone: "単調", good: "良い", complex: "複雑すぎ" },
+    sep: { yes: "あり", weak: "弱い", no: "なし" },
+    lv: { low: "低", mid: "中", high: "高" },
+    st: { strong: "強い", normal: "普通", weak: "弱い" },
+    yn: { yes: "あり", no: "なし" },
+    pr: { high: "高", normal: "普通", low: "低" },
+  } as const;
+  return (
+    <div className="ml-7 mt-1 rounded-xl border border-violet-400/30 bg-violet-500/8 px-3 py-2 text-[11px] leading-relaxed">
+      <div className="text-[11px] font-bold text-violet-200/90 mb-1">🤖 AI仮評価（参考・ユーザー評価とは別。確定は上の評価ボタンで）</div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+        {row("顔一致", J.q[a.faceMatch], a.faceMatch)}
+        {row("同一性", J.safe[a.identitySafety], a.identitySafety)}
+        {row("衣装配色", J.sch[a.outfitColorScheme], a.outfitColorScheme)}
+        {row("上下別色", J.sep[a.topBottomSeparation], a.topBottomSeparation)}
+        {row("外内別色", J.sep[a.outerInnerSeparation], a.outerInnerSeparation)}
+        {row("単色化", J.lv[a.monotone], a.monotone)}
+        {row("背景実写", J.st[a.backgroundRealism], a.backgroundRealism === "strong" ? "high" : a.backgroundRealism === "weak" ? "low" : "mid")}
+        {row("2D/2.5D", J.st[a.stylization], a.stylization === "strong" ? "good" : a.stylization === "weak" ? "bad" : "normal")}
+        {row("色偏り", J.yn[a.colorBias], a.colorBias)}
+        {row("前景", J.lv[a.foregroundIntensity], a.foregroundIntensity)}
+        {row("主役性", J.pr[a.subjectPriority], a.subjectPriority === "high" ? "good" : a.subjectPriority === "low" ? "bad" : "normal")}
+        {row("テンプレ", J.pr[a.templateRisk], a.templateRisk)}
+        {row("skyveil好み", J.st[a.skyveilPreference], a.skyveilPreference === "strong" ? "good" : a.skyveilPreference === "weak" ? "bad" : "normal")}
+      </div>
+      {a.backgroundType && <div className="mt-1 text-text-muted/80">背景：{a.backgroundType}</div>}
+      {a.outfitStructure && <div className="text-text-muted/80">衣装：{a.outfitStructure}</div>}
+      {a.colorBias === "yes" && a.colorBiasNote && <div className="text-amber-200/85">色偏り：{a.colorBiasNote}</div>}
+      {a.improvement && <div className="mt-1 text-violet-100/90">💡 提案：{a.improvement}</div>}
+      <div className="mt-1 text-[10px] text-text-muted/45">※ AI仮評価です。次回プロンプトへは自動反映しません。</div>
+    </div>
+  );
+}
+
 function GeneratedResultSlot({
   resultImages, resultRatings, resultMemos,
   sourceImageUrl,
   onAppend, onReplaceAt, onRemoveAt, onRemoveAll,
   onSetRating, onSetMemo,
   axisRatings, onSetAxisRating,
+  resultAiAnalysis, onAnalyze, analyzingIdx, analyzeError,
 }: SlotProps) {
   const [memoOpenIdx, setMemoOpenIdx] = useState<number | null>(null);
   const slotRef      = useRef<HTMLDivElement>(null);
@@ -424,6 +484,29 @@ function GeneratedResultSlot({
                         );
                       })}
                     </div>
+                    {/* 🔍 AI分析（Gemini Vision・押した時だけ実行・AI仮評価） */}
+                    <div className="pl-7 flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => onAnalyze(i)}
+                        disabled={analyzingIdx !== null}
+                        title="この画像を Gemini Vision で分析（衣装/背景/色/構図/主役性などのAI仮評価）。押した時だけ実行・次回プロンプトへは自動反映しません。"
+                        className={[
+                          "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-semibold leading-none transition select-none",
+                          analyzingIdx === i
+                            ? "border-violet-400/70 bg-violet-500/20 text-violet-100 cursor-wait"
+                            : "border-violet-400/45 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20 hover:border-violet-400/70 disabled:opacity-40",
+                        ].join(" ")}
+                      >
+                        {analyzingIdx === i
+                          ? <><span className="inline-block animate-spin leading-none">⟳</span>AI分析中…</>
+                          : <>🔍 AI分析{resultAiAnalysis[i] ? "（再分析）" : ""}</>}
+                      </button>
+                      {analyzeError && analyzingIdx === null && (
+                        <span className="text-[11px] text-rose-300/85">{analyzeError}</span>
+                      )}
+                    </div>
+                    {resultAiAnalysis[i] && <AiAnalysisPanel a={resultAiAnalysis[i]!} />}
                     {isMemoOpen && (
                       <input
                         type="text"
@@ -489,6 +572,9 @@ export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: 
   const [expanded, setExpanded] = useState(false);
   /** ロック一覧をコピーに含めるか */
   const [includeLockHeader, setIncludeLockHeader] = useState(false);
+  /** 🔍 AI分析（Gemini Vision）の状態：分析中の画像index・エラー */
+  const [analyzingIdx, setAnalyzingIdx] = useState<number | null>(null);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   /** 通常コピー済み：IndexedDB に永続保存（item.copied を直接使用） */
   const isCopied = item.copied === true;
@@ -603,6 +689,27 @@ export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: 
     outfit: currentImages.map((_, i) => getAxisRatingAt(item, "outfit", i)),
     pose:   currentImages.map((_, i) => getAxisRatingAt(item, "pose", i)),
   };
+  // AI仮評価（画像ごと・null=未分析）
+  const aiAnalyses: (ResultAnalysis | null)[] = currentImages.map((_, i) => item.resultAiAnalysis?.[i] ?? null);
+
+  /** 🔍 AI分析（Gemini Vision）：押した画像だけ分析→resultAiAnalysis へ保存。AI仮評価・自動適用/学習なし。 */
+  const handleAnalyzeImage = useCallback(async (index: number) => {
+    const img = currentImages[index];
+    if (!img) return;
+    setAnalyzingIdx(index);
+    setAnalyzeError(null);
+    try {
+      const analysis = await analyzeResultViaBackend(img, { prompt: item.promptText, scopes: item.scopes });
+      const arr = (item.resultAiAnalysis ?? []).slice(0, currentImages.length);
+      while (arr.length < currentImages.length) arr.push(null);
+      arr[index] = analysis;
+      onUpdate(item.id, { resultAiAnalysis: arr });
+    } catch (e) {
+      setAnalyzeError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAnalyzingIdx(null);
+    }
+  }, [item, onUpdate, currentImages]);
 
   return (
     <article
@@ -731,6 +838,10 @@ export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: 
         onSetMemo={handleSetMemo}
         axisRatings={axisRatings}
         onSetAxisRating={handleSetAxisRating}
+        resultAiAnalysis={aiAnalyses}
+        onAnalyze={handleAnalyzeImage}
+        analyzingIdx={analyzingIdx}
+        analyzeError={analyzeError}
       />
 
       {/* ── 🛡 ガードパネル（変更禁止チェック / ロック一覧 / スコア / 失敗メモ） ── */}

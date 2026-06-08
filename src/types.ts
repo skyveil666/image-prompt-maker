@@ -1319,6 +1319,34 @@ export interface GenerationResult {
 
 export type HistoryStatus = "unused" | "used" | "good" | "bad" | "posted";
 
+/**
+ * 生成結果画像の AI 仮評価（Gemini Vision・サーバ /api/analyze-result の戻り値）。
+ * ユーザー評価（resultRatings 等）とは分離した「仮評価」。確定はユーザー操作時のみ。
+ * server/src/analyzeResult.ts の ResultAnalysis と構造を一致させる。
+ */
+export interface ResultAnalysis {
+  version: 1;
+  model: string;
+  analyzedAt: number;
+  faceMatch:            "good" | "normal" | "bad";
+  identitySafety:       "ok" | "caution" | "risk";
+  outfitStructure:      string;
+  outfitColorScheme:    "monotone" | "good" | "complex";
+  topBottomSeparation:  "yes" | "weak" | "no";
+  outerInnerSeparation: "yes" | "weak" | "no";
+  monotone:             "low" | "mid" | "high";
+  backgroundType:       string;
+  backgroundRealism:    "strong" | "normal" | "weak";
+  stylization:          "strong" | "normal" | "weak";
+  colorBias:            "yes" | "no";
+  colorBiasNote:        string;
+  foregroundIntensity:  "low" | "mid" | "high";
+  subjectPriority:      "high" | "normal" | "low";
+  templateRisk:         "high" | "normal" | "low";
+  skyveilPreference:    "strong" | "normal" | "weak";
+  improvement:          string;
+}
+
 /** IndexedDB に保存される 1 案単位の履歴アイテム。 */
 export interface PromptHistoryItem {
   id: string;
@@ -1361,6 +1389,12 @@ export interface PromptHistoryItem {
   resultBgRatings?:     (number | null)[];
   resultOutfitRatings?: (number | null)[];
   resultPoseRatings?:   (number | null)[];
+  /**
+   * 生成結果画像ごとの AI 仮評価（Gemini Vision）。resultImageDataList と同じインデックス。
+   * ユーザーが「AI分析」を押した画像だけ埋まる（未分析は null）。ユーザー評価とは分離。
+   * 追加 optional フィールド＝既存履歴/お気に入り/評価/IDB構造は非破壊。
+   */
+  resultAiAnalysis?: (ResultAnalysis | null)[];
   generatedResultAddedAt?: number;     // 生成結果を登録した unix ms
 
   /**
