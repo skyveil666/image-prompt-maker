@@ -59,13 +59,14 @@ export function buildResultImagesPatch(images: string[]): {
 
 // ── 画像ごとの評価（rating / memo）ヘルパ ──────────────────────────────
 
-/** 評価値の意味 */
-export type ImageRating = 1 | 2 | 3 | 5;  // 4 は欠番（お気に入り＝アイテム単位の isFavorite と混同を避けるため）
+/** 評価値の意味。6=神 を最上位に追加（既存 5=良い は保持＝後方互換）。4 は欠番。 */
+export type ImageRating = 1 | 2 | 3 | 5 | 6;
 
 export const RATING_LABELS: Record<number, { jp: string; emoji: string; tone: string }> = {
+  6: { jp: "神",       emoji: "🌟", tone: "god"    },  // 最上位（お気に入り＝神候補の確定先）
   5: { jp: "良い",     emoji: "👍", tone: "good"   },
-  3: { jp: "まあまあ", emoji: "😐", tone: "normal" },
-  2: { jp: "微妙",     emoji: "👎", tone: "weak"   },
+  3: { jp: "まあまあ", emoji: "🙂", tone: "normal" },  // 👎/😐 等の腕マーク系を分かりやすい表情へ
+  2: { jp: "微妙",     emoji: "😕", tone: "weak"   },
   1: { jp: "失敗",     emoji: "💀", tone: "bad"    },
 };
 
@@ -79,7 +80,7 @@ export function getRatingAt(
   const arr = item.resultRatings;
   if (!Array.isArray(arr)) return null;
   const v = arr[index];
-  return (v === 1 || v === 2 || v === 3 || v === 5) ? v : null;
+  return (v === 1 || v === 2 || v === 3 || v === 5 || v === 6) ? v : null;
 }
 
 /** 指定インデックスのメモを取得（未設定は ""） */
@@ -157,7 +158,7 @@ export const AXIS_RATING_META: Record<RatingAxisKey, { jp: string; emoji: string
   pose:   { jp: "ポーズ", emoji: "🧍", field: "resultPoseRatings" },
 };
 
-/** 軸別評価値を取得（5=良い / 1=悪い / null=未評価） */
+/** 軸別評価値を取得（5=良い / 3=普通 / 1=悪い / null=未評価。3段階。既存5/1データは互換） */
 export function getAxisRatingAt(
   item: { resultBgRatings?: (number|null)[]; resultOutfitRatings?: (number|null)[]; resultPoseRatings?: (number|null)[] },
   axis: RatingAxisKey,
@@ -167,7 +168,7 @@ export function getAxisRatingAt(
   const arr = item[field];
   if (!Array.isArray(arr)) return null;
   const v = arr[index];
-  return (v === 5 || v === 1) ? v : null;
+  return (v === 5 || v === 3 || v === 1) ? v : null;
 }
 
 /**

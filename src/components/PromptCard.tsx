@@ -331,7 +331,8 @@ function GeneratedResultSlot({
                 const isMemoOpen = memoOpenIdx === i;
                 // 番号バッジ（サムネのと同色）
                 const indexBadgeCls =
-                  rating === 5 ? "border-emerald-400/65 bg-emerald-500/15 text-emerald-100"
+                  rating === 6 ? "border-yellow-300/70  bg-yellow-400/15  text-yellow-100"
+                : rating === 5 ? "border-emerald-400/65 bg-emerald-500/15 text-emerald-100"
                 : rating === 3 ? "border-sky-400/65     bg-sky-500/15     text-sky-100"
                 : rating === 2 ? "border-amber-400/65   bg-amber-500/15   text-amber-100"
                 : rating === 1 ? "border-rose-400/65    bg-rose-500/15    text-rose-100"
@@ -345,11 +346,12 @@ function GeneratedResultSlot({
                       ].join(" ")}>
                         {i + 1}
                       </span>
-                      {([5, 3, 2, 1] as const).map((v) => {
+                      {([6, 5, 3, 2, 1] as const).map((v) => {
                         const m = RATING_LABELS[v];
                         const active = rating === v;
                         const activeCls =
-                          v === 5 ? "border-emerald-400/85 bg-emerald-500/25 text-emerald-100 shadow-[0_0_6px_-1px_rgba(52,211,153,0.4)]"
+                          v === 6 ? "border-yellow-300/90  bg-yellow-400/25  text-yellow-100  shadow-[0_0_8px_-1px_rgba(250,204,21,0.5)]"
+                        : v === 5 ? "border-emerald-400/85 bg-emerald-500/25 text-emerald-100 shadow-[0_0_6px_-1px_rgba(52,211,153,0.4)]"
                         : v === 3 ? "border-sky-400/80     bg-sky-500/22     text-sky-100     shadow-[0_0_6px_-1px_rgba(56,189,248,0.35)]"
                         : v === 2 ? "border-amber-400/80   bg-amber-500/22   text-amber-100   shadow-[0_0_6px_-1px_rgba(251,191,36,0.35)]"
                         :            "border-rose-400/85    bg-rose-500/22    text-rose-100    shadow-[0_0_6px_-1px_rgba(244,63,94,0.4)]";
@@ -390,7 +392,8 @@ function GeneratedResultSlot({
                       {(["bg", "outfit", "pose"] as RatingAxisKey[]).map((axis) => {
                         const meta = AXIS_RATING_META[axis];
                         const v = axisRatings[axis][i] ?? null;
-                        const mkBtn = (val: 5 | 1, emoji: string, lbl: string, onCls: string) => {
+                        // 軸別は3段階（良い/普通/悪い）。腕マーク系（👍👎）は廃止し短いラベルに統一。
+                        const mkBtn = (val: 5 | 3 | 1, lbl: string, onCls: string) => {
                           const on = v === val;
                           return (
                             <button
@@ -399,24 +402,24 @@ function GeneratedResultSlot({
                               onClick={() => onSetAxisRating(axis, i, on ? null : val)}
                               title={`${meta.jp}：${lbl}${on ? "（クリックで解除）" : ""}`}
                               className={[
-                                "inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-[13px] font-semibold leading-none transition select-none",
+                                "inline-flex items-center px-2.5 py-1.5 rounded-lg border text-[12px] font-semibold leading-none transition select-none",
                                 on
                                   ? onCls
                                   : "border-bg-border/50 bg-bg-base/40 text-text-muted/70 hover:text-text-base hover:border-white/35",
                               ].join(" ")}
                             >
-                              <span className="text-[14px]">{emoji}</span>
-                              <span className="text-[12px]">{lbl}</span>
+                              {lbl}
                             </button>
                           );
                         };
                         return (
-                          <span key={axis} className="inline-flex items-center gap-1.5 rounded-xl border border-bg-border/35 bg-bg-panel/40 px-2 py-1">
+                          <span key={axis} className="inline-flex items-center gap-1 rounded-xl border border-bg-border/35 bg-bg-panel/40 px-2 py-1">
                             <span className="text-[12px] font-semibold text-text-muted/85 leading-none shrink-0 select-none">
                               {meta.emoji}{meta.jp}
                             </span>
-                            {mkBtn(5, "👍", "良い", "border-emerald-400/75 bg-emerald-500/22 text-emerald-100")}
-                            {mkBtn(1, "👎", "悪い", "border-rose-400/75    bg-rose-500/22    text-rose-100")}
+                            {mkBtn(5, "良い", "border-emerald-400/75 bg-emerald-500/22 text-emerald-100")}
+                            {mkBtn(3, "普通", "border-sky-400/70     bg-sky-500/20     text-sky-100")}
+                            {mkBtn(1, "悪い", "border-rose-400/75    bg-rose-500/22    text-rose-100")}
                           </span>
                         );
                       })}
@@ -665,6 +668,15 @@ export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: 
             active={item.isFavorite}
             onToggle={() => onUpdate(item.id, { isFavorite: !item.isFavorite })}
           />
+          {/* 🌟 神候補：お気に入り画像は「神候補」として扱う（自動で神確定はしない・ユーザー評価が優先） */}
+          {item.isFavorite && (
+            <span
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-yellow-300/55 bg-yellow-400/12 text-yellow-100 text-[11px] font-bold leading-none select-none"
+              title="お気に入り＝神候補。総合評価で「🌟 神」を付けると確定します（自動確定はしません）。"
+            >
+              🌟 神候補
+            </span>
+          )}
 
           {/* ロック一覧もコピーに含める */}
           {lock && (

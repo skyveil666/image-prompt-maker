@@ -217,7 +217,7 @@ export function analyzeRatings(items: readonly PromptHistoryItem[]): RatingAnaly
       const r = getRatingAt(item, i);
       if (r == null) continue;
       ratedHere++;
-      if (r === 5)      { totalGood++; bucket = "good"; }
+      if (r >= 5)       { totalGood++; bucket = "good"; }   // 5=良い / 6=神 を good 扱い
       else if (r === 3) {                bucket = "normal"; }
       else              { totalBad++;   bucket = "bad"; }
 
