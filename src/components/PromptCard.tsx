@@ -645,24 +645,35 @@ export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: 
     });
   }, [item.id, onUpdate, currentImages]);
 
-  /** 指定インデックスの画像を削除（同時に評価・メモも同じ位置を削除） */
+  /** 指定インデックスの画像を削除（評価・メモ・軸別評価・AI仮評価も同じ位置を削除＝インデックス整合） */
   const handleResultRemoveAt = useCallback((index: number) => {
     const nextImages = currentImages.filter((_, i) => i !== index);
     const ratingsSrc = currentImages.map((_, i) => getRatingAt(item, i));
     const memosSrc   = currentImages.map((_, i) => getMemoAt(item, i));
+    // 画像枚数に正規化してから index を抜く（軸別評価・AI仮評価も画像とズレないように揃える）
+    const dropAt = <T,>(arr: (T | null)[] | undefined): (T | null)[] =>
+      currentImages.map((_, i) => arr?.[i] ?? null).filter((_, i) => i !== index);
     onUpdate(item.id, {
       ...buildResultImagesPatch(nextImages),
       resultRatings: ratingsSrc.filter((_, i) => i !== index),
       resultMemos:   memosSrc.filter((_, i) => i !== index),
+      resultBgRatings:     dropAt<number>(item.resultBgRatings),
+      resultOutfitRatings: dropAt<number>(item.resultOutfitRatings),
+      resultPoseRatings:   dropAt<number>(item.resultPoseRatings),
+      resultAiAnalysis:    dropAt<ResultAnalysis>(item.resultAiAnalysis),
     });
   }, [item, onUpdate, currentImages]);
 
-  /** すべての画像を削除（評価・メモも一緒にクリア） */
+  /** すべての画像を削除（評価・メモ・軸別評価・AI仮評価も一緒にクリア） */
   const handleResultRemoveAll = useCallback(() => {
     onUpdate(item.id, {
       ...buildResultImagesPatch([]),
       resultRatings: [],
       resultMemos: [],
+      resultBgRatings: [],
+      resultOutfitRatings: [],
+      resultPoseRatings: [],
+      resultAiAnalysis: [],
     });
   }, [item.id, onUpdate]);
 
