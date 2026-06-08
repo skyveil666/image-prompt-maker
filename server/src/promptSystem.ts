@@ -4162,7 +4162,9 @@ export function buildSystemPrompt(
     `【雰囲気】${moodLine}`,
     autoMoodBlock || "",
     // 時代軸ブロック（設定なし = null/undefined の場合は挿入しない）
-    (() => { const b = eraBlock(req.era); return b ? "\n" + b : ""; })(),
+    // 時代カテゴリ無効化：eraBlock 注入を停止（req.era が state/保存に残っても最終プロンプトに出さない。
+    //   関数 eraBlock / 型 Era / era state / 保存データは残置＝非破壊。eraBlock(null) は常に "" を返す）
+    (() => { const b = eraBlock(null); return b ? "\n" + b : ""; })(),
     // 色戦略ブロック（肯定系のみ。否定系は NG ブロックに追加済み）
     (() => { const b = colorStrategyPositiveBlock(req.colorStrategy); return b ? "\n" + b : ""; })(),
     // 絵柄スタイルブロック（設定なし = null/undefined の場合は挿入しない）

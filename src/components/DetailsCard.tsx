@@ -132,7 +132,9 @@ const Camera3DPicker = lazy(() => import("./Camera3DPicker"));
 type ExtraTabId = "mood" | "era" | "colorStrategy" | "artStyle" | "ng" | "sns" | "culture";
 type TabId = Scope | ExtraTabId;
 
-const EXTRA_TAB_IDS: ExtraTabId[] = ["mood", "era", "colorStrategy", "artStyle", "ng", "sns", "culture"];
+// "era"（時代カテゴリ）は非表示。曖昧で背景/衣装/世界観と役割が重複するため表面から外す。
+// 型(ExtraTabId)・EXTRA_TAB_META・renderTabContent の case "era" は残置（内部データ非破壊・後日Step4で整理）。
+const EXTRA_TAB_IDS: ExtraTabId[] = ["mood", "colorStrategy", "artStyle", "ng", "sns", "culture"];
 
 interface ExtraTabMeta {
   label: string;
