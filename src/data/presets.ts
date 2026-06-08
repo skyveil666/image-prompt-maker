@@ -735,7 +735,7 @@ export const CAMERA_DISTANCES: PresetItem[] = [
   { id: "close", label: "近距離", ja: "近距離", en: "close distance" },
   { id: "medium", label: "中距離", ja: "中距離", en: "medium distance" },
   { id: "far", label: "遠距離", ja: "遠距離", en: "far distance" },
-  { id: "extreme_far", label: "超遠距離", ja: "超遠距離（人物が小さい）", en: "extreme far" },
+  { id: "extreme_far", label: "遠景許可", ja: "超遠距離・遠景許可（人物が小さくなりやすい。遠景を意図する時のみ使用）", en: "extreme far / allow distant framing (subject becomes small)" },
 ];
 
 export const CAMERA_LENSES: PresetItem[] = [

@@ -1595,8 +1595,8 @@ const COMPOSITION_GOD_POOL: readonly CompositionGodEntry[] = [
   {
     id: "drone", label: "ドローン",
     moods: ["cinematic", "cool"],
-    camera: { angle: "top_down", distance: "extreme_far", fov: "ultra_wide", eyeHeight: "above_head" },
-    instruction: "ドローン空撮風。高高度からの俯瞰広角。人物は風景の一部として大地・建築と組み合わさる。",
+    camera: { angle: "top_down", distance: "far", fov: "wide", eyeHeight: "above_head" },
+    instruction: "ドローン空撮風。高めからの俯瞰広角で大地・建築と対比させる。ただし人物は主役の大きさを保ち、豆粒化・点景化させない。",
   },
   {
     id: "smartphone_selfie", label: "スマホ自撮り",

@@ -758,6 +758,10 @@ function CameraContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
   const activePresetId = activeCameraPresetId(d.camera, d.multiOverrides);
   return (
     <div>
+      {/* 人物サイズ維持の注意（豆粒化防止） */}
+      <p className="text-[11px] text-amber-200/80 px-1 pb-1.5 leading-snug">
+        📐 カメラを変えても人物は元画像に近い大きさを維持します。「遠景許可（超遠距離）」「超広角」「俯瞰＋頭上」の組み合わせは人物が小さくなりやすいので注意。全身構図でも画面内で十分大きく見える距離を優先します。
+      </p>
       {/* カメラプリセット */}
       <CellSectionLabel label="プリセット" noTopMargin />
       <CellGrid>
