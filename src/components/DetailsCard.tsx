@@ -11,6 +11,7 @@ import {
   BG_INFOS,
   BG_PLACES,
   BG_STYLES,
+  BG_STYLES_REALISTIC,
   BG_TIMES,
   BG_WEATHERS,
   CAMERA_ANGLES,
@@ -177,6 +178,11 @@ interface Props {
   onSnsRandom?: () => void;
   /** 🌐 カルチャーおまかせ（一発ランダム）。QuickActionsから移設・内部は handleCultureSingle のまま不変 */
   onCultureRandom?: () => void;
+  /** 背景モード用：既存 realismLevel(1-5)/realismType に同期（新フィールドは作らない） */
+  realismLevel?: number;
+  realismType?: string | null;
+  onRealismLevelChange?: (lv: number) => void;
+  onRealismTypeChange?: (t: string | null) => void;
 }
 
 type Updater = <K extends keyof DetailSettings>(
@@ -641,8 +647,33 @@ function OutfitContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
   );
 }
 
-function BackgroundContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
+// ── 背景モード（既存 realismLevel(1-5)+realismType に同期・新フィールドは作らない）─────────
+const BG_MODE_SURFACE: Array<{ id: string; label: string; level: number; type: string | null }> = [
+  { id: "2d",        label: "2D",          level: 1, type: "cel" },
+  { id: "stylized",  label: "スタイライズ", level: 2, type: "concept_art" },
+  { id: "painterly", label: "絵画寄り",     level: 2, type: "oil_paint" },
+  { id: "half3d",    label: "2.5D",        level: 3, type: null },
+];
+const BG_MODE_REALISTIC: Array<{ id: string; label: string; level: number; type: string | null }> = [
+  { id: "realish",   label: "実写寄り",     level: 4, type: null },
+  { id: "photo",     label: "実写",         level: 5, type: "photo_real" },
+];
+/** realismLevel(+type) → 背景モードid に逆引き */
+function currentBgModeId(level: number, type: string | null): string {
+  if (level <= 1) return "2d";
+  if (level === 2) return (type === "oil_paint" || type === "watercolor") ? "painterly" : "stylized";
+  if (level === 3) return "half3d";
+  if (level === 4) return "realish";
+  return "photo";
+}
+
+function BackgroundContent({ d, upd, chg, realismLevel, realismType, onRealismLevelChange, onRealismTypeChange }: {
+  d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void;
+  realismLevel?: number; realismType?: string | null;
+  onRealismLevelChange?: (lv: number) => void; onRealismTypeChange?: (t: string | null) => void;
+}) {
   const activeId = activeBgPresetId(d.background);
+  const curBgMode = currentBgModeId(realismLevel ?? 3, realismType ?? null);
   const textActive =
     d.background.textType !== "skip" ||
     d.background.textMood !== "skip" ||
@@ -651,6 +682,36 @@ function BackgroundContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; c
   const [textOpen, setTextOpen] = useState(textActive);
   return (
     <div>
+      {/* 背景モード（既存 realismLevel に同期・新フィールドは作らない・「🎨 リアル度」と同じ設定）*/}
+      {onRealismLevelChange && (
+        <div className="mb-2">
+          <CellSectionLabel label="背景モード" noTopMargin />
+          <p className="text-[11px] text-text-muted/70 px-1 pb-1 leading-snug">
+            背景の質感タッチ。2D〜2.5D・絵画寄りで実写空間を避け、人物を引き立てる演出背景へ寄せます（「🎨 リアル度」と同じ設定に同期）。
+          </p>
+          <CellGrid>
+            {BG_MODE_SURFACE.map((m) => (
+              <GridCell key={m.id} jaLabel={m.label} active={curBgMode === m.id} cellKind="value"
+                onClick={() => { onRealismLevelChange(m.level); onRealismTypeChange?.(m.type); }} />
+            ))}
+          </CellGrid>
+          <details className="mt-1.5">
+            <summary className="text-[11px] text-text-muted/55 cursor-pointer select-none px-1 py-0.5">▸ 実写寄り（詳細・既定では使わない）</summary>
+            <div className="mt-1">
+              <CellGrid>
+                {BG_MODE_REALISTIC.map((m) => (
+                  <GridCell key={m.id} jaLabel={m.label} active={curBgMode === m.id} cellKind="value"
+                    onClick={() => { onRealismLevelChange(m.level); onRealismTypeChange?.(m.type); }} />
+                ))}
+                {BG_STYLES_REALISTIC.map((s) => (
+                  <GridCell key={s.id} jaLabel={`スタイル：${s.label}`} active={(d.background.style ?? "skip") === s.id} cellKind="value"
+                    onClick={() => upd("background", { style: s.id as DetailSettings["background"]["style"] })} />
+                ))}
+              </CellGrid>
+            </div>
+          </details>
+        </div>
+      )}
       {/* Scene preset grid */}
       <CellSectionLabel label="プリセット" noTopMargin />
       <CellGrid>
@@ -1918,6 +1979,10 @@ export function DetailsCard({
   onCultureSelect,
   onSnsRandom,
   onCultureRandom,
+  realismLevel,
+  realismType,
+  onRealismLevelChange,
+  onRealismTypeChange,
 }: Props) {
   const scopeKeyOf = (t: TabId): string => (t === "big_object" ? "bigObject" : t);
   const isScopeTab = (t: TabId): boolean => !(EXTRA_TAB_IDS as string[]).includes(t);
@@ -2019,7 +2084,7 @@ export function DetailsCard({
       case "outfit":        return <OutfitContent     d={value} upd={update} chg={onChange} />;
       case "cosplay":       return <CosplayContent    d={value} upd={update} />;
       case "cyber":         return <CyberContent      d={value} upd={update} chg={onChange} />;
-      case "background":    return <BackgroundContent d={value} upd={update} chg={onChange} />;
+      case "background":    return <BackgroundContent d={value} upd={update} chg={onChange} realismLevel={realismLevel} realismType={realismType} onRealismLevelChange={onRealismLevelChange} onRealismTypeChange={onRealismTypeChange} />;
       case "foreground":    return <ForegroundContent d={value} upd={update} />;
       case "pose":          return <PoseContent       d={value} upd={update} />;
       case "camera":        return <CameraContent     d={value} upd={update} chg={onChange} />;

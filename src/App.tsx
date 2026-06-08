@@ -172,7 +172,7 @@ export default function App() {
   // dimensionLevel は互換のため state に持つ（旧履歴・旧設定の保存のため）。UI からは外した。
   const [dimensionLevel]                        = useState(s0.dimensionLevel);  // 1-5, 3=2.5D
   /** 質感・リアル度（1=完全2D ↔ 5=写真リアル）。既定 3 = 2.5D */
-  const [realismLevel,     setRealismLevel]     = useState<number>(s0.realismLevel ?? 3);
+  const [realismLevel,     setRealismLevel]     = useState<number>(s0.realismLevel ?? 2);  // 既定Lv2＝背景モード「スタイライズ」（非写実寄り）
   /** 質感タイプ（"anime_bg" 等、null = 指定なし） */
   const [realismType,      setRealismType]      = useState<string | null>(s0.realismType ?? null);
   const [textureOriginal,  setTextureOriginal]  = useState(s0.textureOriginal); // 元画像維持
@@ -2090,7 +2090,7 @@ export default function App() {
     setFavoriteLearnEnabled(false);
     setSkyveilOneShot(false);
     // ── 見た目 / 質感 ──────────────────────────────────────────────────────────
-    setRealismLevel(3);
+    setRealismLevel(2);  // 既定Lv2＝背景モード「スタイライズ」（非写実寄り）
     setRealismType(null);
     setGlossLevel(3);
     setWindLevel(0);
@@ -2975,6 +2975,10 @@ export default function App() {
                 onCultureSelect={handleCulture}
                 onSnsRandom={handleSnsSingle}
                 onCultureRandom={handleCultureSingle}
+                realismLevel={realismLevel}
+                realismType={realismType}
+                onRealismLevelChange={setRealismLevel}
+                onRealismTypeChange={setRealismType}
               />
 
 

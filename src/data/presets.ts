@@ -291,51 +291,32 @@ export const OUTFIT_LUXURIES: PresetItem[] = [
 
 /* ---------------- BACKGROUND ---------------- */
 
+// 場所候補：現実空間名ではなく、演出的・幻想的・非写実的な名称＋プロンプト文へ寄せる（id は保持）
 export const BG_PLACES: PresetItem[] = [
-  { id: "indoor", label: "室内", ja: "整然とした室内空間", en: "interior space" },
-  { id: "alley", label: "路地", ja: "湿度感のある都市の路地裏", en: "urban back alley" },
-  {
-    id: "futuristic",
-    label: "近未来空間",
-    ja: "近未来的な構築空間（金属面と石材の交差）",
-    en: "near-future constructed space",
-  },
-  {
-    id: "abstract",
-    label: "抽象空間",
-    ja: "幾何のみで構成された抽象的アーキテクチャ空間",
-    en: "abstract architectural space",
-  },
-  { id: "nature", label: "自然", ja: "微細な光が差し込む自然環境", en: "natural environment" },
-  {
-    id: "museum",
-    label: "美術館",
-    ja: "美術館のような展示空間（高い天井と均一照明）",
-    en: "museum-like gallery space",
-  },
-  {
-    id: "industrial",
-    label: "工業施設",
-    ja: "重厚な工業施設の構造体",
-    en: "heavy industrial structure",
-  },
-  { id: "gallery", label: "ギャラリー", ja: "白壁のアートギャラリー空間", en: "white-wall art gallery" },
-  { id: "atelier", label: "アトリエ", ja: "画家のアトリエ、キャンバスと絵の具", en: "artist's atelier with canvases and paint" },
-  { id: "japanese_room", label: "和室", ja: "畳・障子・木の柱のある和室空間", en: "Japanese tatami room with shoji" },
-  { id: "garden", label: "庭園", ja: "整えられた日本庭園あるいは洋風庭園", en: "well-kept garden" },
-  { id: "seaside", label: "海辺", ja: "波音のある海辺の浜辺・岸壁", en: "seaside, beachfront or coastal rocks" },
-  { id: "forest", label: "森", ja: "木漏れ日の差す静かな森の中", en: "quiet forest with dappled light" },
+  { id: "indoor", label: "抽象室内", ja: "非写実でデザインされた抽象の室内空間", en: "stylized abstract interior" },
+  { id: "alley", label: "ネオ路地空間", ja: "発光する様式化されたネオ路地空間", en: "stylized neon-lit neo alley space" },
+  { id: "futuristic", label: "近未来空間", ja: "様式化された近未来の構築空間", en: "stylized near-future space" },
+  { id: "abstract", label: "抽象空間", ja: "幾何のみで構成された抽象アーキテクチャ空間", en: "abstract architectural space" },
+  { id: "nature", label: "幻想自然空間", ja: "幻想的に様式化された自然空間", en: "fantasy stylized natural environment" },
+  { id: "museum", label: "幻想展示空間", ja: "幻想的で非写実な演出展示空間", en: "fantasy exhibition space" },
+  { id: "industrial", label: "未来工房", ja: "様式化された近未来の工房空間", en: "stylized futuristic workshop" },
+  { id: "gallery", label: "コンセプト展示空間", ja: "コンセプチュアルで非写実な展示空間", en: "conceptual gallery space" },
+  { id: "atelier", label: "異空間アトリエ", ja: "超現実的な異空間のアトリエ", en: "surreal creative atelier" },
+  { id: "japanese_room", label: "幽玄和空間", ja: "幽玄で様式化された和の空間", en: "stylized ethereal Japanese space" },
+  { id: "garden", label: "空想庭園", ja: "空想的で絵画的な庭園", en: "imaginary painterly garden" },
+  { id: "seaside", label: "幻想海岸空間", ja: "幻想的で絵画的な海岸空間", en: "fantasy coastal space" },
+  { id: "forest", label: "幻想森層", ja: "幻想的に様式化された森の層", en: "fantasy stylized forest" },
   { id: "empty_space", label: "無地空間", ja: "色だけのフラットな無地背景", en: "flat solid-color background" },
-  { id: "studio", label: "スタジオ", ja: "撮影スタジオ、自然光またはソフトボックス", en: "photography studio with soft light" },
+  { id: "studio", label: "演出スタジオ空間", ja: "演出的でデザインされたスタジオ空間", en: "stylized art-direction studio space" },
   { id: "paper_backdrop", label: "紙バック", ja: "和紙・ケント紙のような紙質感バック", en: "paper-textured backdrop" },
   { id: "fabric_backdrop", label: "布バック", ja: "シルク・リネンのような布地バックドロップ", en: "fabric backdrop (silk or linen)" },
-  { id: "old_cinema", label: "古い映画館", ja: "レトロな古い映画館の赤いシート・スクリーン空間", en: "old cinema with red seats and screen" },
-  { id: "greenhouse", label: "温室", ja: "ガラス張りの温室・植物が溢れる空間", en: "greenhouse with lush plants" },
-  { id: "rooftop", label: "屋上", ja: "都市の屋上・スカイラインが見える空間", en: "urban rooftop with skyline" },
-  { id: "library", label: "図書館", ja: "本が壁一面に並ぶ図書館の空間", en: "library with bookshelves" },
-  { id: "rainy_station", label: "雨の駅前", ja: "雨に濡れた駅前・傘が行き交う空間", en: "rainy station front, wet pavement" },
-  { id: "night_amusement", label: "夜の遊園地", ja: "夜の遊園地・カラフルなライトと観覧車", en: "night amusement park with colorful lights" },
-  { id: "frosted_room", label: "曇りガラスの部屋", ja: "曇りガラス越しの柔らかい光が差し込む部屋", en: "room with frosted glass, soft diffused light" },
+  { id: "old_cinema", label: "異界シネマ空間", ja: "異界的で様式化されたシネマ空間", en: "surreal stylized cinema space" },
+  { id: "greenhouse", label: "ガラス植物ドーム", ja: "光に満ちた様式化のガラス植物ドーム", en: "stylized glass botanical dome" },
+  { id: "rooftop", label: "浮遊屋上空間", ja: "空に浮かぶ様式化された屋上空間", en: "floating stylized rooftop space" },
+  { id: "library", label: "幻想書庫", ja: "幻想的で非写実な書庫空間", en: "fantasy archive library" },
+  { id: "rainy_station", label: "幻想雨景空間", ja: "幻想的で絵画的な雨景の空間", en: "fantasy rainy scene space" },
+  { id: "night_amusement", label: "夢幻遊園空間", ja: "夢幻的で発光する遊園空間", en: "dreamlike glowing amusement space" },
+  { id: "frosted_room", label: "曇りガラスの部屋", ja: "曇りガラス越しの柔らかい拡散光の様式化空間", en: "stylized frosted-glass room with soft light" },
 ];
 
 export const BG_COLORS: PresetItem[] = [
@@ -450,8 +431,8 @@ export const BG_INFOS: PresetItem[] = [
   { id: "maximalist", label: "最大限", ja: "ぎっしり詰まったマキシマリスト", en: "maximalist, packed" },
 ];
 
+// 表面UIの背景スタイル（フォトリアルは BG_STYLES_REALISTIC へ隔離・ここには出さない）
 export const BG_STYLES: PresetItem[] = [
-  { id: "photorealistic", label: "フォトリアル", ja: "写真のようなリアルな質感", en: "photorealistic" },
   { id: "watercolor", label: "水彩画", ja: "水彩絵の具のにじみと透明感", en: "watercolor painting" },
   { id: "ink_wash", label: "水墨画", ja: "墨と余白で構成された水墨画風", en: "ink wash painting (sumi-e)" },
   { id: "oil_painting", label: "油彩画", ja: "厚みのある油彩絵の具の質感", en: "oil painting" },
@@ -471,6 +452,11 @@ export const BG_STYLES: PresetItem[] = [
   { id: "pastel", label: "パステル", ja: "淡くやさしいパステルトーン", en: "pastel tone" },
   { id: "cyber", label: "サイバー", ja: "ネオン発光・デジタルグリッド・サイバーパンク", en: "cyber / neon / digital grid" },
   { id: "digital", label: "デジタル", ja: "デジタルアート・ピクセル・データ表現", en: "digital art / pixel / data visualization" },
+];
+
+/** 実写寄りスタイル（詳細設定の実写領域へ隔離。表面UIには出さない・明示選択時のみ） */
+export const BG_STYLES_REALISTIC: PresetItem[] = [
+  { id: "photorealistic", label: "フォトリアル", ja: "写真のようなリアルな質感", en: "photorealistic" },
 ];
 
 /* ---------------- 文字背景 / 書 ---------------- */
