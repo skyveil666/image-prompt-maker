@@ -7,6 +7,9 @@ export interface BackendResponse {
 
 export interface BackendError {
   error: string;
+  /** Gemini 安全フィルタのカテゴリ別スコア（BlockedError 時のみ付く）。
+   *  診断用途のみ — フィルタ回避には使わない。 */
+  safetyCategories?: Record<string, string>;
 }
 
 export async function generateViaBackend(
@@ -70,6 +73,14 @@ export async function generateViaBackend(
       try {
         const j = JSON.parse(raw) as BackendError;
         detail = j.error || raw;
+        // safetyCategories があればエラーメッセージに追記（診断用表示。LOW/NEGLIGIBLE は除外）
+        if (j.safetyCategories && Object.keys(j.safetyCategories).length > 0) {
+          const catStr = Object.entries(j.safetyCategories)
+            .filter(([, v]) => v !== "NEGLIGIBLE" && v !== "LOW")
+            .map(([k, v]) => `${k}:${v}`)
+            .join(" / ");
+          if (catStr) detail += ` ▶ [${catStr}]`;
+        }
       } catch {
         detail = raw;
       }

@@ -6,6 +6,52 @@ import { applyIdentityShield, applyServerScopeFilter } from "./scopeFilter.ts";
 import { planBatch, shouldApplyVariety } from "./varietyEngine.ts";
 import { planSubStylesForBatch } from "./outfitSubStyles.ts";
 
+// ── カスタムエラー：Gemini 安全フィルタによるブロック ─────────────────────────
+/**
+ * Gemini の入力・出力安全フィルタでブロックされた場合にスローするエラー。
+ * safetyCategories に HARM カテゴリ別スコア（HIGH/MEDIUM/LOW/NEGLIGIBLE 等）が入る。
+ * 目的：フィルタ回避ではなく、どのカテゴリに反応しているかを把握して
+ *       より穏当な依頼内容へ修正するための診断情報として使う。
+ */
+export class BlockedError extends Error {
+  constructor(
+    message: string,
+    public readonly safetyCategories: Record<string, string> = {},
+  ) {
+    super(message);
+    this.name = "BlockedError";
+  }
+}
+
+/**
+ * Gemini レスポンスから safetyRatings を抽出する。
+ * promptFeedback（入力ブロック）と candidates[0]（出力ブロック）の両方を試みる。
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractSafetyCategories(response: any): Record<string, string> {
+  const cats: Record<string, string> = {};
+  const toArr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+  // 入力ブロック側（promptFeedback.safetyRatings）
+  const pfRatings = toArr(response?.promptFeedback?.safetyRatings);
+  // 出力ブロック側（candidates[0].safetyRatings）
+  const cRatings = toArr(
+    Array.isArray(response?.candidates) ? response.candidates[0]?.safetyRatings : undefined,
+  );
+
+  for (const r of [...pfRatings, ...cRatings]) {
+    if (r && typeof r === "object") {
+      const { category, probability } = r as Record<string, unknown>;
+      if (typeof category === "string" && typeof probability === "string") {
+        // HARM_CATEGORY_DANGEROUS_CONTENT → DANGEROUS_CONTENT（短縮）
+        const key = category.replace(/^HARM_CATEGORY_/, "");
+        if (!(key in cats)) cats[key] = probability; // promptFeedback を優先
+      }
+    }
+  }
+  return cats;
+}
+
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   throw new Error("GEMINI_API_KEY is not set in server/.env");
@@ -258,9 +304,11 @@ export async function generate(req: GenerateRequest): Promise<GeneratedProposal[
 
     if (finishReason === "SAFETY" || finishReason === "PROHIBITED_CONTENT") {
       // エラーメッセージに PROHIBITED_CONTENT を含める（クライアント側の検知に使用）
-      throw new Error(
+      // BlockedError で包むことで safetyCategories をクライアントへ転送する
+      throw new BlockedError(
         `プロンプトがブロックされました（PROHIBITED_CONTENT）。` +
-        "入力画像・追加指示・NG指定を変更してお試しください。"
+        "入力画像・追加指示・NG指定を変更してお試しください。",
+        extractSafetyCategories(response),
       );
     }
     if (finishReason === "RECITATION") {
@@ -280,9 +328,11 @@ export async function generate(req: GenerateRequest): Promise<GeneratedProposal[
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blockReason = (response as any).promptFeedback?.blockReason as string | undefined;
     if (blockReason) {
-      throw new Error(
+      // BlockedError で包むことで safetyCategories をクライアントへ転送する
+      throw new BlockedError(
         `プロンプトがブロックされました（${blockReason}）。` +
-        "入力画像・追加指示・NG指定を変更してお試しください。"
+        "入力画像・追加指示・NG指定を変更してお試しください。",
+        extractSafetyCategories(response),
       );
     }
 

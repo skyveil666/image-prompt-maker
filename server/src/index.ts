@@ -2,7 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import type { GenerateRequest, GenerateResponse } from "./types.ts";
-import { MODEL_NAME, generate, analyzePreferences, type AnalyzePreferenceSample } from "./gemini.ts";
+import { MODEL_NAME, generate, analyzePreferences, BlockedError, type AnalyzePreferenceSample } from "./gemini.ts";
 import { extractReference } from "./referenceExtract.ts";
 import { compareReference } from "./referenceCompare.ts";
 import { analyzeResult } from "./analyzeResult.ts";
@@ -250,7 +250,13 @@ app.post("/api/generate", async (req, res) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[/api/generate] failed:", message);
-    res.status(500).json({ error: message });
+    // BlockedError にはカテゴリ別スコアが付いている → クライアントへ構造化して転送
+    // 目的：フィルタ回避ではなく、どのカテゴリが反応しているか診断するため
+    if (err instanceof BlockedError && Object.keys(err.safetyCategories).length > 0) {
+      res.status(500).json({ error: message, safetyCategories: err.safetyCategories });
+    } else {
+      res.status(500).json({ error: message });
+    }
   }
 });
 
