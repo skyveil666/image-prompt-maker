@@ -2391,11 +2391,10 @@ export default function App() {
   // P4: 出力先ラベル（表示のみ。promptTarget は安全フィルタモードで生成ロジックは不変）
   const outputTargetLabel = useMemo(() => {
     switch (promptTarget) {
-      case "chatgpt_safe":  return "ChatGPT";
-      case "chatgpt_short": return "ChatGPT短縮";
-      case "gemini_safe":   return "Gemini";
-      case "nano_safe":     return "Nano Banana";
-      default:              return "両対応";
+      case "chatgpt_safe": return "ChatGPT";
+      case "gemini_safe":  return "Gemini";
+      case "nano_safe":    return "Nano Banana";
+      default:             return "両対応";
     }
   }, [promptTarget]);
 

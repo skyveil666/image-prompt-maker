@@ -166,20 +166,24 @@ export function loadSettings(): PersistedSettings {
         aspectRatio: { ...loaded.details.aspectRatio, preset: loaded.defaultAspectRatio },
       };
     }
-    // ── 一度きりの復旧移行（6/3基準の実写維持へ）─────────────────────────────
-    // リグレッション期間（22dda3d 以降）にスタイライズ寄り(Lv1/2)が既定化され、
-    // その状態で保存された realismLevel を写実維持(Lv3)へ一度だけ引き上げる。
-    // 元画像の実写質感・顔・肌をそのまま維持することを最優先するための復旧措置。
-    // マーカーで1回限り。ユーザーが意図的に再度 Lv1/2 を選ぶことは妨げない。
+    // ── 一度きりの復旧移行 v2（6/3基準の実写維持へ・ChatGPT短縮撤去対応）──────────
+    // 直近のリグレッションで以下が保存され、元画像の実写質感を壊していたため一度だけ復旧する：
+    //   ・realismType="cel"（セル画）等の絵柄タイプ → null（解除＝実写質感を維持）
+    //   ・realismLevel < 3 → 3（2.5D。realismBlock が空＝元画像維持）
+    //   ・promptTarget="chatgpt_short"（撤去したモード）→ "chatgpt_safe"
+    // v1 マーカー済みでも v2 で再実行する。ユーザーが後から再設定することは妨げない。
     try {
-      const REALISM_RESTORE_KEY = "ipm_realism_restore_v1";
-      if (!localStorage.getItem(REALISM_RESTORE_KEY)) {
-        if (typeof loaded.realismLevel === "number" && loaded.realismLevel < 3) {
+      const RESTORE_KEY = "ipm_realism_restore_v2";
+      if (!localStorage.getItem(RESTORE_KEY)) {
+        loaded.realismType = null;                                  // セル画等の絵柄タイプを解除
+        if (typeof loaded.realismLevel !== "number" || loaded.realismLevel < 3) {
           loaded.realismLevel = 3;
-          loaded.realismType = null;
-          saveSettings(loaded);  // 引き上げ結果を永続化（リロードしても維持）
         }
-        localStorage.setItem(REALISM_RESTORE_KEY, "1");
+        if ((loaded.promptTarget as string) === "chatgpt_short") {  // 撤去モードを通常へ
+          loaded.promptTarget = "chatgpt_safe";
+        }
+        saveSettings(loaded);                                        // 結果を永続化（リロードしても維持）
+        localStorage.setItem(RESTORE_KEY, "1");
       }
     } catch {
       // localStorage 不可環境では移行をスキップ

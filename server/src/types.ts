@@ -80,13 +80,12 @@ export type SafetyMode = "fictional_ai" | "real_person";
 
 /**
  * 出力先プラットフォームに合わせたプロンプト安全モード（フロントエンド src/types.ts と同期）。
- *  chatgpt_safe  : ChatGPT / DALL-E 向け（最も厳しい語句フィルタ・詳細版）
- *  chatgpt_short : ChatGPT 向け短縮版（60-70%圧縮・生成成功率優先）
+ *  chatgpt_safe  : ChatGPT / DALL-E 向け（最も厳しい語句フィルタ）
  *  gemini_safe   : Gemini Image Generation 向け（やや緩い）
  *  nano_safe     : Nano Banana 向け（軽量・短文）
  *  full          : 従来通り（フィルタなし・詳細記述あり）
  */
-export type PromptTarget = "chatgpt_safe" | "chatgpt_short" | "gemini_safe" | "nano_safe" | "full";
+export type PromptTarget = "chatgpt_safe" | "gemini_safe" | "nano_safe" | "full";
 export type Count = 2 | 3 | 4 | 5 | 6;
 
 /**

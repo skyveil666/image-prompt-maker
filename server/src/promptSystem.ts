@@ -720,7 +720,7 @@ const FOREGROUND_LABELS = {
   effectType: {
     petals: "花びら（汎用）", sakura: "桜花びら", rose: "バラの花びら", camellia: "椿の花びら",
     higanbana: "彼岸花", feather: "羽（汎用）", down: "産毛・ダウン羽", snow: "雪",
-    rain: "雨粒", bubble: "シャボン玉", drop: "水滴", glass: "ガラス破片",
+    rain: "雨粒", bubble: "シャボン玉", drop: "水滴", glass: "クリスタルの輝き",
     confetti: "紙吹雪", spark: "火花", ash: "灰・燃え殻", light_particle: "光の粒子",
     stardust: "星屑", butterfly: "蝶", jellyfish: "クラゲ", foxfire: "狐火",
     spirit_fire: "霊火", red_mist: "赤い霧", blue_mist: "青い霧",
@@ -752,7 +752,7 @@ const FOREGROUND_LABELS = {
     ink_line: "墨ライン", collage: "コラージュ", paper_texture: "紙質感",
     modern_art_line: "現代アートライン", abstract_shape: "抽象シェイプ",
     color_plane: "色面", cubism_fragment: "キュービズム断片",
-    glass_abstract: "ガラス抽象", fragment: "破片", glowing_lineart: "発光ライン画",
+    glass_abstract: "ガラス抽象", fragment: "結晶片", glowing_lineart: "発光ライン画",
     handdrawn: "手描き感", transparent_acrylic: "透明アクリル",
   },
   position: {
@@ -1787,7 +1787,7 @@ const VIRAL_POOL = [
   "発光蝶",
   "透明な羽",
   "花びら",
-  "ガラス破片",
+  "クリスタル",
   "黒薔薇",
   "巨大ハート",
   "魔法陣",
@@ -1808,7 +1808,7 @@ function faceLockBlock(pt: PromptTarget = "full"): string {
       "- ポーズ・カメラ・アスペクト比はなるべく維持する。",
     ].join("\n");
   }
-  if (pt === "chatgpt_safe" || pt === "chatgpt_short" || pt === "gemini_safe") {
+  if (pt === "chatgpt_safe" || pt === "gemini_safe") {
     return [
       "【キャラクター一貫性ロック】",
       "- キャラクターの視覚的特徴、一貫した顔立ち、髪型、全体の雰囲気を維持する。",
@@ -2010,10 +2010,9 @@ function sanitizerBlock(pt: PromptTarget): string {
   if (pt === "full") return "";
 
   const platformName =
-    pt === "chatgpt_safe"  ? "ChatGPT Image (DALL-E)" :
-    pt === "chatgpt_short" ? "ChatGPT Image (DALL-E)" :
-    pt === "gemini_safe"   ? "Gemini Image Generation" :
-                             "Nano Banana";
+    pt === "chatgpt_safe" ? "ChatGPT Image (DALL-E)" :
+    pt === "gemini_safe"  ? "Gemini Image Generation" :
+                            "Nano Banana";
 
   const base = [
     `【出力プロンプト スタイルガイド — ${platformName} 向け】`,
@@ -2027,7 +2026,7 @@ function sanitizerBlock(pt: PromptTarget): string {
     "  ファッション的・スタイリッシュな表現に集中する。",
   ];
 
-  if (pt === "chatgpt_safe" || pt === "chatgpt_short") {
+  if (pt === "chatgpt_safe") {
     base.push("");
     base.push("▼ ChatGPT 向け記述方針：");
     base.push("  衣装は系統・色・素材のみで記述（例: dark cyber jacket, elegant white dress, gothic fashion）。");
@@ -3458,6 +3457,10 @@ function safetyOutputGuideBlock(): string {
     "  SNSインパクトは「配色の強さ」「光演出」「前景エフェクト」「構図の迫力」「ファッション性の高さ」で表現する。",
     "  過激さや危険な雰囲気ではなく、視覚的完成度・配色・光・透明感・高級感でインパクトを演出する。",
     "",
+    "▼ 退廃・破壊・自傷を連想させる語は使わない（重要・ChatGPTの安全フィルタ誤判定を避けるため）：",
+    "  破片・ガラス破片・割れたガラス・廃墟・廃工場・退廃・錆び・朽ち・瓦礫・崩壊・鋭利・刃・破壊 等は禁止。",
+    "  同じ世界観は「クリスタル／結晶」「ヴィンテージ建築」「アンティーク調」「ノスタルジックな美」「脱構築デザイン」「古典美のある空間」等の安全な美的語で表現する。",
+    "",
     "▼ 一発バズりモードの表現方針：",
     "  SNS映えは「強い配色コントラスト」「ドラマチックな光源」「印象的な前景演出」「高級感のあるファッション性」で実現する。",
     "  花・光・羽・水・透明素材・オーラ・粒子エフェクトを優先して使う。",
@@ -3552,6 +3555,33 @@ export function safetySanitizePrompt(
   // ─── 単語・フレーズ置換ルール ─────────────────────────────────────────────
   // ★ 順序重要：複合語・長いフレーズを先に処理し、単語は後でキャッチする
   const rules: Array<[RegExp, string]> = [
+
+    // ── 自傷・暴力・退廃 誤判定の穏当化（ChatGPT「自傷行為/自殺」フィルタ対策）─────
+    //   割れガラス・破片・廃墟・退廃・錆びなどの退廃/破壊系の語に安全フィルタが過剰反応し、
+    //   ファッション演出（バズモード等）を誤ブロックするのを防ぐ。視覚的な演出意図は維持し、
+    //   誤判定を招く語のみ同等の安全語へ置換する（順序：複合語→単語）。
+    [/ガラス破片/g,                             "クリスタル片"],
+    [/廃温室/g,                                 "ヴィンテージ温室"],
+    [/廃工場/g,                                 "ヴィンテージ工場空間"],
+    [/廃ホテル/g,                               "ヴィンテージホテル"],
+    [/廃ビル/g,                                 "ヴィンテージビル空間"],
+    [/廃墟化した/g,                             "ヴィンテージ調の"],
+    [/廃墟と化した/g,                           "ヴィンテージ調の"],
+    [/廃墟/g,                                   "ヴィンテージ建築空間"],
+    [/退廃美/g,                                 "ノスタルジックな美"],
+    [/退廃的な?/g,                              "ノスタルジックな"],
+    [/退廃感/g,                                 "ノスタルジックな空気感"],
+    [/朽ちた/g,                                 "古びた"],
+    [/錆びた/g,                                 "アンティーク調の"],
+    [/鋭利な?/g,                                "洗練された"],
+    [/破片/g,                                   "かけら"],
+    [/破壊的な?/g,                              "アヴァンギャルドな"],
+    [/破壊/g,                                   "脱構築"],
+    [/瓦礫/g,                                   "ヴィンテージ建材"],
+    [/荒廃した/g,                               "古びた"],
+    [/崩壊した/g,                               "古びた"],
+    [/割れたガラス/g,                           "クリスタル面"],
+    [/ひび割れた?/g,                            "アンティーク調の"],
 
     // ── 悪魔・魔王・堕天使・闇落ち系（ChatGPT が特に敏感） ──────────────────
     [/悪魔女王/g,                               "ゴシック系の女王"],
@@ -4034,42 +4064,8 @@ export function buildSystemPrompt(
     ? req.scopes.map((s) => SCOPE_JA[s]).join("、")
     : "（変更対象は【今回の変更対象】に指定された軸）";
 
-  // ── chatgpt_short 用：短縮フォーマット仕様 ──────────────────────────────
-  // 詳細版と分けて管理。セクション削減（前提/雰囲気/光/人体補正を廃止）＋各1〜2文。
-  // ★ scopeListForExample の後に置くこと（TDZ回避）。
-  const isShort = pt === "chatgpt_short";
-  const unifiedFormatShort = isShort ? [
-    "【統一プロンプト出力フォーマット（ChatGPT短縮版）】",
-    "ChatGPT画像編集向けに最小構成で出力する。各セクションは1〜2文以内。",
-    "",
-    "■ 必須セクション（この順番で出力。各見出しを行頭に書く）：",
-    "- 【同一性保護】顔の特徴・人物の同一性・外観スタイルを元画像から維持する旨を1〜2文で記述。別人化・年齢変化・顔立ちの変更禁止を含める。",
-    "- 【固定】変更しない要素を1行で列挙（顔・表情・外観スタイル・ポーズ・アスペクト比など）。",
-    "- 【変更】具体的な変更内容のみ。色・素材・形・場所・アングルなど具体語で1〜2文。",
-    "- 【構図・人物サイズ】人物を主役の大きさで維持し、遠景化・豆粒化させない。1文。★省略禁止★",
-    "- 【体型・頭身】元画像の人物比率を優先し、自然な7〜9頭身の範囲で保つ。脚長化・小顔化・別人体型化は避ける。手足の形と接地感を自然に保つ。1〜2文。★省略禁止★",
-    "- 【背景・質感】背景は2D〜2.5Dのスタイライズされた演出にする（実写写真風にしない）。人物を引き立てる。1文。",
-    "- 【品質】高解像度、自然な影と光、違和感のない合成感。1文。",
-    ngTrim ? "- 【NG】NG指定がある場合は短く列挙。" : "- 【NG】NG指定がない場合は省略する。",
-    "",
-    "■ スタイル要件：",
-    "- 日本語のみ（固有名詞を除く）。1案あたり全体で6〜9行程度に収める。",
-    "- 説明文・前置き不要。完成プロンプト本文のみ。",
-    "- コードブロック・案番号・Markdown装飾は使わない。",
-    "- 案と案の間は `---案区切り---` を1行入れる。",
-    `- 案数：${req.count}案ちょうど。`,
-    "",
-    "■ 出力例（イメージ）：",
-    "【同一性保護】顔の特徴、人物の同一性、外観スタイルを元画像から維持する。別人化・若返り・顔立ちの変更は避ける。",
-    "【固定】顔・表情・外観スタイル・視覚的一貫性・ポーズ・アスペクト比を維持。変更対象以外は元画像に近い状態を保つ。",
-    `【変更】${scopeListForExample}を1〜2文で具体的に記述。`,
-    "【構図・人物サイズ】人物は元画像に近い大きさで主役として見せ、遠景化・豆粒化させない。",
-    "【体型・頭身】元画像の人物比率を優先。自然な7〜9頭身で脚長化・小顔化・別人体型化を避ける。手足の形と接地感を自然に保つ。",
-    "【背景・質感】2D〜2.5Dのスタイライズされた演出背景にする。実写風背景にしない。人物を引き立て背景が主役にならないようにする。",
-    "【品質】高解像度、自然な影と光、違和感のない合成感。",
-    "---案区切り---",
-    "（以下同様）",
-  ].join("\n") : "";
+  // ※ chatgpt_short（ChatGPT短縮モード）は撤去。短縮フォーマットに「2D〜2.5Dスタイライズ背景」が
+  //   埋め込まれており元画像の実写質感を壊す主因だったため削除。出力は通常の unifiedFormat に統一。
 
   const premiseExample = pt === "nano_safe"
     ? `【前提】参照画像は実在人物ではなく、AIで生成された架空のキャラクターイラストです。この架空キャラクターのデザインを基準に、${scopeListForExample}のみ変更してください。`
@@ -4263,10 +4259,8 @@ export function buildSystemPrompt(
     pt !== "full" ? "\n" + sanitizerBlock(pt) : "",
     // ★ 出力プロンプト安全ガイド（全モード共通・常時挿入）
     "\n" + safetyOutputGuideBlock(),
-    // ★ 手足補正ルール。chatgpt_short では体型・頭身セクションに折り込む旨のみ指示。
-    isShort
-      ? "\n【人体補正方針（短縮）】手は片手5本指・脚・接地感の補正は【体型・頭身】末尾の1文で表現すること。【人体補正】セクションは不要。"
-      : "\n" + bodyFixBlock(),
+    // ★ 手足補正ルールは常時挿入。
+    "\n" + bodyFixBlock(),
     // ★ 構図・人物サイズルールも常時挿入。条件なし。人物の豆粒化・遠景化・背景主役化を防ぐ。
     //   cameraAggressionBlock(camera scope時) より後段に置くことで、サイズ下限が最終的に優先される。
     "\n" + subjectScaleBlock(),
@@ -4274,8 +4268,7 @@ export function buildSystemPrompt(
     //   subjectScaleBlock（画面内サイズ）と二段で人物を守る。後段なので構図の誇張より比率が優先される。
     "\n" + bodyProportionBlock(),
     "",
-    // chatgpt_short は短縮フォーマット、それ以外は通常の詳細フォーマット
-    isShort ? unifiedFormatShort : unifiedFormat,
+    unifiedFormat,
   ]
     .filter((s) => s !== "")
     .join("\n");
