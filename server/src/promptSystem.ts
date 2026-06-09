@@ -1809,7 +1809,7 @@ function faceLockBlock(pt: PromptTarget = "full"): string {
       "- ポーズ・カメラ・アスペクト比はなるべく維持する。",
     ].join("\n");
   }
-  if (pt === "chatgpt_safe" || pt === "gemini_safe") {
+  if (pt === "chatgpt_safe" || pt === "chatgpt_short" || pt === "gemini_safe") {
     return [
       "【キャラクター一貫性ロック】",
       "- キャラクターの視覚的特徴、一貫した顔立ち、髪型、全体の雰囲気を維持する。",
@@ -2011,9 +2011,10 @@ function sanitizerBlock(pt: PromptTarget): string {
   if (pt === "full") return "";
 
   const platformName =
-    pt === "chatgpt_safe" ? "ChatGPT Image (DALL-E)" :
-    pt === "gemini_safe"  ? "Gemini Image Generation" :
-                            "Nano Banana";
+    pt === "chatgpt_safe"  ? "ChatGPT Image (DALL-E)" :
+    pt === "chatgpt_short" ? "ChatGPT Image (DALL-E)" :
+    pt === "gemini_safe"   ? "Gemini Image Generation" :
+                             "Nano Banana";
 
   const base = [
     `【出力プロンプト スタイルガイド — ${platformName} 向け】`,
@@ -2027,7 +2028,7 @@ function sanitizerBlock(pt: PromptTarget): string {
     "  ファッション的・スタイリッシュな表現に集中する。",
   ];
 
-  if (pt === "chatgpt_safe") {
+  if (pt === "chatgpt_safe" || pt === "chatgpt_short") {
     base.push("");
     base.push("▼ ChatGPT 向け記述方針：");
     base.push("  衣装は系統・色・素材のみで記述（例: dark cyber jacket, elegant white dress, gothic fashion）。");
@@ -4048,6 +4049,43 @@ export function buildSystemPrompt(
     ? req.scopes.map((s) => SCOPE_JA[s]).join("、")
     : "（変更対象は【今回の変更対象】に指定された軸）";
 
+  // ── chatgpt_short 用：短縮フォーマット仕様 ──────────────────────────────
+  // 詳細版と分けて管理。セクション削減（前提/雰囲気/光/人体補正を廃止）＋各1〜2文。
+  // ★ scopeListForExample の後に置くこと（TDZ回避）。
+  const isShort = pt === "chatgpt_short";
+  const unifiedFormatShort = isShort ? [
+    "【統一プロンプト出力フォーマット（ChatGPT短縮版）】",
+    "ChatGPT画像編集向けに最小構成で出力する。各セクションは1〜2文以内。",
+    "",
+    "■ 必須セクション（この順番で出力。各見出しを行頭に書く）：",
+    "- 【同一性保護】顔の特徴・人物の同一性・外観スタイルを元画像から維持する旨を1〜2文で記述。別人化・年齢変化・顔立ちの変更禁止を含める。",
+    "- 【固定】変更しない要素を1行で列挙（顔・表情・外観スタイル・ポーズ・アスペクト比など）。",
+    "- 【変更】具体的な変更内容のみ。色・素材・形・場所・アングルなど具体語で1〜2文。",
+    "- 【構図・人物サイズ】人物を主役の大きさで維持し、遠景化・豆粒化させない。1文。★省略禁止★",
+    "- 【体型・頭身】元画像の人物比率を優先し、自然な7〜9頭身の範囲で保つ。脚長化・小顔化・別人体型化は避ける。手足の形と接地感を自然に保つ。1〜2文。★省略禁止★",
+    "- 【背景・質感】背景は2D〜2.5Dのスタイライズされた演出にする（実写写真風にしない）。人物を引き立てる。1文。",
+    "- 【品質】高解像度、自然な影と光、違和感のない合成感。1文。",
+    ngTrim ? "- 【NG】NG指定がある場合は短く列挙。" : "- 【NG】NG指定がない場合は省略する。",
+    "",
+    "■ スタイル要件：",
+    "- 日本語のみ（固有名詞を除く）。1案あたり全体で6〜9行程度に収める。",
+    "- 説明文・前置き不要。完成プロンプト本文のみ。",
+    "- コードブロック・案番号・Markdown装飾は使わない。",
+    "- 案と案の間は `---案区切り---` を1行入れる。",
+    `- 案数：${req.count}案ちょうど。`,
+    "",
+    "■ 出力例（イメージ）：",
+    "【同一性保護】顔の特徴、人物の同一性、外観スタイルを元画像から維持する。別人化・若返り・顔立ちの変更は避ける。",
+    "【固定】顔・表情・外観スタイル・視覚的一貫性・ポーズ・アスペクト比を維持。変更対象以外は元画像に近い状態を保つ。",
+    `【変更】${scopeListForExample}を1〜2文で具体的に記述。`,
+    "【構図・人物サイズ】人物は元画像に近い大きさで主役として見せ、遠景化・豆粒化させない。",
+    "【体型・頭身】元画像の人物比率を優先。自然な7〜9頭身で脚長化・小顔化・別人体型化を避ける。手足の形と接地感を自然に保つ。",
+    "【背景・質感】2D〜2.5Dのスタイライズされた演出背景にする。実写風背景にしない。人物を引き立て背景が主役にならないようにする。",
+    "【品質】高解像度、自然な影と光、違和感のない合成感。",
+    "---案区切り---",
+    "（以下同様）",
+  ].join("\n") : "";
+
   const premiseExample = pt === "nano_safe"
     ? `【前提】参照画像は実在人物ではなく、AIで生成された架空のキャラクターイラストです。この架空キャラクターのデザインを基準に、${scopeListForExample}のみ変更してください。`
     : `【前提】この画像はAIで生成された架空キャラクター。画像編集として${scopeListForExample}のみ変更してください。`;
@@ -4241,8 +4279,10 @@ export function buildSystemPrompt(
     pt !== "full" ? "\n" + sanitizerBlock(pt) : "",
     // ★ 出力プロンプト安全ガイド（全モード共通・常時挿入）
     "\n" + safetyOutputGuideBlock(),
-    // ★ 手足補正ルールは常時挿入。条件なし。省略・無効化不可。
-    "\n" + bodyFixBlock(),
+    // ★ 手足補正ルール。chatgpt_short では体型・頭身セクションに折り込む旨のみ指示。
+    isShort
+      ? "\n【人体補正方針（短縮）】手は片手5本指・脚・接地感の補正は【体型・頭身】末尾の1文で表現すること。【人体補正】セクションは不要。"
+      : "\n" + bodyFixBlock(),
     // ★ 構図・人物サイズルールも常時挿入。条件なし。人物の豆粒化・遠景化・背景主役化を防ぐ。
     //   cameraAggressionBlock(camera scope時) より後段に置くことで、サイズ下限が最終的に優先される。
     "\n" + subjectScaleBlock(),
@@ -4250,7 +4290,8 @@ export function buildSystemPrompt(
     //   subjectScaleBlock（画面内サイズ）と二段で人物を守る。後段なので構図の誇張より比率が優先される。
     "\n" + bodyProportionBlock(),
     "",
-    unifiedFormat,
+    // chatgpt_short は短縮フォーマット、それ以外は通常の詳細フォーマット
+    isShort ? unifiedFormatShort : unifiedFormat,
   ]
     .filter((s) => s !== "")
     .join("\n");
