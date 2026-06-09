@@ -165,14 +165,14 @@ export default function App() {
   const [compositionLock, setCompositionLock] = useState(s0.compositionLock);
   const [viralMode, setViralMode] = useState(s0.viralMode);
   const [avoidCliche, setAvoidCliche] = useState(s0.avoidCliche);
-  /** 🌆 リアル背景回避（既定ON・非永続）。背景が変更対象の時だけサーバで実写背景を強め抑制（avoidRealBackgroundBlock）。 */
-  const [avoidRealBackground, setAvoidRealBackground] = useState(true);
+  /** 🌆 リアル背景回避（既定OFF・非永続）。元画像の実写質感維持を最優先するため既定OFF。トグルONの時だけサーバで実写背景を抑制（avoidRealBackgroundBlock）。 */
+  const [avoidRealBackground, setAvoidRealBackground] = useState(false);
   const [strength, setStrength] = useState(s0.strength);
   const [glossLevel,       setGlossLevel]       = useState(s0.glossLevel);      // 1-5, 3=標準
   // dimensionLevel は互換のため state に持つ（旧履歴・旧設定の保存のため）。UI からは外した。
   const [dimensionLevel]                        = useState(s0.dimensionLevel);  // 1-5, 3=2.5D
   /** 質感・リアル度（1=完全2D ↔ 5=写真リアル）。既定 3 = 2.5D */
-  const [realismLevel,     setRealismLevel]     = useState<number>(s0.realismLevel ?? 2);  // 既定Lv2＝背景モード「スタイライズ」（非写実寄り）
+  const [realismLevel,     setRealismLevel]     = useState<number>(s0.realismLevel ?? 3);  // 既定Lv3＝2.5D（realismBlockが空＝元画像の実写質感をそのまま維持。6/3基準へ復元）
   /** 質感タイプ（"anime_bg" 等、null = 指定なし） */
   const [realismType,      setRealismType]      = useState<string | null>(s0.realismType ?? null);
   const [textureOriginal,  setTextureOriginal]  = useState(s0.textureOriginal); // 元画像維持

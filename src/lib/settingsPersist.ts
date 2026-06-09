@@ -166,6 +166,24 @@ export function loadSettings(): PersistedSettings {
         aspectRatio: { ...loaded.details.aspectRatio, preset: loaded.defaultAspectRatio },
       };
     }
+    // ── 一度きりの復旧移行（6/3基準の実写維持へ）─────────────────────────────
+    // リグレッション期間（22dda3d 以降）にスタイライズ寄り(Lv1/2)が既定化され、
+    // その状態で保存された realismLevel を写実維持(Lv3)へ一度だけ引き上げる。
+    // 元画像の実写質感・顔・肌をそのまま維持することを最優先するための復旧措置。
+    // マーカーで1回限り。ユーザーが意図的に再度 Lv1/2 を選ぶことは妨げない。
+    try {
+      const REALISM_RESTORE_KEY = "ipm_realism_restore_v1";
+      if (!localStorage.getItem(REALISM_RESTORE_KEY)) {
+        if (typeof loaded.realismLevel === "number" && loaded.realismLevel < 3) {
+          loaded.realismLevel = 3;
+          loaded.realismType = null;
+          saveSettings(loaded);  // 引き上げ結果を永続化（リロードしても維持）
+        }
+        localStorage.setItem(REALISM_RESTORE_KEY, "1");
+      }
+    } catch {
+      // localStorage 不可環境では移行をスキップ
+    }
     return loaded;
   } catch {
     return SETTINGS_DEFAULTS;

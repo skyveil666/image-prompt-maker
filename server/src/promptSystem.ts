@@ -484,19 +484,18 @@ const OUTFIT_LABELS = {
 } as const;
 
 const BG_LABELS = {
-  // 場所のプロンプト文：現実空間名ではなく非写実・演出的な空間として記述（背景スタイライズ方針）
+  // 場所のプロンプト文：6/3基準の実空間名へ復元（元画像の実写質感を維持する方針）
   place: {
-    indoor: "抽象室内（非写実なデザイン空間）", alley: "ネオ路地空間（発光・様式化）",
-    futuristic: "様式化された近未来空間", abstract: "抽象空間",
-    nature: "幻想自然空間", museum: "幻想展示空間（非写実・演出）", industrial: "未来工房（様式化）",
-    gallery: "コンセプト展示空間（非写実）", atelier: "異空間アトリエ", japanese_room: "幽玄和空間", garden: "空想庭園",
-    seaside: "幻想海岸空間", forest: "幻想森層", empty_space: "無地空間", studio: "演出スタジオ空間",
+    indoor: "室内", alley: "路地", futuristic: "近未来空間", abstract: "抽象空間",
+    nature: "自然", museum: "美術館", industrial: "工業施設",
+    gallery: "ギャラリー", atelier: "アトリエ", japanese_room: "和室", garden: "庭園",
+    seaside: "海辺", forest: "森", empty_space: "無地空間", studio: "スタジオ",
     paper_backdrop: "紙バック", fabric_backdrop: "布バック",
-    old_cinema: "異界シネマ空間（様式化）", greenhouse: "ガラス植物ドーム（光に満ちた様式化空間）",
-    rooftop: "浮遊屋上空間（様式化）", library: "幻想書庫（非写実）",
-    rainy_station: "幻想雨景空間（絵画的）",
-    night_amusement: "夢幻遊園空間（発光・様式化）",
-    frosted_room: "曇りガラスの部屋（柔らかい拡散光・様式化）",
+    old_cinema: "古い映画館（レトロな赤いシートとスクリーン）", greenhouse: "温室（ガラス張りの植物溢れる空間）",
+    rooftop: "都市の屋上（スカイラインが見える）", library: "図書館（本が壁一面に並ぶ）",
+    rainy_station: "雨の駅前（雨に濡れた駅頭・傘が行き交う）",
+    night_amusement: "夜の遊園地（カラフルなライトと観覧車）",
+    frosted_room: "曇りガラスの部屋（柔らかい拡散光が差し込む）",
   },
   color: {
     inherit: "元背景色を継承", blue: "青系", green: "緑系", red: "赤系", pink: "ピンク系", monochrome: "モノクロ",
@@ -2188,23 +2187,9 @@ function avoidRealBackgroundBlock(): string {
   ].join("\n");
 }
 
-/**
- * 背景スタイライズブロック。背景モード（=realismLevel）が 2D/スタイライズ/絵画寄り（Lv<=2）
- * かつ 背景が変更対象（scopes に background）の時だけ注入。
- * リアル建築・写真空間を抑制し、2D〜2.5Dのスタイライズ／絵画／コンセプト空間へ強く寄せる。
- * 「場所」より「背景モード」を優先させる。背景固定ON/scope外では非適用（avoidRealBackground と同じゲート方針）。
- */
-function stylizedBackgroundBlock(): string {
-  return [
-    "【背景スタイライズ — 2D/スタイライズ/絵画寄りモード・背景が変更対象の時のみ】",
-    "背景は現実の建築空間・写真空間として描かない。2D〜2.5Dのスタイライズされた空間として描く。",
-    "・フォトリアルな室内・美術館・展示室・ギャラリー・工業空間は避ける。床・壁・柱・反射・影を写真的に精密にしすぎない。",
-    "・絵画的・グラフィック的・幻想的・コンセプト的な演出を優先し、人物を引き立てる背景にする（背景が主張しすぎない）。",
-    "・場所（指定された場所名）より背景モード（2D/スタイライズ/絵画寄り）を優先する。場所はモチーフの示唆に留め、リアルな建築・写真質感では描かない。",
-    "抑制（頻度を大きく下げる）: photorealistic, realistic interior, museum interior, gallery interior, raw concrete, physically accurate lighting, documentary, hyper realistic, real building photo",
-    "優先: stylized environment, illustrated background, painterly environment, conceptual space, fantasy exhibition environment, decorative spatial design, semi-abstract background, anime-inspired environment",
-  ].join("\n");
-}
+// ※ stylizedBackgroundBlock は撤去（6/3基準の実写維持へ復元）。
+//   背景の2D/スタイライズ/アニメ寄せ（"anime-inspired environment" 等）は元画像の実写質感を壊す主因のため削除した。
+//   背景モード（realismLevel）でスタイライズしたい場合は realismBlock 側の Lv<=2 指定で表現する。
 
 function avoidClicheBlock(): string {
   return [
@@ -4222,10 +4207,9 @@ export function buildSystemPrompt(
     // 量産構図回避：UIトグルに従う（デフォルトON。省略時も true 扱い）。
     // ※「量産AI検知（Gemini採点）」は別物で gemini.ts 側で常時実行している。
     (req.avoidCliche !== false) ? "\n" + avoidClicheBlock() : "",
-    // リアル背景回避：背景が変更対象 かつ トグルON(既定) の時だけ注入（背景固定/scope外では非適用）
-    (req.scopes.includes("background") && req.avoidRealBackground !== false) ? "\n" + avoidRealBackgroundBlock() : "",
-    // 背景スタイライズ：背景が変更対象 かつ 背景モード(realismLevel)が 2D/スタイライズ/絵画寄り(Lv<=2) の時だけ注入（背景固定/scope外では非適用）
-    (req.scopes.includes("background") && (req.realismLevel ?? 3) <= 2) ? "\n" + stylizedBackgroundBlock() : "",
+    // リアル背景回避：背景が変更対象 かつ トグルON の時だけ注入（既定OFFへ変更。トグルで任意ON可能）
+    (req.scopes.includes("background") && req.avoidRealBackground === true) ? "\n" + avoidRealBackgroundBlock() : "",
+    // 背景スタイライズ注入は撤去（6/3基準の実写維持へ復元）
     // 衣装生成ガイド：outfit スコープ選択時は必須挿入
     req.scopes.includes("outfit") ? "\n" + outfitDiversityBlock() : "",
     // 衣装サブジャンル展開：大カテゴリ名は出さず案ごとにサブジャンルへ展開
