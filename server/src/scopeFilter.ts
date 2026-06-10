@@ -223,40 +223,37 @@ export interface IdentityShieldResult {
   reasons: string[];
 }
 
+// 5月設計（最小限の保護）へ回帰。発火時も短い1行に留め、抑制語（若返り/大人化/禁止/完全維持）を削減。
 const CLAUSE_PROTECT =
-  "【同一性保護】顔の特徴、人物の同一性、表情、顔の輪郭、目・鼻・口の配置、肌の質感、キャラクターの外観スタイルは元画像から完全維持してください。";
+  "【同一性保護】顔の造形・配置・表情・外観スタイルは元画像から維持してください。";
 const CLAUSE_ANTIBREAK =
-  "【顔崩れ防止】髪型・衣装・カメラ・ポーズ・前景演出を変更する場合でも、顔の造形、表情、雰囲気、人物の印象は変更しないでください。別人化、若返り、大人化、顔立ちの変更は禁止です。";
+  "【顔崩れ防止】変更時も顔の造形と人物の印象は変えないでください（別人化を避ける）。";
 const CLAUSE_FORCE =
-  "【強制固定】顔、同一性、表情、体型、アスペクト比は最優先で固定してください。演出やトレンド表現よりも、元画像の人物一致を優先してください。";
+  "【強制固定】顔と同一性を最優先で固定してください。";
 
 export function applyIdentityShield(req: GenerateRequest, prompt: string): IdentityShieldResult {
-  const locks = deriveServerLocks(req);
-  const ct = locks.changeTargets;
   const reasons: string[] = [];
   const warnings: string[] = [];
   let risk = 0;
 
-  if (ct.hair)       { risk += 12; reasons.push("髪型変更ON"); }
-  if (ct.pose)       { risk += 16; reasons.push("ポーズ変更ON"); }
-  if (ct.camera)     { risk += 16; reasons.push("カメラ変更ON"); }
-  if (ct.foreground) { risk += 12; reasons.push("前景演出ON"); }
-  if (ct.lighting)   { risk += 8;  reasons.push("ライティング変更ON"); }
-  if (ct.outfit)     { risk += 8;  reasons.push("衣装変更ON"); }
-
-  const changeCount = Object.values(ct).filter(Boolean).length;
-  if (changeCount >= 4) { risk += 18; reasons.push(`変更対象が${changeCount}項目`); }
+  // 顔保護の主機構は faceLock ブロック（本文に常時挿入）＋【固定】に一本化。
+  // Identity Shield は「faceLock が無効化されている／顔造形を変えうる語がある」など
+  // 本当に危険な場合のみ同一性保護文を追加前置する“保険”に縮小（統合プラン Part B①）。
+  // 通常の scope 変更（faceLock ON）では発火させない＝5月の「変更を促す＋最小限の保護」設計へ回帰。
+  if (!req.faceLock) { risk += 50; warnings.push("顔固定がOFFです"); reasons.push("faceLock OFF"); }
 
   const lower = prompt.toLowerCase();
-  const STRONG_ANGLE = ["強いローアングル", "強いハイアングル", "low angle", "high angle", "煽り", "俯瞰"];
-  if (STRONG_ANGLE.some((w) => lower.includes(w.toLowerCase()))) { risk += 10; reasons.push("強いアングル指定"); }
-  if (["顔の向き", "顔を傾け", "横顔", "振り向き"].some((w) => prompt.includes(w))) { risk += 8; reasons.push("顔の向きが変わる可能性"); }
-  if (FACE_DANGER.some((w) => lower.includes(w.toLowerCase()))) { risk += 30; warnings.push("顔変更に近い表現が含まれます"); }
-  if (!req.faceLock) { risk += 12; warnings.push("顔固定がOFFです"); }
+  if (FACE_DANGER.some((w) => lower.includes(w.toLowerCase()))) {
+    risk += 50; warnings.push("顔変更に近い表現が含まれます"); reasons.push("顔造形を変えうる語");
+  }
+  // 顔の向きが大きく変わりうる指定のみ軽く加点（単独では発火しない）
+  if (["顔の向き", "顔を傾け", "横顔", "振り向き"].some((w) => prompt.includes(w))) {
+    risk += 12; reasons.push("顔の向きが変わる可能性");
+  }
 
   risk = Math.max(0, Math.min(100, risk));
   const riskLevel: IdentityShieldResult["riskLevel"] =
-    risk >= 80 ? "danger" : risk >= 60 ? "high" : risk >= 30 ? "medium" : "low";
+    risk >= 90 ? "danger" : risk >= 50 ? "high" : risk >= 30 ? "medium" : "low";
 
   const addedIdentityClauses: string[] = [];
   if (riskLevel !== "low") addedIdentityClauses.push(CLAUSE_PROTECT);
@@ -264,8 +261,22 @@ export function applyIdentityShield(req: GenerateRequest, prompt: string): Ident
   if (riskLevel === "danger") addedIdentityClauses.push(CLAUSE_FORCE);
 
   const strengthenedPrompt = addedIdentityClauses.length > 0
-    ? addedIdentityClauses.join("\n") + "\n" + prompt
+    ? insertClausesAfterPremise(prompt, addedIdentityClauses)
     : prompt;
 
   return { strengthenedPrompt, riskScore: risk, riskLevel, addedIdentityClauses, warnings, reasons };
+}
+
+/**
+ * 同一性保護文を【前提】セクションの直後に挿入する。
+ * 「AIで生成された架空キャラクター」という文脈宣言を必ず本文先頭に保つため、
+ * 前置はしない（先頭の文脈宣言が画像生成側フィルタ通過の要）。
+ * 【前提】が見つからない場合のみ従来どおり先頭に置く。
+ */
+function insertClausesAfterPremise(prompt: string, clauses: string[]): string {
+  const joined = clauses.join("\n");
+  if (!/^\s*【前提】/.test(prompt)) return joined + "\n" + prompt;
+  const nextSection = prompt.indexOf("\n【", prompt.indexOf("【前提】") + 1);
+  if (nextSection === -1) return prompt + "\n" + joined;
+  return prompt.slice(0, nextSection) + "\n" + joined + prompt.slice(nextSection);
 }

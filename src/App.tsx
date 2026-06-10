@@ -50,10 +50,10 @@ import { detectCandidateMotifs, addIgnoredTerm, loadIgnoredTerms } from "./lib/d
 import {
   loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
   isApplied, setAppliedStorage,
-  getNgTokens, getMotifControls,
+  getMotifControls,
   computeAutoAdjust, countLevels, countComboPolicies,
   loadComboPolicies, saveComboPolicies, setComboPolicy as setComboPolicyFn,
-  resetComboPolicies, getComboControls, getNgPhrasesFromCombos,
+  resetComboPolicies, getComboControls,
   type LevelMap, type MotifLevel,
   type ComboPolicy, type ComboPolicyMap,
 } from "./lib/motifPolicy";
@@ -137,7 +137,7 @@ import {
 } from "./lib/preferenceProfile";
 import {
   loadColorWeights, saveColorWeights, setColorWeight as setColorWeightFn,
-  resetColorWeights, getColorWeightControls, getBlockedColorTokens,
+  resetColorWeights, getColorWeightControls,
   autoAdjustColorWeights,
   type ColorWeight, type ColorWeightMap, type ColorAxisCtrl,
 } from "./lib/colorPolicy";
@@ -598,34 +598,11 @@ export default function App() {
       extraInstructions: [worldCombinedNote, referenceNoteText, extraInstructions].filter(Boolean).join("\n\n"),
       faceLock,
       expression: faceLock ? undefined : (expression ?? undefined),
-      ngList: (() => {
-        let base = mergeForbiddenIntoNgList(ngList, forbiddenTokens);
-        // 禁止色（weight=0）の代表トークン（policyApplied に依存しない・色は明示UI設定なので常に効かせる）
-        const blockedColorTokens = getBlockedColorTokens(colorWeights);
-        if (blockedColorTokens.length > 0) {
-          const joined = blockedColorTokens.join(", ");
-          base = base ? `${base}\n${joined}` : joined;
-        }
-        if (!policyApplied) return base;
-        // モチーフ単体の完全NG
-        const ngTokens = getNgTokens(levels);
-        if (ngTokens.length > 0) {
-          const joined = ngTokens.join(", ");
-          base = base ? `${base}\n${joined}` : joined;
-        }
-        // 頻出構成 block の同時使用禁止フレーズも ngList に追加
-        if (historyAnalysis && historyAnalysis.topCombos.length > 0) {
-          const keyToCombo = new Map(
-            historyAnalysis.topCombos.map((c) => [c.comboKey, { motifLabels: c.motifLabels, motifIds: c.motifIds }])
-          );
-          const phrases = getNgPhrasesFromCombos(comboPolicies, keyToCombo);
-          if (phrases.length > 0) {
-            const joined = phrases.join("、");
-            base = base ? `${base}\n${joined}` : joined;
-          }
-        }
-        return base;
-      })(),
+      // 出力の【NG】にはユーザー明示のNG（NG欄＋禁止ワードチップ）のみを載せる。
+      // モチーフlv0・禁止色(weight=0)・頻出構成block は motifControls / colorWeights /
+      // comboControls として別経路でサーバへ届き生成側で除外されるため、
+      // ここで ngList へ合流させない（自動NGが出力プロンプト末尾の【NG】に乗るのを防ぐ）。
+      ngList: mergeForbiddenIntoNgList(ngList, forbiddenTokens),
       // 重複制御：反映ON時のみ、非4レベルのモチーフをサーバへ渡す
       motifControls: policyApplied ? getMotifControls(levels) : undefined,
       // 構成制御：反映ON時のみ、block/alt のコンボをサーバへ渡す
@@ -2967,10 +2944,6 @@ export default function App() {
                 onCultureSelect={handleCulture}
                 onSnsRandom={handleSnsSingle}
                 onCultureRandom={handleCultureSingle}
-                realismLevel={realismLevel}
-                realismType={realismType}
-                onRealismLevelChange={setRealismLevel}
-                onRealismTypeChange={setRealismType}
               />
 
 
