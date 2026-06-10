@@ -20,6 +20,7 @@ import type { BatchPlan } from "./varietyEngine.ts";
 import { varietyBlock } from "./varietyEngine.ts";
 import type { SubStylePlan } from "./outfitSubStyles.ts";
 import { subStyleBlock } from "./outfitSubStyles.ts";
+import { GPT_FILTER_RULES, L3_COMPOUND } from "./gptFilterConstants.ts";
 
 /**
  * Camera3DState（3Dピッカー指定）を自然言語化する。
@@ -3760,7 +3761,7 @@ export function safetySanitizePrompt(
     [/覗き見的な?/g,                           "印象的な"],
     [/覗き見/g,                               "ユニークな視点からの"],
     [/盗撮/g,                                 "キャンドルショット"],
-    [/監視カメラ(?:CCTV)?/g,                  "俯瞰ハイアングル"],
+    [/監視カメラ(?:CCTV)?/g,                  "映画スチール風アングル"],
 
     // ── ロリィタ系ラベルバックストップ ────────────────────────────────────
     // subStyleBlock 等で残存した場合のフォールバック
@@ -3775,6 +3776,9 @@ export function safetySanitizePrompt(
     [/JK制服/g,                              "カレッジスタイル"],
     [/セーラー服/g,                          "マリンカレッジウェア"],
     [/学ラン/g,                              "クラシックカレッジジャケット"],
+
+    // ── GPT Image 2 フィルター 3層対策 L1/L2（英語 + 日本語未カバー補完）────
+    ...GPT_FILTER_RULES,
   ];
 
   let out = text;
@@ -3817,6 +3821,17 @@ export function safetySanitizePrompt(
       }
       return m;
     });
+  }
+
+  // ── GPT Image 2 フィルター L3: 複合トリガー文脈補正 ─────────────────────
+  for (const { label, detect, fix } of L3_COMPOUND) {
+    if (detect(out)) {
+      const before = out;
+      out = fix(out);
+      if (out !== before) {
+        log.push({ detected: `(複合トリガー: ${label})`, replaced: "(L3補正適用)" });
+      }
+    }
   }
 
   // ─── デバッグ出力（サーバーコンソールのみ・UIには表示しない） ────────────
