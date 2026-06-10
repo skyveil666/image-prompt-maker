@@ -391,7 +391,7 @@ export function QuickActions({
             <TagBtn label={avoidCliche ? "🛡 テンプレ回避 ON" : "🛡 テンプレ回避"} title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避ける常時補正（既定ON・サーバ側で全案に効く）" onClick={() => onAvoidClicheChange?.(!avoidCliche)} disabled={disabled} variant="amber" active={avoidCliche} />
             <TagBtn label="🔁 被り回避"  title="直近の生成と似た背景・衣装・色・前景・カメラ・世界観を避ける（複数選択可）"                          onClick={() => onBoostToggle?.("avoid_overlap")} disabled={disabled} variant="amber" active={activeBoosts.includes("avoid_overlap")} />
             <TagBtn label="🔎 AIっぽさ確認" title="分析センターを開いて、AIっぽさ（量産パターン）・テンプレ回避を確認します（生成画面では分析を実行しません）" onClick={onOpenAnalysisCenter} disabled={disabled} variant="rose" />
-            <TagBtn label={avoidRealBackground ? "🌆 リアル背景を避ける ON" : "🌆 リアル背景を避ける"} title="実写っぽい住宅街・普通の路地・生活感のある背景を避け、キャラに合う演出背景へ寄せる（背景を変更対象にした時だけ効く・既定ON）" onClick={() => onAvoidRealBackgroundChange?.(!avoidRealBackground)} disabled={disabled} variant="amber" active={avoidRealBackground} />
+            <TagBtn label={avoidRealBackground ? "🌆 背景を2D/非写実に ON" : "🌆 背景を2D/非写実に"} title="背景の風景・空間だけを2D/イラスト調（アニメ背景・コンセプトアート・絵画調）に寄せる。人物・顔・肌は元画像の実写質感のまま固定。背景を変更対象にした時だけ効く・既定ON" onClick={() => onAvoidRealBackgroundChange?.(!avoidRealBackground)} disabled={disabled} variant="amber" active={avoidRealBackground} />
           </div>
         )}
       </CategoryRow>

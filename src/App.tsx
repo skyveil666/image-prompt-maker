@@ -165,8 +165,8 @@ export default function App() {
   const [compositionLock, setCompositionLock] = useState(s0.compositionLock);
   const [viralMode, setViralMode] = useState(s0.viralMode);
   const [avoidCliche, setAvoidCliche] = useState(s0.avoidCliche);
-  /** 🌆 リアル背景回避（既定OFF・非永続）。元画像の実写質感維持を最優先するため既定OFF。トグルONの時だけサーバで実写背景を抑制（avoidRealBackgroundBlock）。 */
-  const [avoidRealBackground, setAvoidRealBackground] = useState(false);
+  /** 🌆 背景を2D/非写実に（既定ON・非永続）。背景が変更対象の時だけ、背景の風景・空間を2D/イラスト調へ寄せる（avoidRealBackgroundBlock）。人物・顔・肌は元画像の実写質感を厳守（ブロック内で明記）。 */
+  const [avoidRealBackground, setAvoidRealBackground] = useState(true);
   const [strength, setStrength] = useState(s0.strength);
   const [glossLevel,       setGlossLevel]       = useState(s0.glossLevel);      // 1-5, 3=標準
   // dimensionLevel は互換のため state に持つ（旧履歴・旧設定の保存のため）。UI からは外した。
@@ -2732,8 +2732,7 @@ export default function App() {
               {analysisCenterOpen && (
                 <div className="fixed inset-0 z-40 bg-black/70 p-2 sm:p-4 grid place-items-center" onClick={() => setAnalysisCenterOpen(false)}>
                   <div className="w-[95vw] h-[92vh] rounded-xl border border-bg-border bg-bg-panel shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                  {(massProductionResult || historyAnalysis || analysisInitialTab === "plan") ? (
-                <DuplicateAnalysisPanel
+                  <DuplicateAnalysisPanel
                   asModal
                   onCenterClose={() => setAnalysisCenterOpen(false)}
                   initialTab={analysisInitialTab}
@@ -2825,13 +2824,6 @@ export default function App() {
                   favoriteProfile={favoriteProfile}
                   favoriteLearnEnabled={favoriteLearnEnabled}
                 />
-                  ) : (
-                    <div className="flex-1 grid place-items-center p-8 text-center text-[13px] text-text-muted gap-3">
-                      <div>分析データがまだありません。画像を生成すると重複分析・評価・発見が集計されます。</div>
-                      <button type="button" onClick={() => setAnalysisCenterOpen(false)}
-                        className="text-[12px] px-3 py-1.5 rounded border border-bg-border bg-bg-base/60 text-text-muted hover:text-text-base">✕ 閉じる</button>
-                    </div>
-                  )}
                   </div>
                 </div>
               )}

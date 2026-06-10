@@ -3345,7 +3345,9 @@ export function buildCombinedAssistInputs(
 export function buildImageViralInputs(current: PromptInputs): PromptInputs {
   const moods: Mood[] = ["vivid", "sns_pop", "cinematic", "instagram", "portrait"];
 
-  const scopes: Scope[] = ["outfit", "hair", "lighting", "background", "camera", "foreground"];
+  // 既定スコープ：背景・ポーズ・コスプレ ＋ カメラ ＋ ライティング（5軸固定）。
+  // 旧 outfit/hair/foreground は外す（特に foreground は自傷誤判定語「ガラス破片」等の発生源だった）。
+  const scopes: Scope[] = ["background", "pose", "cosplay", "camera", "lighting"];
 
   const note = [
     "【⚡ 画像バズり生成モード — この画像から最強プロンプトを作る】",
