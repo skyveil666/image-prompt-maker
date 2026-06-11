@@ -228,8 +228,10 @@ export function getBlockedColorTokens(map: ColorWeightMap): string[] {
   for (const g of COLOR_GROUPS) {
     const e = map[g.id];
     if (!e) continue;
-    // 1軸でも 0 があれば、その色の英語トークンを NG リスト候補へ
-    if (e.hair === 0 || e.outfit === 0 || e.background === 0) {
+    // 全軸が 0（=その色を完全に使わない）のときだけハード NG トークン化する。
+    // 一部の軸だけ 0（例：衣装だけ白禁止）は colorWeightBlock の軸別自然文指示に委ね、
+    // 他軸（髪・背景）へ波及させない（軸別制御の維持）。
+    if (e.hair === 0 && e.outfit === 0 && e.background === 0) {
       tokens.push(...g.ngTokens);
     }
   }

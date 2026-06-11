@@ -384,6 +384,7 @@ export function subStyleBlock(plan: SubStylePlan): string {
     `必要なら「${plan.styleLabel}系のサブジャンル」のように具体名と並記する。`
   );
   lines.push("  - 案ごとに素材・色・シルエットを変えて差別化する。");
+  lines.push("  - サブジャンル名に含まれる色名（白・黒等）は一例。各案で色は多様に展開してよく、名前の色に固定しない。");
   lines.push("  - サブジャンルの数（2〜3）を同案内で減らさない（全て使い切る）。");
   return lines.join("\n");
 }
