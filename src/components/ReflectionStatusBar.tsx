@@ -66,8 +66,6 @@ interface Props {
   chaosLabel: string | null;
   activeBoosts: string[];
   viralMode: boolean;
-  activeSnsLabels: string[];
-  activeCultureLabels: string[];
   /** 世界観プリセットID（y2k 等）。内部でラベル化する */
   activeWorldPresets: string[];
   // 好み反映
@@ -185,8 +183,7 @@ export function ReflectionStatusBar(p: Props) {
     (p.bodyPoseLock ? 1 : 0) + (p.colorMoodLock ? 1 : 0) + (p.compositionLock ? 1 : 0);
   const assistCount =
     godChips.length + (p.viralMode ? 1 : 0) + p.activeWorldPresets.length +
-    (p.avoidCliche ? 1 : 0) + p.activeBoosts.length +
-    p.activeSnsLabels.length + p.activeCultureLabels.length;
+    (p.avoidCliche ? 1 : 0) + p.activeBoosts.length;
   const prefOn = favActive || zozoActive;
   const summaryParts: string[] = [
     `🎯変更${p.scopes.length}`,
@@ -322,13 +319,10 @@ export function ReflectionStatusBar(p: Props) {
                 {BOOST_JP[b] ?? b}
               </Chip>
             ))}
-            {/* SNS / 文化 */}
-            {p.activeSnsLabels.map((l, i) => <Chip key={`s${i}`} tone="assist">📈 {l}</Chip>)}
-            {p.activeCultureLabels.map((l, i) => <Chip key={`c${i}`} tone="assist">🌐 {l}</Chip>)}
+            {/* SNS/カルチャーは撤去（バズボタン・世界観プリセットに一本化） */}
             {/* 何もなし */}
             {godChips.length === 0 && !p.viralMode && !p.avoidCliche &&
-             p.activeBoosts.length === 0 && p.activeWorldPresets.length === 0 &&
-             p.activeSnsLabels.length === 0 && p.activeCultureLabels.length === 0 && (
+             p.activeBoosts.length === 0 && p.activeWorldPresets.length === 0 && (
               <span className="text-[11px] text-text-muted/40">なし</span>
             )}
           </Row>

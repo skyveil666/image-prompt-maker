@@ -28,23 +28,11 @@ export const MOOD_GROUPS_BASIC: MoodGroup[] = [
       { id: "ephemeral", label: "儚い"     },
     ],
   },
-  {
-    label: "世界観",
-    moods: [
-      { id: "near_future",   label: "近未来"        },
-      { id: "cyberpunk",     label: "サイバーパンク" },
-      { id: "japanese",      label: "和風"          },
-      { id: "gothic",        label: "ゴシック"      },
-      { id: "fantasy",       label: "幻想的"        },
-      { id: "fantasy_world", label: "ファンタジー"   },
-      { id: "wa_fantasy",    label: "和ファンタジー" },
-      { id: "retro",         label: "レトロ"        },
-      { id: "contemporary",  label: "現代美術"      },
-      { id: "architectural", label: "建築的"        },
-      { id: "urban_fantasy", label: "都市幻想"      },
-      { id: "retro_future",  label: "レトロ未来"    },
-    ],
-  },
+  // 「世界観」行は撤去（世界観プリセット＝QuickActionsに一本化・重複整理）。
+  // 「色味」行は撤去（色戦略タブの colorStrategy に一本化・重複整理）。
+  // 「SNS最適化」行は撤去（SNS系はバズボタンに一本化・重複整理）。
+  // ※ mood ID 自体（gothic/vivid/instagram等）は VIRAL_MOOD_POOL・世界観プリセット・
+  //   保存済み設定が使用するため types/サーバ側 MOOD_JA から削除しないこと。
   {
     label: "演出",
     moods: [
@@ -60,31 +48,6 @@ export const MOOD_GROUPS_BASIC: MoodGroup[] = [
       { id: "ad_visual",         label: "広告ビジュアル"},
       { id: "magazine_cover",    label: "雑誌表紙風"   },
       { id: "movie_poster",      label: "映画ポスター風"},
-    ],
-  },
-  {
-    label: "色味",
-    moods: [
-      { id: "monochrome", label: "モノクロ" },
-      { id: "pastel",     label: "パステル" },
-      { id: "vivid",      label: "ビビッド" },
-      { id: "pop",        label: "ポップ"  },
-      { id: "mystic",     label: "神秘的"  },
-      { id: "art",        label: "アート系" },
-    ],
-  },
-  {
-    label: "SNS最適化",
-    moods: [
-      { id: "portrait",      label: "ポートレート"   },
-      { id: "instagram",     label: "Instagram映え"  },
-      { id: "tiktok",        label: "TikTok映え"    },
-      { id: "pinterest",     label: "Pinterest映え"  },
-      { id: "x_buzz",        label: "Xバズ"         },
-      { id: "trend_2026",    label: "2026トレンド"   },
-      { id: "thumbnail_pop", label: "サムネ映え"     },
-      { id: "scroll_stop",   label: "スクロール停止" },
-      { id: "icon_pop",      label: "アイコン映え"   },
     ],
   },
   {

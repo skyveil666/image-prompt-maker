@@ -1,5 +1,5 @@
 import { Suspense, lazy, useState } from "react";
-import type { ArtStyle, Camera3DState, ColorStrategy, DetailSettings, Era, Mood, Scope } from "../types";
+import type { ArtStyle, Camera3DState, ColorStrategy, DetailSettings, Mood, Scope } from "../types";
 import { DEFAULT_DETAILS, AUTO_DETAILS } from "../types";
 import { describeCameraAngle } from "../lib/cameraAngle";
 import type { PresetItem } from "../data/presets";
@@ -109,8 +109,6 @@ import {
   BIG_OBJECT_SIZES,
   BIG_OBJECT_MOODS,
 } from "../data/presets";
-import type { SnsType, CultureType } from "../lib/quickActions";
-import { getSnsLabel, getCultureLabel } from "../lib/quickActions";
 import { GridCell, CellSectionLabel, CellGrid } from "./GridCell";
 import { ExtraInstructions } from "./ExtraInstructions";
 import { NgInput } from "./NgInput";
@@ -122,18 +120,18 @@ import {
   MoodGroupRow,
   hasDetailSelection,
 } from "./MoodSelector";
-import { ERA_OPTIONS, COLOR_STRATEGY_OPTIONS } from "./EraColorSelector";
+import { COLOR_STRATEGY_OPTIONS } from "./EraColorSelector";
 
 const Camera3DPicker = lazy(() => import("./Camera3DPicker"));
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ExtraTabId = "mood" | "era" | "colorStrategy" | "artStyle" | "ng" | "sns" | "culture";
+// "era"（時代）は完全撤去（dead code整理）。"sns"/"culture" タブも撤去（重複整理：
+// SNS系はバズボタン・世界観はQuickActionsプリセットに一本化。mood ID・保存データは非破壊）。
+type ExtraTabId = "mood" | "colorStrategy" | "artStyle" | "ng";
 type TabId = Scope | ExtraTabId;
 
-// "era"（時代カテゴリ）は非表示。曖昧で背景/衣装/世界観と役割が重複するため表面から外す。
-// 型(ExtraTabId)・EXTRA_TAB_META・renderTabContent の case "era" は残置（内部データ非破壊・後日Step4で整理）。
-const EXTRA_TAB_IDS: ExtraTabId[] = ["mood", "colorStrategy", "artStyle", "ng", "sns", "culture"];
+const EXTRA_TAB_IDS: ExtraTabId[] = ["mood", "colorStrategy", "artStyle", "ng"];
 
 interface ExtraTabMeta {
   label: string;
@@ -145,12 +143,9 @@ interface ExtraTabMeta {
 
 const EXTRA_TAB_META: Record<ExtraTabId, ExtraTabMeta> = {
   mood:          { label: "🎭 雰囲気",  activeBorder: "border-violet-400/70", activeBg: "bg-violet-500/15",  activeText: "text-violet-200",  activeShadow: "shadow-[0_0_10px_rgba(139,92,246,0.22)]" },
-  era:           { label: "🕰 時代",    activeBorder: "border-amber-400/70",  activeBg: "bg-amber-500/15",   activeText: "text-amber-200",   activeShadow: "shadow-[0_0_8px_rgba(245,158,11,0.22)]"  },
   colorStrategy: { label: "🎨 色戦略",  activeBorder: "border-teal-400/70",   activeBg: "bg-teal-500/15",    activeText: "text-teal-200",    activeShadow: "shadow-[0_0_8px_rgba(45,212,191,0.22)]"  },
   artStyle:      { label: "🖌 絵柄",    activeBorder: "border-fuchsia-400/70", activeBg: "bg-fuchsia-500/15", activeText: "text-fuchsia-200", activeShadow: "shadow-[0_0_8px_rgba(217,70,239,0.22)]"  },
   ng:            { label: "🚫 NG指定",     activeBorder: "border-rose-400/70",   activeBg: "bg-rose-500/15",    activeText: "text-rose-200",    activeShadow: "shadow-[0_0_8px_rgba(244,63,94,0.22)]"   },
-  sns:           { label: "📈 SNS",        activeBorder: "border-pink-400/70",   activeBg: "bg-pink-500/15",    activeText: "text-pink-200",    activeShadow: "shadow-[0_0_8px_rgba(236,72,153,0.22)]"  },
-  culture:       { label: "🌐 カルチャー", activeBorder: "border-cyan-400/70",   activeBg: "bg-cyan-500/15",    activeText: "text-cyan-200",    activeShadow: "shadow-[0_0_8px_rgba(34,211,238,0.22)]"  },
 };
 
 interface Props {
@@ -161,10 +156,8 @@ interface Props {
   moods: Mood[];
   autoMoodCategories: string[];
   onMoodsChange: (moods: Mood[], autoCategories: string[]) => void;
-  era: Era | null;
   colorStrategy: ColorStrategy | null;
   artStyle: ArtStyle | null;
-  onEraChange: (v: Era | null) => void;
   onColorStrategyChange: (v: ColorStrategy | null) => void;
   onArtStyleChange: (v: ArtStyle | null) => void;
   extraInstructions: string;
@@ -173,12 +166,6 @@ interface Props {
   onNgListChange: (v: string) => void;
   forbiddenTokens: string[];
   onForbiddenTokensChange: (tokens: string[]) => void;
-  onSnsSelect?: (t: SnsType) => void;
-  onCultureSelect?: (t: CultureType) => void;
-  /** 📈 SNS向けおまかせ（一発ランダム）。QuickActionsから移設・内部は handleSnsSingle のまま不変 */
-  onSnsRandom?: () => void;
-  /** 🌐 カルチャーおまかせ（一発ランダム）。QuickActionsから移設・内部は handleCultureSingle のまま不変 */
-  onCultureRandom?: () => void;
 }
 
 type Updater = <K extends keyof DetailSettings>(
@@ -1579,101 +1566,20 @@ function ArtStyleTabContent({
   );
 }
 
-/** 時代タブ：時代軸セレクター */
-function EraTabContent({
-  era,
-  onEraChange,
-}: {
-  era: Era | null;
-  onEraChange: (v: Era | null) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-2">
-        <span className="text-[12px] font-black uppercase tracking-widest text-text-muted/80 select-none">
-          🕰 時代
-        </span>
-        {era !== null && (
-          <button
-            type="button"
-            onClick={() => onEraChange(null)}
-            className="text-[11px] text-text-muted/65 hover:text-amber-400/80 transition leading-none"
-          >
-            解除
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1">
-        {ERA_OPTIONS.map((opt) => {
-          const active = era === opt.value;
-          const isAuto = opt.value === "auto";
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => onEraChange(active ? null : opt.value)}
-              className={[
-                "text-[11px] font-semibold px-2 py-0.5 rounded border transition leading-none whitespace-nowrap",
-                active
-                  ? isAuto
-                    ? "bg-violet-500/30 border-violet-400/70 text-violet-200 shadow-[0_0_8px_rgba(139,92,246,0.35)]"
-                    : "bg-amber-500/25 border-amber-400/60 text-amber-200 shadow-[0_0_8px_rgba(245,158,11,0.3)]"
-                  : "bg-transparent border-[#252e44] text-text-muted/80 hover:border-[#3a4460] hover:text-text-muted/95",
-              ].join(" ")}
-            >
-              {active && <span className="mr-0.5 text-[9px]">✓</span>}
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+// 時代タブ（EraTabContent）は完全撤去（dead code整理・グローバル era は生成にも不使用）。
 
-/** 色戦略タブ：色味（MoodSelector から）＋ 色戦略セレクター */
+/** 色戦略タブ：色戦略セレクター（「色味」mood 行は撤去＝色戦略に一本化・重複整理） */
 function ColorStrategyTabContent({
-  moods,
-  autoMoodCategories,
-  onMoodsChange,
   colorStrategy,
   onColorStrategyChange,
 }: {
-  moods: Mood[];
-  autoMoodCategories: string[];
-  onMoodsChange: (moods: Mood[], autoCategories: string[]) => void;
   colorStrategy: ColorStrategy | null;
   onColorStrategyChange: (v: ColorStrategy | null) => void;
 }) {
-  const colorMoodGroup = MOOD_GROUPS_BASIC.find((g) => g.label === "色味")!;
-
-  const handleSelect = (group: MoodGroup, selection: "skip" | "auto" | Mood) => {
-    const newMoods = moods.filter((m) => !group.moods.some((gm) => gm.id === m));
-    const newAuto = autoMoodCategories.filter((c) => c !== group.label);
-    if (selection === "skip") {
-      onMoodsChange(newMoods, newAuto);
-    } else if (selection === "auto") {
-      onMoodsChange(newMoods, [...newAuto, group.label]);
-    } else {
-      onMoodsChange([...newMoods, selection as Mood], newAuto);
-    }
-  };
-
   return (
     <div className="space-y-4">
-      {/* 色味 mood group */}
-      <div>
-        <MoodGroupRow
-          group={colorMoodGroup}
-          moods={moods}
-          autoMoodCategories={autoMoodCategories}
-          onSelect={handleSelect}
-          noTopMargin
-        />
-      </div>
-
       {/* 色戦略 */}
-      <div className="space-y-1.5 border-t border-bg-border/25 pt-3">
+      <div className="space-y-1.5">
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-black uppercase tracking-widest text-text-muted/80 select-none">
             🎨 色戦略
@@ -1764,138 +1670,6 @@ function NgTabContent({
   );
 }
 
-// ─── SNS tab content ─────────────────────────────────────────────────────────
-
-const SNS_OPTIONS: Array<{ type: SnsType; hint: string }> = [
-  { type: "x_buzz",      hint: "X(Twitter)でRTされる。高コントラスト・意外性のある構図・視覚的インパクト重視"     },
-  { type: "instagram",   hint: "Instagramフィード映え。美しい色調・洗練されたライフスタイル感・保存したくなる完成度" },
-  { type: "tiktok",      hint: "TikTokで止まる演出。縦長・トレンディ・エネルギッシュ・若者文化の空気感"          },
-  { type: "pinterest",   hint: "ムードボード的な美しさ。ライフスタイル・インスピレーション・キュレーション感"       },
-  { type: "thumbnail",   hint: "YouTube・動画サムネイルで最高クリック率。顔・驚き・対比・鮮やかな色"              },
-  { type: "icon",        hint: "SNSアイコンに最適な一枚。円形クロップ前提。顔中心・シンプル背景・個性が伝わる表情"  },
-  { type: "scroll_stop", hint: "フィードをスクロールする指が止まる画面。予想外の要素・意外な色の組み合わせ"         },
-  { type: "save",        hint: "スマホの壁紙にしたくなる・永久保存したくなる質の高い一枚。詩的な美しさ・奥行き"    },
-  { type: "double_take", hint: "一瞬で意味がわからない・見直すと発見がある構図。視点のトリック・スケールの誤魔化し"  },
-  { type: "global",      hint: "海外SNSで受ける国際的な美意識。普遍的な美しさ・高品質感・インターナショナルな雰囲気" },
-];
-
-function SnsTabContent({ onSelect, onRandom }: { onSelect?: (t: SnsType) => void; onRandom?: () => void }) {
-  return (
-    <div>
-      <p className="text-[11px] text-text-muted/65 mb-2 leading-relaxed">
-        SNS媒体・用途に合わせたビジュアル補正を適用します。選択するとすぐに設定が変わります。
-      </p>
-      {onRandom && (
-        <div className="mb-3">
-          <button
-            type="button"
-            onClick={onRandom}
-            title="SNS向けビジュアル補正をランダムに追加（最大2コンボ）"
-            className="rounded-lg px-3 py-1.5 text-[12px] font-bold border border-pink-400/55 bg-pink-400/15 text-pink-100 hover:bg-pink-400/25 hover:border-pink-400/80 transition leading-none whitespace-nowrap"
-          >
-            🎲 SNS向けおまかせ
-          </button>
-        </div>
-      )}
-      <div className="flex flex-wrap gap-1.5">
-        {SNS_OPTIONS.map(({ type, hint }) => (
-          <button
-            key={type}
-            type="button"
-            title={hint}
-            onClick={() => onSelect?.(type)}
-            className="rounded-lg px-3 py-1.5 text-[12px] font-semibold border border-pink-400/35 bg-pink-400/8 text-pink-200 hover:bg-pink-400/15 hover:border-pink-400/60 transition leading-none whitespace-nowrap"
-          >
-            {getSnsLabel(type)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Culture tab content ──────────────────────────────────────────────────────
-
-const CULTURE_ASIA: Array<{ type: CultureType; hint: string }> = [
-  { type: "korea_ad",      hint: "韓国高級広告の美学。クリーンな背景・K-beautyの完璧な肌・ミニマルで洗練されたスタイリング"       },
-  { type: "china_future",  hint: "中国の次世代広告美学。赤と金×未来感・大胆なビジュアルインパクト・中華ネオフューチャリズム"       },
-  { type: "hk_neon",       hint: "香港夜のネオン街。看板の光・雨濡れの路地・ノワール的な色彩・多文化が混じり合うアジア的混沌と美"   },
-  { type: "shibuya_night", hint: "渋谷の夜の喧騒。ビル広告の光・現代日本の都市エネルギー・圧倒的な情報量の美"                     },
-  { type: "harajuku_pop",  hint: "原宿スタイルのポップカルチャー。カラフル・個性的・原色×パステル・日本のハイパーポップ文化の爆発"  },
-  { type: "tokyo_cyber",   hint: "東京サイバー（過剰なブレードランナーは禁止）。テック感・日本的清潔サイバー"                       },
-  { type: "taiwan_neon",   hint: "台湾の夜市・ネオン看板・屋台の光・親しみやすい暖かさと現代感が混じったアジアの原風景"             },
-  { type: "seoul_night",   hint: "ソウルのナイトシーン。ホンデ・明洞のネオン・K-popアイドル文化とストリートの交差"                   },
-  { type: "osaka_town",    hint: "大阪の下町情緒。道頓堀・看板・人情と現代が混じり合う独特の賑わいと空気感"                         },
-];
-
-const CULTURE_WEST: Array<{ type: CultureType; hint: string }> = [
-  { type: "la_90s",             hint: "1990年代ロサンゼルス。プールサイド・ヤシの木・カリフォルニアの太陽・ヒップホップ×スポーツウェア"   },
-  { type: "nyc_street",         hint: "ニューヨークのストリートスタイル。レンガの壁・マンハッタンの空気感・多様性とファッションの聖地"     },
-  { type: "paris_luxury",       hint: "パリの高級ファッション。フランス的エレガンス・couture文化の本場"                                  },
-  { type: "milan_runway",       hint: "ミラノコレクションのランウェイ。建築的シルエット・イタリアの素材感・alta modaの完成度"              },
-  { type: "berlin_industrial",  hint: "ベルリンの廃工場・テクノカルチャー・ポストインダストリアル美学・コンクリートと自由の都市"           },
-  { type: "nordic_minimal",     hint: "北欧ミニマリズム。白・グレー・木の質感・自然光・機能美・ラグジュアリーな静けさ"                    },
-  { type: "london_punk",        hint: "ロンドンパンク・ポストパンク。スタッズ・プラットフォームブーツ・反骨精神・カオスの中の美学"         },
-];
-
-const CULTURE_GLOBAL: Array<{ type: CultureType; hint: string }> = [
-  { type: "dubai_luxury", hint: "ドバイの超高級ライフスタイル。黄金の内装・砂漠の夕日・アラビアン×現代富裕層の過剰な美"              },
-  { type: "mumbai",       hint: "ボリウッド映画の美学。鮮烈なカラー・花装飾・インドの豊かな色彩文化・祝祭的なビジュアル"             },
-  { type: "bangkok",      hint: "バンコクの寺院と現代都市の共存。黄金の仏塔・熱帯の光・仏教文化×現代タイのコントラスト"             },
-  { type: "sao_paulo",    hint: "サンパウロのアーバンアート。巨大なグラフィティ・熱帯の色彩・ブラジルのストリートカルチャー"         },
-];
-
-function CultureTabContent({ onSelect, onRandom }: { onSelect?: (t: CultureType) => void; onRandom?: () => void }) {
-  const btnCls = "rounded-lg px-3 py-1.5 text-[12px] font-semibold border border-cyan-400/30 bg-cyan-400/8 text-cyan-200 hover:bg-cyan-400/15 hover:border-cyan-400/55 transition leading-none whitespace-nowrap";
-  const groupLabel = (emoji: string, name: string) => (
-    <div className="mt-3 mb-1.5 text-[10px] font-bold text-cyan-300/50 uppercase tracking-widest leading-none">
-      {emoji} {name}
-    </div>
-  );
-  return (
-    <div>
-      <p className="text-[11px] text-text-muted/65 mb-1 leading-relaxed">
-        都市・文化圏の世界観を選択して適用します。選択するとすぐに設定が変わります。
-      </p>
-      {onRandom && (
-        <div className="mt-2 mb-1">
-          <button
-            type="button"
-            onClick={onRandom}
-            title="都市・文化圏の世界観をランダムに追加（最大2コンボ）"
-            className="rounded-lg px-3 py-1.5 text-[12px] font-bold border border-cyan-400/55 bg-cyan-400/15 text-cyan-100 hover:bg-cyan-400/25 hover:border-cyan-400/80 transition leading-none whitespace-nowrap"
-          >
-            🎲 カルチャーおまかせ
-          </button>
-        </div>
-      )}
-      {groupLabel("🌏", "アジア")}
-      <div className="flex flex-wrap gap-1.5">
-        {CULTURE_ASIA.map(({ type, hint }) => (
-          <button key={type} type="button" title={hint} onClick={() => onSelect?.(type)} className={btnCls}>
-            {getCultureLabel(type)}
-          </button>
-        ))}
-      </div>
-      {groupLabel("🌎", "欧米")}
-      <div className="flex flex-wrap gap-1.5">
-        {CULTURE_WEST.map(({ type, hint }) => (
-          <button key={type} type="button" title={hint} onClick={() => onSelect?.(type)} className={btnCls}>
-            {getCultureLabel(type)}
-          </button>
-        ))}
-      </div>
-      {groupLabel("🌍", "中東・その他")}
-      <div className="flex flex-wrap gap-1.5">
-        {CULTURE_GLOBAL.map(({ type, hint }) => (
-          <button key={type} type="button" title={hint} onClick={() => onSelect?.(type)} className={btnCls}>
-            {getCultureLabel(type)}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -1906,10 +1680,8 @@ export function DetailsCard({
   moods,
   autoMoodCategories,
   onMoodsChange,
-  era,
   colorStrategy,
   artStyle,
-  onEraChange,
   onColorStrategyChange,
   onArtStyleChange,
   extraInstructions,
@@ -1918,10 +1690,6 @@ export function DetailsCard({
   onNgListChange,
   forbiddenTokens,
   onForbiddenTokensChange,
-  onSnsSelect,
-  onCultureSelect,
-  onSnsRandom,
-  onCultureRandom,
 }: Props) {
   const scopeKeyOf = (t: TabId): string => (t === "big_object" ? "bigObject" : t);
   const isScopeTab = (t: TabId): boolean => !(EXTRA_TAB_IDS as string[]).includes(t);
@@ -1934,12 +1702,9 @@ export function DetailsCard({
   function countTab(t: TabId): number {
     switch (t) {
       case "mood":          return moods.length + autoMoodCategories.length;
-      case "era":           return era ? 1 : 0;
       case "colorStrategy": return colorStrategy ? 1 : 0;
       case "artStyle":      return artStyle ? 1 : 0;
       case "ng":            return (extraInstructions.trim() ? 1 : 0) + (ngList.trim() ? 1 : 0) + forbiddenTokens.length;
-      case "sns":
-      case "culture":       return 0;
       case "aspect_ratio":  return value.aspectRatio?.preset && value.aspectRatio.preset !== "skip" ? 1 : 0;
       default: {
         const scopeKey = scopeKeyOf(t);
@@ -2034,12 +1799,9 @@ export function DetailsCard({
       case "lighting":      return <LightingContent   d={value} upd={update} chg={onChange} />;
       case "aspect_ratio":  return <AspectRatioContent d={value} upd={update} />;
       case "mood":          return <MoodTabContent moods={moods} autoMoodCategories={autoMoodCategories} onMoodsChange={onMoodsChange} />;
-      case "era":           return <EraTabContent era={era} onEraChange={onEraChange} />;
       case "artStyle":      return <ArtStyleTabContent artStyle={artStyle} onArtStyleChange={onArtStyleChange} />;
-      case "colorStrategy": return <ColorStrategyTabContent moods={moods} autoMoodCategories={autoMoodCategories} onMoodsChange={onMoodsChange} colorStrategy={colorStrategy} onColorStrategyChange={onColorStrategyChange} />;
+      case "colorStrategy": return <ColorStrategyTabContent colorStrategy={colorStrategy} onColorStrategyChange={onColorStrategyChange} />;
       case "ng":            return <NgTabContent extraInstructions={extraInstructions} onExtraInstructionsChange={onExtraInstructionsChange} ngList={ngList} onNgListChange={onNgListChange} forbiddenTokens={forbiddenTokens} onForbiddenTokensChange={onForbiddenTokensChange} />;
-      case "sns":           return <SnsTabContent onSelect={onSnsSelect} onRandom={onSnsRandom} />;
-      case "culture":       return <CultureTabContent onSelect={onCultureSelect} onRandom={onCultureRandom} />;
       default:              return null;
     }
   };

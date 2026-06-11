@@ -104,30 +104,7 @@ export type Expression =
   | "ephemeral"    // 儚い
   | "intimidating"; // 威圧感
 
-/**
- * 時代軸。プロンプトの【時代軸】ブロックに反映される。
- * null = 設定なし（ブロック挿入しない）
- */
-export type Era =
-  | "auto"        // おまかせ
-  | "primitive"   // 原始
-  | "ancient"     // 古代
-  | "egypt"       // エジプト
-  | "greek"       // ギリシャ
-  | "roman"       // ローマ
-  | "heian"       // 平安
-  | "sengoku"     // 戦国
-  | "edo"         // 江戸
-  | "meiji"       // 明治
-  | "taisho"      // 大正
-  | "showa"       // 昭和
-  | "90s"         // 90s
-  | "y2k"         // Y2K
-  | "modern"      // 現代
-  | "near_future" // 近未来
-  | "y3k"         // Y3K
-  | "far_future"  // 超未来
-  | "apocalypse"; // 終末
+// 旧 type Era（グローバル時代軸）は撤去（dead code整理）。乗り物の「年代」(vehicle.era) は別物で存続。
 
 /**
  * 色戦略。肯定系は【色戦略】ブロックに、否定系は【NG指定】ブロックに追加。
@@ -536,8 +513,6 @@ export interface GenerateRequest {
    * ※背景がscope外（背景固定）の時は適用しない。
    */
   avoidRealBackground?: boolean;
-  /** 時代軸（null / 省略 = 設定なし）。プロンプトの【時代軸】ブロックに反映。 */
-  era?: Era | null;
   /** 色戦略（null / 省略 = 設定なし）。肯定系は【色戦略】ブロック、否定系は NG ブロックに追加。 */
   colorStrategy?: ColorStrategy | null;
   /** 絵柄スタイル（null / 省略 = 設定なし）。【絵柄】ブロックに反映。 */

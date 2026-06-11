@@ -21,9 +21,9 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import type { SnsType, CultureType, WorldPreset, EffectPreset } from "../lib/quickActions";
+import type { WorldPreset, EffectPreset } from "../lib/quickActions";
 
-export type { SnsType, CultureType, WorldPreset, EffectPreset };
+export type { WorldPreset, EffectPreset };
 
 /** 旧型名エイリアス（外部コードとの互換性維持） */
 export type FashionPreset = WorldPreset;

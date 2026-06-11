@@ -21,16 +21,10 @@ import { playCompletionSound } from "./lib/completionSound";
 import {
   buildAntiTemplateInputs,
   buildArrangeInputs,
-  buildCombinedCultureInputs,
   buildCombinedEffectInputs,
-  buildCombinedSnsInputs,
   buildCombinedWorldInputs,
-  buildCultureInputs,
-  buildSnsInputs,
   buildViralInputs,
   buildImageViralInputs,
-  getCultureLabel,
-  getSnsLabel,
   WORLD_PRESET_DISPLAY,
 } from "./lib/quickActions";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
@@ -55,9 +49,9 @@ import {
   mergeForbiddenIntoNgList,
 } from "./lib/forbiddenTokens";
 // MassProductionBanner は DuplicateAnalysisPanel に統合されました。
-import type { WorldPreset, EffectPreset, SnsType, CultureType } from "./components/QuickActions";
+import type { WorldPreset, EffectPreset } from "./components/QuickActions";
 import { type VariationMemory, createEmptyMemory, updateMemory } from "./lib/variationEngine";
-import type { ColorStrategy, Era, Expression } from "./types";
+import type { ColorStrategy, Expression } from "./types";
 import {
   buildHistoryItems,
   getAll,
@@ -135,8 +129,7 @@ import {
 } from "./lib/colorPolicy";
 
 // ── 代表ボタン用ランダムピック定数（モジュールレベル） ────────────────────────
-const SNS_TYPES: SnsType[] = ["x_buzz", "instagram", "tiktok", "pinterest", "thumbnail", "icon", "scroll_stop", "save", "double_take", "global"];
-const CULTURE_TYPES: CultureType[] = ["korea_ad", "china_future", "hk_neon", "shibuya_night", "harajuku_pop", "tokyo_cyber", "taiwan_neon", "la_90s", "nyc_street", "paris_luxury", "milan_runway", "berlin_industrial", "nordic_minimal", "london_punk", "dubai_luxury", "mumbai", "seoul_night", "osaka_town", "bangkok", "sao_paulo"];
+// SNS/カルチャープリセットは撤去（重複整理：SNS系はバズボタン・世界観はQuickActionsプリセットに一本化）。
 
 export default function App() {
   const [s0] = useState<PersistedSettings>(() => loadSettings());
@@ -226,8 +219,7 @@ export default function App() {
   const [faceLock, setFaceLock] = useState<boolean>(s0.faceLock);
   /** 表情指定（faceLock: false 時のみ有効）*/
   const [expression, setExpression] = useState<Expression | null>(s0.expression);
-  /** 時代軸（null = 設定なし）*/
-  const [era, setEra] = useState<Era | null>(s0.era);
+  // 時代軸（era）は完全撤去（dead code整理・生成にも不使用だった）。
   /** 色戦略（null = 設定なし）*/
   const [colorStrategy, setColorStrategy] = useState<ColorStrategy | null>(s0.colorStrategy);
   /** 絵柄スタイル（null = 設定なし）*/
@@ -257,10 +249,7 @@ export default function App() {
   // boost の state 操作は分析センター handleAgentAction が直接 setActiveBoosts で行うため state/setter は温存。
   /** アクティブな演出プリセット（マルチセレクト、最大2） */
   const [activeEffectTypes, setActiveEffectTypes] = useState<EffectPreset[]>([]);
-  /** アクティブな SNS バズタイプ（マルチセレクト、最大2） */
-  const [activeSnsTypes,    setActiveSnsTypes]    = useState<SnsType[]>([]);
-  /** アクティブなカルチャータイプ（マルチセレクト、最大2） */
-  const [activeCultureTypes, setActiveCultureTypes] = useState<CultureType[]>([]);
+  // SNS/カルチャー state は撤去（重複整理。mood ID は VIRAL_MOOD_POOL 等で存続）。
   /** 量産AI / 偏り分析結果（バナー表示用） */
   const [massProductionResult, setMassProductionResult] = useState<BiasAnalysisResult | null>(null);
   /** 全履歴分析結果（重複分析センター用） */
@@ -531,7 +520,7 @@ export default function App() {
       dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
       promptTarget, avoidCliche,
       bodyPoseLock, colorMoodLock, compositionLock,
-      era, colorStrategy,
+      colorStrategy,
       faceLock, expression,
       artStyle, defaultAspectRatio,
       favoriteLearnEnabled, favoriteStrength,
@@ -543,7 +532,7 @@ export default function App() {
     dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
     promptTarget, avoidCliche,
     bodyPoseLock, colorMoodLock, compositionLock,
-    era, colorStrategy,
+    colorStrategy,
     faceLock, expression,
     artStyle, defaultAspectRatio,
     favoriteLearnEnabled, favoriteStrength,
@@ -648,7 +637,6 @@ export default function App() {
       promptTarget: promptTarget ?? undefined,
       avoidCliche,
       avoidRealBackground,
-      era: era ?? undefined,
       colorStrategy: colorStrategy ?? undefined,
       artStyle: artStyle ?? undefined,
       // skyveil好みAI：ON（または今回だけ反映）かつ傾向がある場合のみ反映（コピーではなく方向性）。
@@ -701,7 +689,6 @@ export default function App() {
       promptTarget,
       avoidCliche,
       avoidRealBackground,
-      era,
       colorStrategy,
       artStyle,
       faceLock,
@@ -822,7 +809,6 @@ export default function App() {
             activeBoosts: activeBoosts.length > 0 ? [...activeBoosts] : undefined,
             colorStrategy: colorStrategy ?? null,
             artStyle: artStyle ?? null,
-            era: era ?? null,
           },
         });
         await saveBatch(built);
@@ -1640,8 +1626,6 @@ export default function App() {
     setActiveWorldPresets([]);
     setWorldCombinedNote("");
     setActiveGodModes([]);
-    setActiveSnsTypes([]);
-    setActiveCultureTypes([]);
     setScopeFlashKey((k) => k + 1);
     setVariationMemory((prev) => updateMemory(prev, {
       moods:  next.moods,
@@ -1751,103 +1735,9 @@ export default function App() {
   // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
   // assist の state（activeAssistModes）は生成送信・復元のため温存。
 
-  // ─── SNSバズ・カルチャー：マルチセレクト（最大2コンボ） ────────────────────────
-
-  /** DetailsCard から特定タイプを1つ選んで適用（単一選択・DetailsCard 専用） */
-  const handleSns = useCallback((type: SnsType) => {
-    const next = buildSnsInputs(buildInputs(), variationMemory, type);
-    setScopes(next.scopes);
-    setMoods(next.moods);
-    setAutoMoodCategories(next.autoMoodCategories ?? []);
-    setDetails(next.details);
-    setViralMode(next.viralMode);
-    setExtraInstructions(next.extraInstructions);
-    setActiveSnsTypes([type]);
-    setActiveCultureTypes([]);
-    setScopeFlashKey((k) => k + 1);
-    setVariationMemory((prev) => updateMemory(prev, { moods: next.moods, scopes: next.scopes }));
-    showPresetToast(`📈 SNSバズ「${getSnsLabel(type)}」を適用しました`, APPLY_HINT);
-  }, [buildInputs, variationMemory, showPresetToast]);
-
-  /** DetailsCard からカルチャータイプを1つ選んで適用（単一選択・DetailsCard 専用） */
-  const handleCulture = useCallback((type: CultureType) => {
-    const next = buildCultureInputs(buildInputs(), variationMemory, type);
-    setScopes(next.scopes);
-    setMoods(next.moods);
-    setAutoMoodCategories(next.autoMoodCategories ?? []);
-    setDetails(next.details);
-    setViralMode(next.viralMode);
-    setExtraInstructions(next.extraInstructions);
-    setActiveCultureTypes([type]);
-    setActiveSnsTypes([]);
-    setScopeFlashKey((k) => k + 1);
-    setVariationMemory((prev) => updateMemory(prev, {
-      bgPlace: next.details.background.place !== "auto" && next.details.background.place !== "skip" ? next.details.background.place : undefined,
-      moods:   next.moods,
-      scopes:  next.scopes,
-    }));
-    showPresetToast(`🌐 カルチャー「${getCultureLabel(type)}」を適用しました`, APPLY_HINT);
-  }, [buildInputs, variationMemory, showPresetToast]);
-
-  /** QuickActions の SNSバズボタン：クリックごとにランダム追加（最大2コンボ） */
-  const handleSnsSingle = useCallback(() => {
-    const prev = activeSnsTypes;
-    const available = SNS_TYPES.filter((t) => !prev.includes(t));
-    const pool = available.length > 0 ? available : SNS_TYPES;
-    const type = pool[Math.floor(Math.random() * pool.length)];
-    const next: SnsType[] = prev.length >= 2 ? [...prev.slice(1), type] : [...prev, type];
-    setActiveSnsTypes(next);
-    setActiveCultureTypes([]);
-
-    const combined = buildCombinedSnsInputs(buildInputs(), next, variationMemory);
-    setScopes(combined.scopes);
-    setMoods(combined.moods);
-    setAutoMoodCategories(combined.autoMoodCategories ?? []);
-    setDetails(combined.details);
-    setViralMode(combined.viralMode);
-    setExtraInstructions(combined.extraInstructions);
-    setScopeFlashKey((k) => k + 1);
-    setVariationMemory((prev) => updateMemory(prev, { moods: combined.moods, scopes: combined.scopes }));
-
-    const labels = next.map((t) => getSnsLabel(t));
-    const msg = next.length === 1
-      ? `📈 SNSバズ「${labels[0]}」を適用しました`
-      : `📈 SNSコンボ：${labels.join(" × ")}`;
-    showPresetToast(msg, APPLY_HINT);
-  }, [activeSnsTypes, buildInputs, variationMemory, showPresetToast]);
-
-  /** QuickActions のカルチャーボタン：クリックごとにランダム追加（最大2コンボ） */
-  const handleCultureSingle = useCallback(() => {
-    const prev = activeCultureTypes;
-    const available = CULTURE_TYPES.filter((t) => !prev.includes(t));
-    const pool = available.length > 0 ? available : CULTURE_TYPES;
-    const type = pool[Math.floor(Math.random() * pool.length)];
-    const next: CultureType[] = prev.length >= 2 ? [...prev.slice(1), type] : [...prev, type];
-    setActiveCultureTypes(next);
-    setActiveSnsTypes([]);
-
-    const combined = buildCombinedCultureInputs(buildInputs(), next, variationMemory);
-    setScopes(combined.scopes);
-    setMoods(combined.moods);
-    setAutoMoodCategories(combined.autoMoodCategories ?? []);
-    setDetails(combined.details);
-    setViralMode(combined.viralMode);
-    setExtraInstructions(combined.extraInstructions);
-    setScopeFlashKey((k) => k + 1);
-    setVariationMemory((prev) => updateMemory(prev, {
-      bgPlace: combined.details.background.place !== "auto" && combined.details.background.place !== "skip"
-        ? combined.details.background.place
-        : undefined,
-      moods:   combined.moods,
-      scopes:  combined.scopes,
-    }));
-
-    const labels = next.map((t) => getCultureLabel(t));
-    const msg = next.length === 1
-      ? `🌐 カルチャー「${labels[0]}」を適用しました`
-      : `🌐 カルチャーコンボ：${labels.join(" × ")}`;
-    showPresetToast(msg, APPLY_HINT);
-  }, [activeCultureTypes, buildInputs, variationMemory, showPresetToast]);
+  // SNSバズ・カルチャーのハンドラ群（handleSns/handleCulture/handleSnsSingle/handleCultureSingle）は撤去。
+  // 重複整理：SNS系はバズボタン（viralMode）・世界観はQuickActionsプリセットに一本化。
+  // ※カルチャーの hint/bgPlace ワンショット注入（見えない支配）もこれで消滅。
 
   /** ⚡ この画像でバズる：画像を元にSNSバズり最強設定を適用して即座に生成 */
   const handleImageViral = useCallback(() => {
@@ -1862,8 +1752,6 @@ export default function App() {
     setWorldCombinedNote("");
     setActiveGodModes([]);
     setActiveEffectTypes([]);
-    setActiveSnsTypes([]);
-    setActiveCultureTypes([]);
     setScopeFlashKey((k) => k + 1);
     // 設定適用後に即座に生成実行
     pendingRunRef.current = next;
@@ -1892,8 +1780,6 @@ export default function App() {
     setActiveGodModes([]);
     setActiveBoosts([]);
     setActiveEffectTypes([]);
-    setActiveSnsTypes([]);
-    setActiveCultureTypes([]);
     setChaosLabel(null);
     setMoods([]);
     setAutoMoodCategories([]);
@@ -2028,7 +1914,6 @@ export default function App() {
         if (ss.activeBoosts) setActiveBoosts(ss.activeBoosts);
         if (ss.colorStrategy !== undefined) setColorStrategy(ss.colorStrategy as import("./types").ColorStrategy | null);
         if (ss.artStyle !== undefined) setArtStyle(ss.artStyle as import("./types").ArtStyle | null);
-        if (ss.era !== undefined) setEra(ss.era as import("./types").Era | null);
       }
 
       // 確認バナー表示用
@@ -2038,7 +1923,7 @@ export default function App() {
      setNgList, setViralMode, setExtraInstructions, setBodyPoseLock, setColorMoodLock,
      setCompositionLock, setRealismLevel, setRealismType, setGlossLevel,
      setTextureOriginal, setTextureDisabled, setPromptTarget, setImageDataUrl,
-     setWindLevel, setZozoApplied, setActiveBoosts, setColorStrategy, setArtStyle, setEra]
+     setWindLevel, setZozoApplied, setActiveBoosts, setColorStrategy, setArtStyle]
   );
 
   /**
@@ -2491,8 +2376,6 @@ export default function App() {
                 chaosLabel={chaosLabel}
                 activeBoosts={activeBoosts}
                 viralMode={viralMode}
-                activeSnsLabels={activeSnsTypes.map(getSnsLabel)}
-                activeCultureLabels={activeCultureTypes.map(getCultureLabel)}
                 activeWorldPresets={activeWorldPresets}
                 favoriteEnabled={favoriteLearnEnabled}
                 favoriteProfile={favoriteProfile}
@@ -2762,10 +2645,8 @@ export default function App() {
                 moods={moods}
                 autoMoodCategories={autoMoodCategories}
                 onMoodsChange={(m, a) => { setMoods(m); setAutoMoodCategories(a); }}
-                era={era}
                 colorStrategy={colorStrategy}
                 artStyle={artStyle}
-                onEraChange={setEra}
                 onColorStrategyChange={setColorStrategy}
                 onArtStyleChange={setArtStyle}
                 extraInstructions={extraInstructions}
@@ -2774,10 +2655,6 @@ export default function App() {
                 onNgListChange={setNgList}
                 forbiddenTokens={forbiddenTokens}
                 onForbiddenTokensChange={setForbiddenTokens}
-                onSnsSelect={handleSns}
-                onCultureSelect={handleCulture}
-                onSnsRandom={handleSnsSingle}
-                onCultureRandom={handleCultureSingle}
               />
 
 

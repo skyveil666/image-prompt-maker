@@ -46,7 +46,6 @@ export async function generateViaBackend(
       autoMoodCategories: inputs.autoMoodCategories,
       avoidCliche: inputs.avoidCliche,
       avoidRealBackground: inputs.avoidRealBackground,
-      era: inputs.era,
       colorStrategy: inputs.colorStrategy,
       artStyle: inputs.artStyle,
       expression: inputs.expression,

@@ -12,7 +12,6 @@ import type {
   ColorStrategy,
   Count,
   DetailSettings,
-  Era,
   Expression,
   Mood,
   PromptTarget,
@@ -54,8 +53,6 @@ export interface PersistedSettings {
   colorMoodLock:      boolean;
   /** 元画像構図を守る（初期ON）*/
   compositionLock:    boolean;
-  /** 時代軸（null = 設定なし）*/
-  era:                Era | null;
   /** 色戦略（null = 設定なし）*/
   colorStrategy:      ColorStrategy | null;
   /** 顔/同一性ロック（初期ON）*/
@@ -99,7 +96,6 @@ export const SETTINGS_DEFAULTS: PersistedSettings = {
   bodyPoseLock:       true,
   colorMoodLock:      true,
   compositionLock:    true,
-  era:                null,
   colorStrategy:      null,
   faceLock:           true,
   expression:         null,

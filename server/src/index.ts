@@ -80,7 +80,6 @@ app.post("/api/generate", async (req, res) => {
     // ── 以下、前セッションで追加されたフィールド（転送漏れ修正）──────────────────
     ...(raw.avoidCliche   !== undefined && { avoidCliche:   raw.avoidCliche }),
     ...(raw.avoidRealBackground !== undefined && { avoidRealBackground: raw.avoidRealBackground }),
-    ...(raw.era           !== undefined && { era:           raw.era }),
     ...(raw.colorStrategy !== undefined && { colorStrategy: raw.colorStrategy }),
     ...(raw.artStyle      !== undefined && { artStyle:      raw.artStyle }),
     ...(raw.expression    !== undefined && { expression:    raw.expression }),
