@@ -21,26 +21,18 @@ import { playCompletionSound } from "./lib/completionSound";
 import {
   buildAntiTemplateInputs,
   buildArrangeInputs,
-  buildCombinedAssistInputs,
   buildCombinedCultureInputs,
   buildCombinedEffectInputs,
-  buildCombinedGodInputs,
   buildCombinedSnsInputs,
   buildCombinedWorldInputs,
   buildCultureInputs,
-  buildGodInputs,
-  buildCompositionGodInputs,
-  buildRandomInputs,
   buildSnsInputs,
-  buildVariantInputs,
   buildViralInputs,
   buildImageViralInputs,
   getCultureLabel,
   getSnsLabel,
-  GOD_MODE_DISPLAY,
   WORLD_PRESET_DISPLAY,
 } from "./lib/quickActions";
-import { buildChaosFusionInputs, formatChaosLabel } from "./lib/chaosEngine";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
 import { analyzeFullHistory, filterRecentWindow, WINDOW_DAYS, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
 import { DuplicateAnalysisPanel } from "./components/DuplicateAnalysisPanel";
@@ -261,17 +253,14 @@ export default function App() {
   const [activeBoosts,      setActiveBoosts]      = useState<string[]>(s0.activeBoosts);
   /** 風の強さ 0–5（初期0）。永続化 */
   const [windLevel,         setWindLevel]         = useState<number>(s0.windLevel);
-  const handleBoostToggle = useCallback((id: string) => {
-    setActiveBoosts((prev) => prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]);
-  }, []);
+  // handleBoostToggle（被り回避/映え補正/顔映え/世界観を一新のUIトグル）は撤去。
+  // boost の state 操作は分析センター handleAgentAction が直接 setActiveBoosts で行うため state/setter は温存。
   /** アクティブな演出プリセット（マルチセレクト、最大2） */
   const [activeEffectTypes, setActiveEffectTypes] = useState<EffectPreset[]>([]);
   /** アクティブな SNS バズタイプ（マルチセレクト、最大2） */
   const [activeSnsTypes,    setActiveSnsTypes]    = useState<SnsType[]>([]);
   /** アクティブなカルチャータイプ（マルチセレクト、最大2） */
   const [activeCultureTypes, setActiveCultureTypes] = useState<CultureType[]>([]);
-  /** アクティブな生成補助モード（"gap" | "anti"、最大2コンボ） */
-  const [activeAssistModes,  setActiveAssistModes]  = useState<string[]>([]);
   /** 量産AI / 偏り分析結果（バナー表示用） */
   const [massProductionResult, setMassProductionResult] = useState<BiasAnalysisResult | null>(null);
   /** 全履歴分析結果（重複分析センター用） */
@@ -1653,7 +1642,6 @@ export default function App() {
     setActiveGodModes([]);
     setActiveSnsTypes([]);
     setActiveCultureTypes([]);
-    setActiveAssistModes([]);
     setScopeFlashKey((k) => k + 1);
     setVariationMemory((prev) => updateMemory(prev, {
       moods:  next.moods,
@@ -1667,131 +1655,10 @@ export default function App() {
     showPresetToast("一発バズりモードをOFFにしました");
   }, [showPresetToast]);
 
-  // ─── 🎲 全自動おまかせ：設定反映のみ。プロンプト生成はしない ─────────────────
-  const handleRandom = useCallback(() => {
-    const next = buildRandomInputs(buildInputs());
-    setScopes(next.scopes);
-    setMoods(next.moods);
-    setAutoMoodCategories(next.autoMoodCategories ?? []);
-    setCount(next.count);
-    setDetails(next.details);
-    setViralMode(next.viralMode);
-    setActiveWorldPresets([]);
-    setWorldCombinedNote("");
-    setActiveGodModes([]);
-    setActiveEffectTypes([]);
-    setActiveSnsTypes([]);
-    setActiveCultureTypes([]);
-    setActiveAssistModes([]);
-    showPresetToast("🎲 全自動おまかせの設定を適用しました", APPLY_HINT);
-  }, [buildInputs, showPresetToast]);
+  // handleRandom（🎲おまかせ）・handleVariant（🔄別案）の UI トグルは撤去。
 
-  const handleVariant = useCallback(() => {
-    const next = buildVariantInputs(buildInputs());
-    setMoods(next.moods);
-    setAutoMoodCategories(next.autoMoodCategories ?? []);
-    setDetails(next.details);
-    setViralMode(next.viralMode);
-    pendingRunRef.current = next;
-    // pendingRunKey をインクリメントしてエフェクトを確実に発火（mood が変わらなかった場合の保険）
-    setPendingRunKey((k) => k + 1);
-  }, [buildInputs]);
-
-  // ─── 👑 神引き：トグル選択（solo: normal/chaos/composition、combo: 最大2） ───
-
-  const handleGodToggle = useCallback((mode: string) => {
-    // Solo モード（normal / chaos / composition）→ 常に単独適用
-    if (mode === "normal") {
-      const next = buildGodInputs(buildInputs(), variationMemory);
-      setScopes(next.scopes);
-      setMoods(next.moods);
-      setAutoMoodCategories(next.autoMoodCategories ?? []);
-      setCount(next.count);
-      setDetails(next.details);
-      setViralMode(next.viralMode);
-      setExtraInstructions(next.extraInstructions);
-      setActiveWorldPresets([]);
-      setWorldCombinedNote("");
-      setActiveGodModes(["normal"]);
-      setScopeFlashKey((k) => k + 1);
-      setVariationMemory((prev) => updateMemory(prev, { moods: next.moods, scopes: next.scopes }));
-      showPresetToast("👑 神引きの設定を適用しました", APPLY_HINT);
-      return;
-    }
-
-    if (mode === "chaos") {
-      const next  = buildChaosFusionInputs(buildInputs(), variationMemory);
-      const label = formatChaosLabel(next.extraInstructions ?? "");
-      setScopes(next.scopes);
-      setMoods(next.moods);
-      setAutoMoodCategories(next.autoMoodCategories ?? []);
-      setDetails(next.details);
-      setViralMode(next.viralMode);
-      setExtraInstructions(next.extraInstructions);
-      setActiveWorldPresets([]);
-      setWorldCombinedNote("");
-      setChaosLabel(label);
-      setActiveGodModes(["chaos"]);
-      setScopeFlashKey((k) => k + 1);
-      setVariationMemory((prev) => updateMemory(prev, { moods: next.moods, scopes: next.scopes }));
-      showPresetToast(`🎲 ぶっ飛び融合神引き: ${label}`, "設定を適用しました。プロンプトを生成してください。");
-      return;
-    }
-
-    if (mode === "composition") {
-      const { inputs: next, compositionId } = buildCompositionGodInputs(buildInputs(), variationMemory);
-      setScopes(next.scopes);
-      setMoods(next.moods);
-      setAutoMoodCategories(next.autoMoodCategories ?? []);
-      setDetails(next.details);
-      setViralMode(next.viralMode);
-      setExtraInstructions(next.extraInstructions);
-      setActiveWorldPresets([]);
-      setWorldCombinedNote("");
-      setActiveGodModes(["composition"]);
-      setScopeFlashKey((k) => k + 1);
-      setVariationMemory((prev) => updateMemory(prev, { composition: compositionId, scopes: next.scopes }));
-      showPresetToast("📷 構図神引きを適用しました", APPLY_HINT);
-      return;
-    }
-
-    // Combineable モード（outfit/bg/color/world_god/props/bigobject/myth/movie）→ トグル最大2
-    const prevCombo = activeGodModes.filter((m) => !["normal", "chaos", "composition"].includes(m));
-    let nextCombo: string[];
-    if (prevCombo.includes(mode)) {
-      nextCombo = prevCombo.filter((m) => m !== mode);
-    } else if (prevCombo.length >= 2) {
-      nextCombo = [...prevCombo.slice(1), mode];
-    } else {
-      nextCombo = [...prevCombo, mode];
-    }
-    setActiveGodModes(nextCombo);
-
-    if (nextCombo.length === 0) {
-      setExtraInstructions("");
-      setScopeFlashKey((k) => k + 1);
-      showPresetToast("神引きの設定をリセットしました");
-      return;
-    }
-
-    const combined = buildCombinedGodInputs(buildInputs(), nextCombo, variationMemory);
-    setScopes(combined.scopes);
-    setMoods(combined.moods);
-    setAutoMoodCategories(combined.autoMoodCategories ?? []);
-    setDetails(combined.details);
-    setViralMode(combined.viralMode);
-    setExtraInstructions(combined.extraInstructions);
-    setActiveWorldPresets([]);
-    setWorldCombinedNote("");
-    setScopeFlashKey((k) => k + 1);
-    setVariationMemory((prev) => updateMemory(prev, { moods: combined.moods, scopes: combined.scopes }));
-
-    const labels = nextCombo.map((m) => GOD_MODE_DISPLAY[m] ?? m);
-    const msg = nextCombo.length === 1
-      ? `${labels[0]} 神引きを適用しました`
-      : `👑 神引きコンボ：${labels.join(" × ")}`;
-    showPresetToast(msg, nextCombo.length > 1 ? "神引き要素を融合します" : APPLY_HINT);
-  }, [activeGodModes, buildInputs, variationMemory, showPresetToast]);
+  // 👑 神引き（handleGodToggle）の UI トグルは撤去（神引き完全撤去）。
+  // god の state 操作は分析センター handleAgentAction が直接 setActiveGodModes で行うため state/setter は温存。
 
   // ─── 世界観プリセット：トグル選択（最大3コンボ）────────────────────────────────
 
@@ -1881,32 +1748,8 @@ export default function App() {
   }, [activeEffectTypes, buildInputs, variationMemory, showPresetToast]);
 
   // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
-  // 「anti（量産回避）」モードはUIから撤去済み（avoidCliche に統合）。
-  // 引数型は "gap" のみに狭めてあり、buildAntiTemplateInputs は別ジャンル化機能から直接利用される。
-
-  const handleAssistToggle = useCallback((mode: "gap") => {
-    const prev = activeAssistModes;
-    const next = prev.includes(mode) ? prev.filter((m) => m !== mode) : [...prev, mode];
-    setActiveAssistModes(next);
-
-    if (next.length === 0) {
-      setExtraInstructions("");
-      showPresetToast("生成補助の設定をリセットしました");
-      return;
-    }
-
-    const combined = buildCombinedAssistInputs(buildInputs(), next, variationMemory);
-    setScopes(combined.scopes);
-    setMoods(combined.moods);
-    setAutoMoodCategories(combined.autoMoodCategories ?? []);
-    setDetails(combined.details);
-    setViralMode(combined.viralMode);
-    setExtraInstructions(combined.extraInstructions);
-    setScopeFlashKey((k) => k + 1);
-    setVariationMemory((prev) => updateMemory(prev, { moods: combined.moods, scopes: combined.scopes }));
-
-    showPresetToast(`🎭 雰囲気を逆に を適用しました`, APPLY_HINT);
-  }, [activeAssistModes, buildInputs, variationMemory, showPresetToast]);
+  // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
+  // assist の state（activeAssistModes）は生成送信・復元のため温存。
 
   // ─── SNSバズ・カルチャー：マルチセレクト（最大2コンボ） ────────────────────────
 
@@ -2021,7 +1864,6 @@ export default function App() {
     setActiveEffectTypes([]);
     setActiveSnsTypes([]);
     setActiveCultureTypes([]);
-    setActiveAssistModes([]);
     setScopeFlashKey((k) => k + 1);
     // 設定適用後に即座に生成実行
     pendingRunRef.current = next;
@@ -2052,7 +1894,6 @@ export default function App() {
     setActiveEffectTypes([]);
     setActiveSnsTypes([]);
     setActiveCultureTypes([]);
-    setActiveAssistModes([]);
     setChaosLabel(null);
     setMoods([]);
     setAutoMoodCategories([]);
@@ -2676,19 +2517,14 @@ export default function App() {
 
               <QuickActions
                 viralMode={viralMode}
-                canVariant={!!imageDataUrl || hasResults}
                 canUndo={undoStack.length > 0}
                 favPanelOpen={favPanelOpen}
                 disabled={generating}
-                chaosLabel={chaosLabel}
                 activeWorldPresets={activeWorldPresets}
                 activeEffectTypes={activeEffectTypes}
                 onViral={handleViral}
                 onViralOff={handleViralOff}
-                onRandom={handleRandom}
-                onVariant={handleVariant}
                 onUndo={handleUndo}
-                onOpenAnalysisCenter={() => setAnalysisCenterOpen(true)}
                 onToggleFavPanel={() => setFavPanelOpen((v) => !v)}
                 onShowCalendar={() => {
                   setHistoryFavoritesOnly(false);
@@ -2696,16 +2532,10 @@ export default function App() {
                 }}
                 onWorldPresetToggle={handleWorldPresetToggle}
                 onEffectToggle={handleEffectToggle}
-                onGodToggle={handleGodToggle}
-                onBoostToggle={handleBoostToggle}
                 avoidCliche={avoidCliche}
                 onAvoidClicheChange={setAvoidCliche}
                 avoidRealBackground={avoidRealBackground}
                 onAvoidRealBackgroundChange={setAvoidRealBackground}
-                onAssistToggle={handleAssistToggle}
-                activeGodModes={activeGodModes}
-                activeBoosts={activeBoosts}
-                activeAssistModes={activeAssistModes}
                 onResetAll={handleResetAll}
               />
 
