@@ -84,6 +84,15 @@ interface Props {
   motifControlledCount: number;
   comboControlCount: number;
   colorWeights: ColorWeightMap;
+  // ── 「見えない支配」設定：全案に効くのに画面に出ない指示文を常時可視化＋解除 ──
+  /** 世界観プリセット由来の追加指示（全案へ注入・通常は不可視）。非空なら支配バッジを出す。 */
+  worldCombinedNote: string;
+  /** 参照画像から適用した強制ブロック（全案へ注入・通常は不可視）。非空なら支配バッジを出す。 */
+  referenceNoteText: string;
+  /** 世界観の解除（worldCombinedNote + activeWorldPresets をクリア）。 */
+  onClearWorld: () => void;
+  /** 参照画像適用の解除（referenceNote をクリア）。 */
+  onClearReference: () => void;
 }
 
 // ── チップ ───────────────────────────────────────────────────────────────────
@@ -186,8 +195,42 @@ export function ReflectionStatusBar(p: Props) {
     `🧬好み${prefOn ? "ON" : "OFF"}`,
   ];
 
+  // 🚨 「見えない支配」：全案に注入されるのに画面に出ない指示文（世界観/参照画像）を常時バッジ化する
+  const worldNote = p.worldCombinedNote.trim();
+  const refNote = p.referenceNoteText.trim();
+  const hasDominator = worldNote.length > 0 || refNote.length > 0;
+  const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
+  const summarize = (s: string) => {
+    const flat = s.replace(/【[^】]*】/g, "").replace(/\s+/g, " ").trim();
+    return flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
+  };
+
   return (
     <section className="rounded-lg border border-violet-400/25 bg-violet-500/5 overflow-hidden">
+      {/* 🚨 「見えない支配」常時バッジ：全案に効くのに画面に出ない指示文（世界観/参照画像）を
+          open 状態に関係なく常時表示し、ワンクリックで解除できるようにする。両方空なら何も出さない。 */}
+      {hasDominator && (
+        <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 bg-rose-500/12 border-b border-rose-400/30">
+          {worldNote && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 text-[11px] font-medium">
+              <span className="font-bold">🌍 世界観：{worldLabel}</span>
+              <span className="text-rose-200/65 text-[10px] font-normal" title={p.worldCombinedNote}>（{summarize(worldNote)}）</span>
+              <button type="button" onClick={p.onClearWorld}
+                className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
+                title="この世界観を全案から解除する">× 解除</button>
+            </span>
+          )}
+          {refNote && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 text-[11px] font-medium">
+              <span className="font-bold">🖼 参照画像から適用中</span>
+              <span className="text-rose-200/65 text-[10px] font-normal" title={p.referenceNoteText}>（{summarize(refNote)}）</span>
+              <button type="button" onClick={p.onClearReference}
+                className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
+                title="参照画像からの適用を全案から解除する">× 解除</button>
+            </span>
+          )}
+        </div>
+      )}
       {/* ヘッダ（button入れ子を避けるため div+role=button。Enter/Spaceで開閉） */}
       <div
         role="button"

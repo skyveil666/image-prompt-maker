@@ -2665,6 +2665,10 @@ export default function App() {
                 comboControlCount={countComboPolicies(comboPolicies).block + countComboPolicies(comboPolicies).alt}
                 colorWeights={colorWeights}
                 onResetAll={handleResetAll}
+                worldCombinedNote={worldCombinedNote}
+                referenceNoteText={referenceNoteText}
+                onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
+                onClearReference={() => setReferenceNote({})}
               />
 
 
