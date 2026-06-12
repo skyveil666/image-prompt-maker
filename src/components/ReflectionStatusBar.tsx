@@ -91,6 +91,10 @@ interface Props {
   onClearWorld: () => void;
   /** 参照画像適用の解除（referenceNote をクリア）。 */
   onClearReference: () => void;
+  /** 🌆 背景を2D/非写実に（既定ON・非永続）。背景が変更対象の時だけ全案に効くが回避▼に埋もれて気付きにくい。 */
+  avoidRealBackground: boolean;
+  /** 背景2D化の解除（avoidRealBackground を false に）。 */
+  onClearAvoidRealBg: () => void;
 }
 
 // ── チップ ───────────────────────────────────────────────────────────────────
@@ -195,7 +199,9 @@ export function ReflectionStatusBar(p: Props) {
   // 🚨 「見えない支配」：全案に注入されるのに画面に出ない指示文（世界観/参照画像）を常時バッジ化する
   const worldNote = p.worldCombinedNote.trim();
   const refNote = p.referenceNoteText.trim();
-  const hasDominator = worldNote.length > 0 || refNote.length > 0;
+  // 背景2D化（avoidRealBackground）は既定ON・非永続だが、背景が変更対象の時だけ実際に発火する（server側ゲートと一致）
+  const bgStylizeActive = p.avoidRealBackground && p.scopes.includes("background");
+  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
   const summarize = (s: string) => {
     const flat = s.replace(/【[^】]*】/g, "").replace(/\s+/g, " ").trim();
@@ -224,6 +230,15 @@ export function ReflectionStatusBar(p: Props) {
               <button type="button" onClick={p.onClearReference}
                 className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
                 title="参照画像からの適用を全案から解除する">× 解除</button>
+            </span>
+          )}
+          {bgStylizeActive && (
+            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 text-[11px] font-medium">
+              <span className="font-bold">🌆 背景を2D/非写実に</span>
+              <span className="text-rose-200/65 text-[10px] font-normal" title="背景の風景・空間をイラスト調に寄せる（人物・顔・肌は実写維持）。既定ON・背景が変更対象の時だけ全案に効く。">（既定ON・全案の背景をイラスト調に）</span>
+              <button type="button" onClick={p.onClearAvoidRealBg}
+                className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
+                title="背景2D化をOFFにする（実写背景を許可。回避▼トグルと同じ設定）">× 解除</button>
             </span>
           )}
         </div>

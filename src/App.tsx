@@ -2393,6 +2393,8 @@ export default function App() {
                 referenceNoteText={referenceNoteText}
                 onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
                 onClearReference={() => setReferenceNote({})}
+                avoidRealBackground={avoidRealBackground}
+                onClearAvoidRealBg={() => setAvoidRealBackground(false)}
               />
 
 
