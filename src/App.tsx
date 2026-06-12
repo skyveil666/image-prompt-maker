@@ -1931,7 +1931,7 @@ export default function App() {
    * 元プロンプトの保護ルール（faceLock / locks / 変更範囲）を尊重する。
    */
   const handleArrangeInline = useCallback(
-    async (sourceItem: PromptHistoryItem, selectedScopes?: Scope[]): Promise<ArrangeResult | null> => {
+    async (sourceItem: PromptHistoryItem, selectedScopes?: Scope[], count?: Count): Promise<ArrangeResult | null> => {
       const base = buildArrangeInputs(buildInputs(), sourceItem);
       // 使用する要素（ON）。未指定なら元プロンプトの全変更範囲。
       const usedScopes = (selectedScopes && selectedScopes.length > 0)
@@ -1945,6 +1945,8 @@ export default function App() {
       const arrangeInputs: PromptInputs = {
         ...base,
         scopes: usedScopes,
+        // アレンジ専用の生成枚数（パネルの枚数セレクタ）。未指定なら従来どおり base.count（メイン案数）。
+        count: count ?? base.count,
         faceLock: sourceItem.faceLock,
         locks: sourceItem.locks ?? base.locks,
         expression: sourceItem.faceLock ? undefined : base.expression,

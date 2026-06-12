@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ArrangeResult, GeneratedProposal, PromptHistoryItem, Scope } from "../types";
+import type { ArrangeResult, Count, GeneratedProposal, PromptHistoryItem, Scope } from "../types";
 import { ARRANGE_AXES, ALL_SCOPE_LABELS, arrangeCandidateScopes } from "../lib/arrange";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 import {
@@ -73,6 +73,12 @@ interface Props {
   onClearWorld?:        () => void;
   /** 参照画像適用の解除（App の referenceNote をクリア）。 */
   onClearReference?:    () => void;
+
+  // ── アレンジ生成枚数（アレンジ専用・メイン案数とは独立・非永続）──
+  /** このアレンジで生成する案数（2-6）。未指定なら 2。 */
+  arrangeCount?:        Count;
+  /** 生成枚数の変更。 */
+  onArrangeCountChange?: (c: Count) => void;
 }
 
 function formatDateTime(ts: number): string {
@@ -540,6 +546,8 @@ export function ArrangePreviewPanel({
   onClearAvoidRealBg = () => {},
   onClearWorld = () => {},
   onClearReference = () => {},
+  arrangeCount = 2,
+  onArrangeCountChange = () => {},
 }: Props) {
   const usedAxes = result?.changedAxes.filter((a) => a.changed) ?? [];
   const excludedAxes = result?.changedAxes.filter((a) => !a.changed) ?? [];
@@ -702,6 +710,29 @@ export function ArrangePreviewPanel({
                 )}
               </div>
             )}
+
+            {/* 生成枚数（アレンジ専用・メイン案数とは独立・非永続）。サーバ検証は 2-6。 */}
+            <div className="flex items-center gap-2 px-0.5">
+              <span className="text-[11px] font-bold text-violet-100 shrink-0">生成枚数</span>
+              <div className="flex items-center gap-1">
+                {([2, 3, 4, 5, 6] as Count[]).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => onArrangeCountChange(c)}
+                    className={[
+                      "w-7 h-7 rounded-md text-[12px] font-bold border transition leading-none",
+                      arrangeCount === c
+                        ? "border-violet-400/80 bg-violet-500/25 text-violet-50 shadow-[0_0_6px_rgba(139,92,246,0.4)]"
+                        : "border-bg-border bg-transparent text-text-muted/50 hover:border-violet-400/40 hover:text-text-base/80",
+                    ].join(" ")}
+                  >
+                    {c}
+                  </button>
+                ))}
+                <span className="text-[10px] text-text-muted/45 self-center ml-0.5">枚</span>
+              </div>
+            </div>
 
             {/* 生成ボタン */}
             <button

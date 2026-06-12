@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ArrangeResult, GeneratedProposal, PromptHistoryItem, Scope } from "../types";
+import type { ArrangeResult, Count, GeneratedProposal, PromptHistoryItem, Scope } from "../types";
 import { detectSourceScopes } from "../lib/arrange";
 import { deleteItem, getAll, getByDate, updateItem } from "../lib/history";
 import { CalendarView } from "./CalendarView";
@@ -20,7 +20,7 @@ interface Props {
   onBack: () => void;
   initialFavoritesOnly?: boolean;
   /** その場でアレンジ生成し結果を返す（選択した要素のみ使用）。 */
-  onArrangeInline?: (item: PromptHistoryItem, scopes: Scope[]) => Promise<ArrangeResult | null>;
+  onArrangeInline?: (item: PromptHistoryItem, scopes: Scope[], count?: Count) => Promise<ArrangeResult | null>;
   /** アレンジ案をお気に入りとして履歴に保存する（生成画像・評価を含む）。 */
   onSaveArranged?: (result: ArrangeResult, proposal: GeneratedProposal, localState?: import("./ArrangePreviewPanel").ProposalLocalState) => Promise<void> | void;
   /** アレンジ元の設定を生成画面へ送る（メイン画面に遷移）。 */
@@ -102,6 +102,8 @@ export function HistoryView({
   // ─ アレンジ・プレビュー（要素選択 → 生成） ─────────────────────────────────
   const [arrangeSource, setArrangeSource]   = useState<PromptHistoryItem | null>(null);
   const [selectedScopes, setSelectedScopes] = useState<Scope[]>([]);
+  // アレンジ生成枚数（アレンジ専用・メイン案数とは独立・非永続）。既定 2。
+  const [arrangeCount, setArrangeCount]     = useState<Count>(2);
   const [arrangeResult, setArrangeResult]   = useState<ArrangeResult | null>(null);
   const [arrangeBusy, setArrangeBusy]       = useState(false);
   const [pinned, setPinned]                 = useState(false);
@@ -128,12 +130,12 @@ export function HistoryView({
     if (!onArrangeInline || !arrangeSource || selectedScopes.length === 0 || arrangeBusy) return;
     setArrangeBusy(true);
     try {
-      const r = await onArrangeInline(arrangeSource, selectedScopes);
+      const r = await onArrangeInline(arrangeSource, selectedScopes, arrangeCount);
       if (r) setArrangeResult(r);
     } finally {
       setArrangeBusy(false);
     }
-  }, [onArrangeInline, arrangeSource, selectedScopes, arrangeBusy]);
+  }, [onArrangeInline, arrangeSource, selectedScopes, arrangeCount, arrangeBusy]);
 
   // さらにアレンジ：選んだ案を新しい元プロンプトとして、同じ要素選択で再生成
   const handleReArrange = useCallback(
@@ -144,13 +146,13 @@ export function HistoryView({
       setArrangeSource(synthetic);
       setArrangeBusy(true);
       try {
-        const r = await onArrangeInline(synthetic, selectedScopes);
+        const r = await onArrangeInline(synthetic, selectedScopes, arrangeCount);
         if (r) setArrangeResult(r);
       } finally {
         setArrangeBusy(false);
       }
     },
-    [arrangeSource, arrangeResult, onArrangeInline, selectedScopes, arrangeBusy]
+    [arrangeSource, arrangeResult, onArrangeInline, selectedScopes, arrangeCount, arrangeBusy]
   );
 
   const handleCloseArrange = useCallback(() => {
@@ -671,6 +673,8 @@ export function HistoryView({
               onClearAvoidRealBg={onClearAvoidRealBg}
               onClearWorld={onClearWorld}
               onClearReference={onClearReference}
+              arrangeCount={arrangeCount}
+              onArrangeCountChange={setArrangeCount}
               onSaveFavorite={(p, ls) => {
                 if (arrangeResult && onSaveArranged) return onSaveArranged(arrangeResult, p, ls);
               }}
