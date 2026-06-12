@@ -2119,6 +2119,14 @@ export default function App() {
             onRestore={handleRestoreFromHistory}
             favoriteProfile={favoriteProfile}
             favoriteLearnEnabled={favoriteLearnEnabled}
+            // 「見えない支配」可視化：アレンジ画面（ArrangePreviewPanel）にも反映状態バッジを出す。
+            // メイン ReflectionStatusBar（下記）と同じライブ state・同じ解除関数を使い回す。
+            avoidRealBackground={avoidRealBackground}
+            worldCombinedNote={worldCombinedNote}
+            referenceNoteText={referenceNoteText}
+            onClearAvoidRealBg={() => setAvoidRealBackground(false)}
+            onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
+            onClearReference={() => setReferenceNote({})}
           />
         ) : (
           <>

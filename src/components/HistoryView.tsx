@@ -31,6 +31,22 @@ interface Props {
   favoriteProfile?: FavoriteProfile | null;
   /** お気に入り学習が現在ONか（「反映中」表示用）。 */
   favoriteLearnEnabled?: boolean;
+
+  // ── 「見えない支配」可視化（App のライブ state を ArrangePreviewPanel へ透過）──
+  // アレンジは handleArrangeInline 内で buildInputs() を {...current} 取り込みするため、
+  // これらの値がそのままアレンジ全案に効く。鉄則（全案に効く設定は可視化＋解除）の穴を塞ぐ。
+  /** 🌆 背景を2D/非写実に（既定ON・非永続）。 */
+  avoidRealBackground?: boolean;
+  /** 世界観プリセット由来の追加指示（全案へ注入）。 */
+  worldCombinedNote?:   string;
+  /** 参照画像から適用した強制ブロック（全案へ注入）。 */
+  referenceNoteText?:   string;
+  /** 背景2D化の解除。 */
+  onClearAvoidRealBg?:  () => void;
+  /** 世界観の解除。 */
+  onClearWorld?:        () => void;
+  /** 参照画像適用の解除。 */
+  onClearReference?:    () => void;
 }
 
 type FilterMode = "all" | "favorites" | "used" | "good" | "bad";
@@ -71,6 +87,8 @@ export function HistoryView({
   onBack, initialFavoritesOnly = false,
   onArrangeInline, onSaveArranged, onSendToGenerator, onRestore,
   favoriteProfile = null, favoriteLearnEnabled = false,
+  avoidRealBackground, worldCombinedNote, referenceNoteText,
+  onClearAvoidRealBg, onClearWorld, onClearReference,
 }: Props) {
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -647,6 +665,12 @@ export function HistoryView({
               onClose={handleCloseArrange}
               refImage={refImage}
               onClearRefImage={() => setRefImage(null)}
+              avoidRealBackground={avoidRealBackground}
+              worldCombinedNote={worldCombinedNote}
+              referenceNoteText={referenceNoteText}
+              onClearAvoidRealBg={onClearAvoidRealBg}
+              onClearWorld={onClearWorld}
+              onClearReference={onClearReference}
               onSaveFavorite={(p, ls) => {
                 if (arrangeResult && onSaveArranged) return onSaveArranged(arrangeResult, p, ls);
               }}

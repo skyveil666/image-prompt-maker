@@ -57,6 +57,22 @@ interface Props {
   refImage?:         string | null;
   /** 参照画像をクリア */
   onClearRefImage?:  () => void;
+
+  // ── 「見えない支配」可視化（メイン ReflectionStatusBar と同形式の rose バッジ）──
+  // このアレンジで全案に効くのに画面に出ない設定を可視化＋ワンクリック解除する。
+  // 値はいずれも App のライブ state（handleArrangeInline が {...current} で取り込む値と一致）。
+  /** 🌆 背景を2D/非写実に（既定ON・非永続）。selectedScopes に background がある時だけ発火。 */
+  avoidRealBackground?: boolean;
+  /** 世界観プリセット由来の追加指示（全案へ注入・通常は不可視）。非空なら支配バッジを出す。 */
+  worldCombinedNote?:   string;
+  /** 参照画像から適用した強制ブロック（全案へ注入・通常は不可視）。非空なら支配バッジを出す。 */
+  referenceNoteText?:   string;
+  /** 背景2D化の解除（App の avoidRealBackground を false に）。 */
+  onClearAvoidRealBg?:  () => void;
+  /** 世界観の解除（App の activeWorldPresets + worldCombinedNote をクリア）。 */
+  onClearWorld?:        () => void;
+  /** 参照画像適用の解除（App の referenceNote をクリア）。 */
+  onClearReference?:    () => void;
 }
 
 function formatDateTime(ts: number): string {
@@ -484,6 +500,33 @@ function ArrangeProposalCard({
   );
 }
 
+// ── 「見えない支配」バッジ（rose系・メイン ReflectionStatusBar 235-243 と同形式）─────────
+
+/** 指示文を【…】除去＋空白圧縮して24字に要約（ReflectionStatusBar と同ロジック）。 */
+function summarizeNote(s: string): string {
+  const flat = s.replace(/【[^】]*】/g, "").replace(/\s+/g, " ").trim();
+  return flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
+}
+
+/** 全案に効くのに画面に出ない設定の rose バッジ（ラベル＋要約＋「× 解除」）。 */
+function DominatorBadge({
+  label, summary, summaryTitle, onClear, clearTitle,
+}: {
+  label: string; summary?: string; summaryTitle?: string; onClear: () => void; clearTitle: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 text-[11px] font-medium">
+      <span className="font-bold">{label}</span>
+      {summary && (
+        <span className="text-rose-200/65 text-[10px] font-normal" title={summaryTitle}>（{summary}）</span>
+      )}
+      <button type="button" onClick={onClear}
+        className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
+        title={clearTitle}>× 解除</button>
+    </span>
+  );
+}
+
 // ── メインパネル ───────────────────────────────────────────────────────────────
 
 export function ArrangePreviewPanel({
@@ -491,9 +534,23 @@ export function ArrangePreviewPanel({
   result, busy, pinned, onTogglePin, onClose,
   onSaveFavorite, onReArrange, onSendToGenerator,
   refImage, onClearRefImage,
+  avoidRealBackground = false,
+  worldCombinedNote = "",
+  referenceNoteText = "",
+  onClearAvoidRealBg = () => {},
+  onClearWorld = () => {},
+  onClearReference = () => {},
 }: Props) {
   const usedAxes = result?.changedAxes.filter((a) => a.changed) ?? [];
   const excludedAxes = result?.changedAxes.filter((a) => !a.changed) ?? [];
+
+  // 「見えない支配」常時バッジの判定（メイン ReflectionStatusBar 200-204 と同形）。
+  // 背景2D化は selectedScopes（=このアレンジの usedScopes）に background がある時だけ発火させ、
+  // server ゲート（req.scopes.includes("background") && avoidRealBackground）と一致させる。
+  const worldNote = worldCombinedNote.trim();
+  const refNote   = referenceNoteText.trim();
+  const bgStylizeActive = avoidRealBackground && selectedScopes.includes("background");
+  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive;
 
   // 案ごとのローカル state（画像・評価）。result が変わったらリセット。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
@@ -610,6 +667,41 @@ export function ArrangePreviewPanel({
               onToggleScope={onToggleScope}
               onSetScopes={onSetScopes}
             />
+
+            {/* 🚨 「見えない支配」常時バッジ：このアレンジで全案に効くのに画面に出ない設定を可視化＋
+                ワンクリック解除。背景2D化は selectedScopes に background がある時だけ（server ゲートと一致）。
+                解除は App のライブ state を変えるため、次の「アレンジ生成」から外れる。 */}
+            {hasDominator && (
+              <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-rose-400/30 bg-rose-500/12 px-2.5 py-2">
+                {bgStylizeActive && (
+                  <DominatorBadge
+                    label="🌆 背景を2D/非写実に"
+                    summary="既定ON・全案の背景をイラスト調に"
+                    summaryTitle="背景の風景・空間をイラスト調に寄せる（人物・顔・肌は実写維持）。既定ON・背景が変更対象の時だけ全案に効く。"
+                    onClear={onClearAvoidRealBg}
+                    clearTitle="背景2D化をOFFにする（実写背景を許可。メインの回避▼トグルと同じ設定）"
+                  />
+                )}
+                {worldNote && (
+                  <DominatorBadge
+                    label="🌐 世界観適用中"
+                    summary={summarizeNote(worldNote)}
+                    summaryTitle={worldCombinedNote}
+                    onClear={onClearWorld}
+                    clearTitle="この世界観を全案から解除する"
+                  />
+                )}
+                {refNote && (
+                  <DominatorBadge
+                    label="🖼 参照画像から適用中"
+                    summary={summarizeNote(refNote)}
+                    summaryTitle={referenceNoteText}
+                    onClear={onClearReference}
+                    clearTitle="参照画像からの適用を全案から解除する"
+                  />
+                )}
+              </div>
+            )}
 
             {/* 生成ボタン */}
             <button
