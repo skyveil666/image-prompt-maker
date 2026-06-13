@@ -560,11 +560,19 @@ export function ArrangePreviewPanel({
   const bgStylizeActive = avoidRealBackground && selectedScopes.includes("background");
   const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive;
 
-  // 案ごとのローカル state（画像・評価）。result が変わったらリセット。
+  // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
   useEffect(() => {
     if (result) {
-      setProposalStates(result.proposals.map(() => emptyProposalLocalState()));
+      setProposalStates((prev) =>
+        result.proposals.map((_, i) => {
+          const existing = prev[i];
+          if (existing && (existing.images.length > 0 || existing.ratings.some((r) => r != null))) {
+            return existing;
+          }
+          return emptyProposalLocalState();
+        })
+      );
     }
   }, [result]);
   const canGenerate = !!source && selectedScopes.length > 0 && !busy;

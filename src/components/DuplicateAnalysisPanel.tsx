@@ -2739,7 +2739,7 @@ function DuplicateAnalysisPanelInner({
                 </div>
 
                 {/* 回避中 */}
-                {(motifAvoid.length > 0 || comboBlocked.length > 0 || imgSuppress.length > 0) && (
+                {(motifAvoid.length > 0 || comboBlocked.length > 0) && (
                   <ReflectRow color="rose" label="回避中" items={[
                     ...motifAvoid, ...comboBlocked,
                   ]} />

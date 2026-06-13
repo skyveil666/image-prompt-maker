@@ -4,6 +4,7 @@
  *
  * セッション内メモリ。各ボタンを押すたびに App.tsx で更新する。
  */
+import { shuffled } from "./shuffle";
 
 /** 直近 MAX_RECENT 件のスタイル使用履歴 */
 export interface VariationMemory {
@@ -91,12 +92,10 @@ export function pickNAvoidingRecent<T extends string>(
   n:          number,
 ): T[] {
   const recentSet = new Set(recentUsed);
-  const fresh = pool.filter((x) => !recentSet.has(x)).sort(() => Math.random() - 0.5);
+  const fresh = shuffled(pool.filter((x) => !recentSet.has(x)));
   const result: T[] = fresh.slice(0, n);
   if (result.length < n) {
-    const extras = [...pool]
-      .filter((x) => !result.includes(x))
-      .sort(() => Math.random() - 0.5);
+    const extras = shuffled(pool.filter((x) => !result.includes(x)));
     result.push(...extras.slice(0, n - result.length));
   }
   return result;

@@ -39,14 +39,10 @@ import {
   pickAvoidingRecent,
   pickNAvoidingRecent,
 } from "./variationEngine";
+import { shuffled } from "./shuffle";
 
 function pickN<T>(arr: T[], n: number): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a.slice(0, Math.min(n, a.length));
+  return shuffled(arr).slice(0, Math.min(n, arr.length));
 }
 
 const VIRAL_MOOD_POOL: Mood[] = [

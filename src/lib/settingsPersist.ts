@@ -22,7 +22,7 @@ import type { ZozoTrend } from "./zozoTrend";
 
 // ─── 定数 ─────────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = "ipm_settings_v1";
+export const STORAGE_KEY = "ipm_settings_v1";
 
 // ─── 型定義 ──────────────────────────────────────────────────────────────────
 

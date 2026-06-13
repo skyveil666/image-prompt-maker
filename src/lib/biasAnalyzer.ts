@@ -199,7 +199,7 @@ export function analyzeBias(
     });
 
   const duplicateScore = calcDuplicateScore(relevant);
-  const noveltyScore   = Math.max(0, Math.round(100 - duplicateScore * 1.1));
+  const noveltyScore   = Math.max(0, Math.round(100 - duplicateScore));
   const risk           = calcBiasRisk(duplicateScore);
 
   // 警告文：現バッチに含まれかつ高頻度のモチーフ名を列挙

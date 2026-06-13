@@ -14,7 +14,7 @@ import { CompletionToast } from "./components/CompletionToast";
 import { PresetAppliedToast } from "./components/PresetAppliedToast";
 import { ReflectionStatusBar } from "./components/ReflectionStatusBar";
 import { generateViaBackend, analyzePreferencesViaBackend } from "./lib/backendClient";
-import { loadSettings, saveSettings, type PersistedSettings } from "./lib/settingsPersist";
+import { loadSettings, saveSettings, type PersistedSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY } from "./lib/settingsPersist";
 import { getNotifSettings } from "./lib/notificationSettings";
 import { playCompletionSound } from "./lib/completionSound";
 import {
@@ -533,6 +533,45 @@ export default function App() {
     favoriteLearnEnabled, favoriteStrength,
     zozoApplied, activeBoosts, windLevel,
   ]);
+
+  // 他タブの設定変更を storage イベントで受け取り UI に反映（マルチタブ相互上書き対策）
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key !== SETTINGS_STORAGE_KEY) return;
+      const next = loadSettings();
+      setScopes(next.scopes);
+      setMoods(next.moods);
+      setAutoMoodCategories(next.autoMoodCategories);
+      setCount(next.count);
+      setDetails(next.details);
+      setExtraInstructions(next.extraInstructions);
+      setNgList(next.ngList);
+      setViralMode(next.viralMode);
+      setStrength(next.strength);
+      setGlossLevel(next.glossLevel);
+      setRealismLevel(next.realismLevel);
+      setRealismType(next.realismType);
+      setTextureOriginal(next.textureOriginal);
+      setTextureDisabled(next.textureDisabled);
+      setPromptTarget(next.promptTarget);
+      setAvoidCliche(next.avoidCliche);
+      setBodyPoseLock(next.bodyPoseLock);
+      setColorMoodLock(next.colorMoodLock);
+      setCompositionLock(next.compositionLock);
+      setColorStrategy(next.colorStrategy);
+      setFaceLock(next.faceLock);
+      setExpression(next.expression);
+      setArtStyle(next.artStyle);
+      setDefaultAspectRatio(next.defaultAspectRatio);
+      setFavoriteLearnEnabled(next.favoriteLearnEnabled);
+      setFavoriteStrength(next.favoriteStrength);
+      setZozoApplied(next.zozoApplied);
+      setActiveBoosts(next.activeBoosts);
+      setWindLevel(next.windLevel);
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
   // stale closure 回避（BUG-1）：preferenceProfile / ratingAnalysis / imageAnalysis は
   // buildInputs より後で宣言されるため依存配列に入れられない（TDZ）。
@@ -1721,6 +1760,7 @@ export default function App() {
     setNgList("");
     setViralMode(false);
     setAvoidCliche(false);
+    setAvoidRealBackground(true);
     // ── 詳細設定 ───────────────────────────────────────────────────────────────
     setDetails(DEFAULT_DETAILS);
     // ── 好み反映 ───────────────────────────────────────────────────────────────
@@ -1728,7 +1768,7 @@ export default function App() {
     setFavoriteLearnEnabled(false);
     setSkyveilOneShot(false);
     // ── 見た目 / 質感 ──────────────────────────────────────────────────────────
-    setRealismLevel(2);  // 既定Lv2＝背景モード「スタイライズ」（非写実寄り）
+    setRealismLevel(3);  // 既定Lv3＝2.5D（元画像の実写質感をそのまま維持）
     setRealismType(null);
     setGlossLevel(3);
     setWindLevel(0);

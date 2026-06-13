@@ -13,6 +13,7 @@ import type { BackgroundPlace, Count, Mood, OutfitStyle, Scope } from "../types"
 import type { PromptInputs } from "../types";
 import { type VariationMemory, createEmptyMemory } from "./variationEngine";
 import { AUTO_DETAILS } from "../types";
+import { shuffled } from "./shuffle";
 
 // ── カテゴリ定義（互いに独立した次元） ──────────────────────────────────────────
 
@@ -319,7 +320,7 @@ function pickChaosWorlds(): ChaosWorld[] {
   const ALL_CATEGORIES: ChaosCategory[] = ["era", "environment", "genre", "aesthetic"];
 
   // カテゴリシャッフル
-  const shuffledCats = [...ALL_CATEGORIES].sort(() => Math.random() - 0.5);
+  const shuffledCats = shuffled(ALL_CATEGORIES);
 
   // 各カテゴリから 1 世界選出して最大 4 世界候補を作る
   const selected: ChaosWorld[] = [];
@@ -354,9 +355,7 @@ function pickChaosWorlds(): ChaosWorld[] {
   // 最低 3 つ確保（足りなければ任意カテゴリから追加）
   if (selected.length < 3) {
     const usedIds = new Set(selected.map((w) => w.id));
-    const fallback = [...CHAOS_WORLDS]
-      .filter((w) => !usedIds.has(w.id))
-      .sort(() => Math.random() - 0.5);
+    const fallback = shuffled(CHAOS_WORLDS.filter((w) => !usedIds.has(w.id)));
     for (const fb of fallback) {
       if (selected.length >= 3) break;
       const ids = [...selected.map((w) => w.id), fb.id];
@@ -393,8 +392,7 @@ export function buildChaosFusionInputs(
   // ムードを全世界からピックアップ（重複除去・最大 5 個）
   const allMoods = worlds.flatMap((w) => [...w.moods]);
   const moodSet  = new Set(allMoods);
-  const moods    = [...moodSet]
-    .sort(() => Math.random() - 0.5)
+  const moods    = shuffled([...moodSet])
     .slice(0, 4 + Math.floor(Math.random() * 2)) as Mood[];
 
   // 背景・衣装は先頭の世界の候補からランダム選択

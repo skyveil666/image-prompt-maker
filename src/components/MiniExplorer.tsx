@@ -647,7 +647,10 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
     setPinned(null);
     try {
       const imgs = await readImagesFromDir(handle);
-      setImages(imgs);
+      setImages((prev) => {
+        prev.forEach((img) => URL.revokeObjectURL(img.objectUrl));
+        return imgs;
+      });
     } finally {
       setLoading(false);
     }
@@ -693,6 +696,16 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
       await initRoot(handle, false);
     } catch { /* ignore */ }
   }, [initRoot]);
+
+  // アンマウント時に残存 objectURL を全解放
+  useEffect(() => {
+    return () => {
+      setImages((prev) => {
+        prev.forEach((img) => URL.revokeObjectURL(img.objectUrl));
+        return prev;
+      });
+    };
+  }, []);
 
   // ── Navigate ─────────────────────────────────────────────────────────
   const navigateTo = useCallback((handle: FileSystemDirectoryHandle, pathHandles: FileSystemDirectoryHandle[]) => {

@@ -143,7 +143,7 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore,
             <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${targetColor}`}>
               {targetLabel} 案{item.proposalIndex}
             </span>
-            {item.scopes.slice(0, 4).map((s) => (
+            {(item.scopes ?? []).slice(0, 4).map((s) => (
               <span
                 key={s}
                 className="text-[10px] px-1.5 py-0.5 rounded-full border border-accent/40 bg-accent/10"
@@ -151,8 +151,8 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore,
                 {SCOPE_LABEL[s]}
               </span>
             ))}
-            {item.scopes.length > 4 && (
-              <span className="text-[10px] text-text-muted">+{item.scopes.length - 4}</span>
+            {(item.scopes ?? []).length > 4 && (
+              <span className="text-[10px] text-text-muted">+{(item.scopes ?? []).length - 4}</span>
             )}
             {item.viralMode && (
               <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-rose-400/40 bg-rose-400/15 text-rose-200">

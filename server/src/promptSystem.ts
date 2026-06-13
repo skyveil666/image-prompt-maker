@@ -3497,9 +3497,16 @@ export function safetySanitizePrompt(
   const log: Array<{ detected: string; replaced: string }> = [];
 
   function applyRule(input: string, pat: RegExp, rep: string): string {
-    // 【NG】で始まる行は置換対象から除外（否定指示の意味反転を防ぐ）
+    // 【NG】/《NG》セクション開始行以降は置換対象外（否定指示の意味反転を防ぐ）。
+    // NG 本文は次行以降に来るため、ヘッダ行だけでなく以降全行をスキップする。
+    let inNgSection = false;
     return input.split('\n').map(line => {
-      if (line.trimStart().startsWith('《NG》') || line.trimStart().startsWith('【NG】')) return line;
+      const trimmed = line.trimStart();
+      if (trimmed.startsWith('《NG》') || trimmed.startsWith('【NG】')) {
+        inNgSection = true;
+        return line;
+      }
+      if (inNgSection) return line;
       return line.replace(pat, (match) => {
         log.push({ detected: match, replaced: rep });
         return rep;
