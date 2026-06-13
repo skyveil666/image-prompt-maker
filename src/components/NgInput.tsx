@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useAutoResizeTextarea } from "../lib/useAutoResizeTextarea";
 
 interface Props {
   value: string;
@@ -9,14 +9,7 @@ const PLACEHOLDER = "例：露出高めNG / 武器NG / ピンクNG";
 
 /** 「NG指定」入力欄 */
 export function NgInput({ value, onChange }: Props) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  const ref = useAutoResizeTextarea(value);
 
   return (
     <textarea

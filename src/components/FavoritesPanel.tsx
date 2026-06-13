@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptHistoryItem, Mood, Scope } from "../types";
 import { getAll, updateItem, getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES } from "../lib/history";
 import { makeThumbnail } from "../lib/imageThumb";
+import { confirmUnfavorite } from "../lib/favoriteConfirm";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 
 // ── ラベルマップ ──────────────────────────────────────────────────────────────
@@ -735,7 +736,7 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
         <button
           type="button"
           onClick={() => {
-            if (!window.confirm("お気に入りを解除しますか？")) return;
+            if (!confirmUnfavorite()) return;
             void onUpdate(item.id, { isFavorite: false });
           }}
           title="お気に入りから削除"

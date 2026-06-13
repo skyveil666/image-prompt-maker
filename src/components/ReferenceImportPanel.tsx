@@ -14,21 +14,16 @@
  *
  * Phase2 で Gemini Vision による自動抽出（/api/extract-reference）を追加予定。
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scope } from "../types";
 import { extractReferenceViaBackend } from "../lib/backendClient";
+import { useAutoResizeTextarea } from "../lib/useAutoResizeTextarea";
 
 /** 内容に合わせて高さが自動で伸びる textarea（抽出結果をスクロールせず読めるように） */
 function AutoTextarea({ value, onChange, placeholder, minRows = 4 }: {
   value: string; onChange: (v: string) => void; placeholder: string; minRows?: number;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${Math.max(el.scrollHeight, minRows * 20)}px`;
-  }, [value, minRows]);
+  const ref = useAutoResizeTextarea(value, { minRows });
   return (
     <textarea
       ref={ref}

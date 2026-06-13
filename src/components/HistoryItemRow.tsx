@@ -3,6 +3,7 @@ import type { PromptHistoryItem, Scope } from "../types";
 import { FavoriteButton } from "./FavoriteButton";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 import { getResultImages } from "../lib/history";
+import { confirmUnfavorite } from "../lib/favoriteConfirm";
 
 interface Props {
   item: PromptHistoryItem;
@@ -180,7 +181,7 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore,
         <FavoriteButton
           active={item.isFavorite}
           onToggle={() => {
-            if (item.isFavorite && !window.confirm("お気に入りを解除しますか？")) return;
+            if (item.isFavorite && !confirmUnfavorite()) return;
             onUpdate(item.id, { isFavorite: !item.isFavorite });
           }}
         />
