@@ -1,5 +1,5 @@
 import "dotenv/config";
-import express from "express";
+import express, { type Response } from "express";
 import cors from "cors";
 import type { GenerateRequest, GenerateResponse } from "./types.ts";
 import { MODEL_NAME, generate, analyzePreferences, BlockedError, type AnalyzePreferenceSample } from "./gemini.ts";
@@ -28,6 +28,27 @@ async function withTimeout<T>(fn: () => Promise<T>): Promise<T> {
     return await Promise.race([fn(), timeoutPromise]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * 各エンドポイントの catch 共通処理。
+ * - isTimeout 付きエラー（withTimeout のタイムアウト）→ 504 Request timed out
+ * - BlockedError（safetyCategories 付き）→ 500 + カテゴリ転送（診断用・フィルタ回避には使わない）
+ * - その他 → 500 + message
+ */
+function handleEndpointError(res: Response, err: unknown, tag: string): void {
+  const message = err instanceof Error ? err.message : String(err);
+  if ((err as Error & { isTimeout?: boolean }).isTimeout) {
+    console.error(`[${tag}] timed out`);
+    res.status(504).json({ error: "Request timed out" });
+    return;
+  }
+  console.error(`[${tag}] failed:`, message);
+  if (err instanceof BlockedError && Object.keys(err.safetyCategories).length > 0) {
+    res.status(500).json({ error: message, safetyCategories: err.safetyCategories });
+  } else {
+    res.status(500).json({ error: message });
   }
 }
 
@@ -270,20 +291,7 @@ app.post("/api/generate", async (req, res) => {
     const response: GenerateResponse = { proposals, ...(retried ? { retried: true } : {}) };
     res.json(response);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if ((err as Error & { isTimeout?: boolean }).isTimeout) {
-      console.error("[/api/generate] timed out");
-      res.status(504).json({ error: "Request timed out" });
-      return;
-    }
-    console.error("[/api/generate] failed:", message);
-    // BlockedError にはカテゴリ別スコアが付いている → クライアントへ構造化して転送
-    // 目的：フィルタ回避ではなく、どのカテゴリが反応しているか診断するため
-    if (err instanceof BlockedError && Object.keys(err.safetyCategories).length > 0) {
-      res.status(500).json({ error: message, safetyCategories: err.safetyCategories });
-    } else {
-      res.status(500).json({ error: message });
-    }
+    handleEndpointError(res, err, "/api/generate");
   }
 });
 
@@ -333,14 +341,7 @@ app.post("/api/analyze-preferences", async (req, res) => {
       generatedAt: Date.now(),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if ((err as Error & { isTimeout?: boolean }).isTimeout) {
-      console.error("[/api/analyze-preferences] timed out");
-      res.status(504).json({ error: "Request timed out" });
-      return;
-    }
-    console.error("[/api/analyze-preferences] failed:", message);
-    res.status(500).json({ error: message });
+    handleEndpointError(res, err, "/api/analyze-preferences");
   }
 });
 
@@ -357,14 +358,7 @@ app.post("/api/extract-reference", async (req, res) => {
     const out = await withTimeout(() => extractReference(url));
     res.json(out);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if ((err as Error & { isTimeout?: boolean }).isTimeout) {
-      console.error("[/api/extract-reference] timed out");
-      res.status(504).json({ error: "Request timed out" });
-      return;
-    }
-    console.error("[/api/extract-reference] failed:", message);
-    res.status(500).json({ error: message });
+    handleEndpointError(res, err, "/api/extract-reference");
   }
 });
 
@@ -390,14 +384,7 @@ app.post("/api/compare-reference", async (req, res) => {
     const out = await withTimeout(() => compareReference(url, sanitizedItems));
     res.json(out);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if ((err as Error & { isTimeout?: boolean }).isTimeout) {
-      console.error("[/api/compare-reference] timed out");
-      res.status(504).json({ error: "Request timed out" });
-      return;
-    }
-    console.error("[/api/compare-reference] failed:", message);
-    res.status(500).json({ error: message });
+    handleEndpointError(res, err, "/api/compare-reference");
   }
 });
 
@@ -416,14 +403,7 @@ app.post("/api/analyze-result", async (req, res) => {
     const out = await withTimeout(() => analyzeResult(url, { prompt, scopes }));
     res.json(out);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    if ((err as Error & { isTimeout?: boolean }).isTimeout) {
-      console.error("[/api/analyze-result] timed out");
-      res.status(504).json({ error: "Request timed out" });
-      return;
-    }
-    console.error("[/api/analyze-result] failed:", message);
-    res.status(500).json({ error: message });
+    handleEndpointError(res, err, "/api/analyze-result");
   }
 });
 

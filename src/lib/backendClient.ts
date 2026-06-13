@@ -13,6 +13,35 @@ export interface BackendError {
   safetyCategories?: Record<string, string>;
 }
 
+/**
+ * 失敗レスポンス(res.ok===false)から診断用の詳細文字列を抽出する共通ヘルパ。
+ * Body は1度しか読めないので text() で取ってから JSON 試行（BUG-11 と同方式）。
+ * safetyCategories があれば NEGLIGIBLE/LOW を除いて追記（診断用表示・フィルタ回避には使わない）。
+ * 呼び出し側は固有のプレフィックスを付けて throw する:
+ *   const detail = await extractBackendError(res);
+ *   throw new Error(`...に失敗しました (${res.status}): ${detail || "unknown"}`);
+ */
+async function extractBackendError(res: Response): Promise<string> {
+  let detail = "";
+  try {
+    const raw = await res.text();
+    try {
+      const j = JSON.parse(raw) as BackendError;
+      detail = j.error || raw;
+      if (j.safetyCategories && Object.keys(j.safetyCategories).length > 0) {
+        const catStr = Object.entries(j.safetyCategories)
+          .filter(([, v]) => v !== "NEGLIGIBLE" && v !== "LOW")
+          .map(([k, v]) => `${k}:${v}`)
+          .join(" / ");
+        if (catStr) detail += ` ▶ [${catStr}]`;
+      }
+    } catch {
+      detail = raw;
+    }
+  } catch { /* noop */ }
+  return detail;
+}
+
 export async function generateViaBackend(
   inputs: PromptInputs,
   imageDataUrl: string | null,
@@ -66,25 +95,7 @@ export async function generateViaBackend(
   });
 
   if (!res.ok) {
-    // Body は1度しか読めないので text() で取ってから JSON 試行
-    let detail = "";
-    try {
-      const raw = await res.text();
-      try {
-        const j = JSON.parse(raw) as BackendError;
-        detail = j.error || raw;
-        // safetyCategories があればエラーメッセージに追記（診断用表示。LOW/NEGLIGIBLE は除外）
-        if (j.safetyCategories && Object.keys(j.safetyCategories).length > 0) {
-          const catStr = Object.entries(j.safetyCategories)
-            .filter(([, v]) => v !== "NEGLIGIBLE" && v !== "LOW")
-            .map(([k, v]) => `${k}:${v}`)
-            .join(" / ");
-          if (catStr) detail += ` ▶ [${catStr}]`;
-        }
-      } catch {
-        detail = raw;
-      }
-    } catch { /* noop */ }
+    const detail = await extractBackendError(res);
     throw new Error(`Backend error (${res.status}): ${detail || "unknown"}`);
   }
   return (await res.json()) as BackendResponse;
@@ -111,17 +122,7 @@ export async function extractReferenceViaBackend(
     body: JSON.stringify({ imageDataUrl }),
   });
   if (!res.ok) {
-    // Body は1度しか読めないので text() で取ってから JSON 試行（BUG-11 と同方式）
-    let detail = "";
-    try {
-      const rawText = await res.text();
-      try {
-        const j = JSON.parse(rawText) as BackendError;
-        detail = j.error || rawText;
-      } catch {
-        detail = rawText;
-      }
-    } catch { /* noop */ }
+    const detail = await extractBackendError(res);
     throw new Error(`抽出に失敗しました (${res.status}): ${detail || "unknown"}`);
   }
   const data = (await res.json()) as ReferenceExtractResponse;
@@ -144,11 +145,7 @@ export async function analyzeResultViaBackend(
     body: JSON.stringify({ imageDataUrl, prompt: context.prompt, scopes: context.scopes }),
   });
   if (!res.ok) {
-    let detail = "";
-    try {
-      const rawText = await res.text();
-      try { detail = (JSON.parse(rawText) as BackendError).error || rawText; } catch { detail = rawText; }
-    } catch { /* noop */ }
+    const detail = await extractBackendError(res);
     throw new Error(`AI分析に失敗しました (${res.status}): ${detail || "unknown"}`);
   }
   return (await res.json()) as import("../types").ResultAnalysis;
@@ -177,17 +174,7 @@ export async function compareReferenceViaBackend(
     body: JSON.stringify({ resultImageDataUrl, referenceItems }),
   });
   if (!res.ok) {
-    // Body は1度しか読めないので text() で取ってから JSON 試行（BUG-11 と同方式）
-    let detail = "";
-    try {
-      const rawText = await res.text();
-      try {
-        const j = JSON.parse(rawText) as BackendError;
-        detail = j.error || rawText;
-      } catch {
-        detail = rawText;
-      }
-    } catch { /* noop */ }
+    const detail = await extractBackendError(res);
     throw new Error(`一致率の算出に失敗しました (${res.status}): ${detail || "unknown"}`);
   }
   const data = (await res.json()) as CompareReferenceResponse;
@@ -234,11 +221,7 @@ export async function analyzePreferencesViaBackend(
     body: JSON.stringify({ samples }),
   });
   if (!res.ok) {
-    let detail = "";
-    try {
-      const errData = await res.json() as BackendError;
-      detail = errData.error || "";
-    } catch { /* noop */ }
+    const detail = await extractBackendError(res);
     throw new Error(`Backend error (${res.status}): ${detail || "unknown"}`);
   }
   const data = (await res.json()) as AnalyzePreferencesResponse;
