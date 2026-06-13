@@ -1559,8 +1559,8 @@ const COMPOSITION_GOD_POOL: readonly CompositionGodEntry[] = [
   {
     id: "foot_level", label: "足元",
     moods: ["cinematic", "street"],
-    camera: { angle: "low", distance: "close", lens: "wide", eyeHeight: "ground" },
-    instruction: "足元からの超低アングル。靴・裾・地面の質感を切り取る。体の高さと空間のコントラストを演出。",
+    camera: { angle: "low", distance: "close", lens: "normal", eyeHeight: "low" },
+    instruction: "足元視点の落ち着いたローアングル。靴・裾・地面の質感を切り取る。体の高さと空間のコントラストを演出。",
   },
   {
     id: "back_view", label: "背面",
@@ -1571,14 +1571,14 @@ const COMPOSITION_GOD_POOL: readonly CompositionGodEntry[] = [
   {
     id: "top_down", label: "真上",
     moods: ["art", "cinematic"],
-    camera: { angle: "top_down", distance: "medium", lens: "wide", eyeHeight: "ceiling" },
+    camera: { angle: "top_down", distance: "medium", lens: "normal", eyeHeight: "ceiling" },
     instruction: "真上から見下ろすトップダウン構図。床のデザイン・衣装の広がり・人物の平面的な美しさを強調。",
   },
   {
     id: "fisheye", label: "魚眼",
     moods: ["digital", "cinematic"],
-    camera: { angle: "low", lens: "fisheye", fov: "ultra_wide" },
-    instruction: "魚眼レンズの広角歪み構図。被写体を中心に配置し周囲を誇張。ただし強度は控えめ—人体崩壊禁止。",
+    camera: { angle: "low", lens: "portrait", fov: "standard" },
+    instruction: "ローアングルのポートレートレンズ構図。被写体を見上げるように捉え、存在感と迫力を引き出す。",
   },
   {
     id: "dutch", label: "ダッチ",
@@ -1589,14 +1589,14 @@ const COMPOSITION_GOD_POOL: readonly CompositionGodEntry[] = [
   {
     id: "cctv", label: "CCTV",
     moods: ["digital", "near_future"],
-    camera: { angle: "high", distance: "far", lens: "wide", eyeHeight: "ceiling", composition: "symmetric" },
-    instruction: "天井付近のCCTV監視カメラ風視点。広角フレーム・低コントラスト・グレイン感を加えてもよい。",
+    camera: { angle: "high", distance: "far", lens: "normal", eyeHeight: "ceiling", composition: "symmetric" },
+    instruction: "天井付近のCCTV監視カメラ風視点。低コントラスト・グレイン感を加えてもよい。",
   },
   {
     id: "drone", label: "ドローン",
     moods: ["cinematic", "cool"],
-    camera: { angle: "top_down", distance: "far", fov: "wide", eyeHeight: "above_head" },
-    instruction: "ドローン空撮風。高めからの俯瞰広角で大地・建築と対比させる。ただし人物は主役の大きさを保ち、豆粒化・点景化させない。",
+    camera: { angle: "top_down", distance: "far", fov: "standard", eyeHeight: "above_head" },
+    instruction: "ドローン空撮風。高めからの俯瞰で大地・建築と対比させる。ただし人物は主役の大きさを保ち、豆粒化・点景化させない。",
   },
   {
     id: "smartphone_selfie", label: "スマホ自撮り",
@@ -1607,7 +1607,7 @@ const COMPOSITION_GOD_POOL: readonly CompositionGodEntry[] = [
   {
     id: "security_cam", label: "監視カメラ",
     moods: ["dark", "cinematic"],
-    camera: { angle: "diagonal_high", distance: "far", lens: "wide", eyeHeight: "above_head" },
+    camera: { angle: "diagonal_high", distance: "far", lens: "normal", eyeHeight: "above_head" },
     instruction: "斜め上からの監視カメラ的視点。CCTVより斜め感が強く、人物を俯瞰で捉える。緊張感と孤独を演出。",
   },
   {
@@ -1643,14 +1643,14 @@ const COMPOSITION_GOD_POOL: readonly CompositionGodEntry[] = [
   {
     id: "low_angle", label: "低い視点",
     moods: ["cinematic", "cool"],
-    camera: { angle: "low", distance: "medium", lens: "wide", eyeHeight: "low" },
+    camera: { angle: "low", distance: "medium", lens: "normal", eyeHeight: "low" },
     instruction: "見上げる低角度アングル。被写体の迫力・威圧感・高さを強調する。空や背景を大きく取り込む。",
   },
   {
     id: "ground_level", label: "地面すれすれ",
     moods: ["street", "cinematic"],
-    camera: { angle: "low", distance: "close", lens: "wide_distort", eyeHeight: "ground", fov: "ultra_wide" },
-    instruction: "地面すれすれの超低アングル。地面の質感・空との対比・ダイナミックな臨場感を演出する。",
+    camera: { angle: "low", distance: "close", lens: "normal", eyeHeight: "low", fov: "standard" },
+    instruction: "低い視点から捉えた構図。地面の質感・脚元と空との対比を自然な低アングルで演出する。",
   },
   {
     id: "over_shoulder", label: "肩越し",
@@ -2652,7 +2652,7 @@ const MOVIE_GOD_POOL: MovieGodDirection[] = [
   { label: "SF叙事詩",              moods: ["near_future", "cinematic", "cool"] as Mood[],   bgPlace: "futuristic",    outfitStyle: "techwear",  lens: "cinema",   hint: "銀河・宇宙船・壮大なスケール・英雄的な孤独感。過剰なブレードランナー感は禁止。" },
   { label: "ゴシックホラー",        moods: ["dark", "gothic", "cinematic"] as Mood[],        bgPlace: "industrial",    outfitStyle: "gothic",    lens: "cinema",   hint: "ゴシックホラー映画。不気味な光・長い影・廃墟・恐怖と美の拮抗。" },
   { label: "香港映画（詩情派）",   moods: ["cinematic", "emo", "retro"] as Mood[],           bgPlace: "indoor",        outfitStyle: "mode",      lens: "normal",   hint: "香港映画的な詩情。長時間露光・余白の多い構図・孤独と欲望の交差。" },
-  { label: "西部劇",                moods: ["cinematic", "retro", "street"] as Mood[],       bgPlace: "rooftop",       outfitStyle: "military",  lens: "wide",     hint: "荒野の夕暮れ・砂埃・正義と悪の緊張・ウェスタン映画の英雄的な孤独。" },
+  { label: "西部劇",                moods: ["cinematic", "retro", "street"] as Mood[],       bgPlace: "rooftop",       outfitStyle: "military",  lens: "normal",   hint: "荒野の夕暮れ・砂埃・正義と悪の緊張・ウェスタン映画の英雄的な孤独。" },
   { label: "スパイ映画",            moods: ["cool", "cinematic", "luxe"] as Mood[],           bgPlace: "indoor",        outfitStyle: "mode",      lens: "portrait", hint: "Bond映画的なエレガンス。夜のバー・ガラス・スーツ・危険と魅力の同居。" },
   { label: "日本映画（黒澤風）",   moods: ["japanese", "cinematic", "dark"] as Mood[],       bgPlace: "japanese_room", outfitStyle: "wa_modern", lens: "cinema",   hint: "黒澤映画的な強い光と影・雨・凛としたたたずまい・時代の重み。" },
   { label: "イタリア・ネオリアリズモ",moods: ["cinematic", "emo", "art"] as Mood[],          bgPlace: "alley",         outfitStyle: "street",    lens: "normal",   hint: "路地・自然光・普通の人の顔・詩的なリアリズム・人間の尊厳と美しさ。" },
