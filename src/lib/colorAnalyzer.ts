@@ -17,6 +17,7 @@
  *           ヒューリスティックなので完全ではないが、追加依存ゼロ・即時実行可。
  */
 import type { PromptHistoryItem } from "../types";
+import { isGoodRating } from "./history";
 
 // ── 型 ──────────────────────────────────────────────────────────────────────
 
@@ -490,7 +491,7 @@ export function analyzeColorSuccess(items: readonly PromptHistoryItem[], nowMs: 
     if (colors.size === 0) continue;
 
     const ratings = (it.resultRatings ?? []).filter((r): r is number => typeof r === "number");
-    const goodImgs = ratings.filter((r) => r >= 4).length;
+    const goodImgs = ratings.filter(isGoodRating).length;
     const badImgs = ratings.filter((r) => r >= 1 && r <= 2).length;
     if (goodImgs > 0 || badImgs > 0) ratedItemCount++;
     for (const id of colors) {

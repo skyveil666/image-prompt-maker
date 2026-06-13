@@ -232,7 +232,7 @@ function CompareModal({
                   ) : (
                     <div className="flex flex-col gap-2 max-h-[65vh] overflow-y-auto">
                       {imgs.map((url, i) => (
-                        <div key={url} className="relative">
+                        <div key={`${i}-${url}`} className="relative">
                           <img
                             src={url}
                             alt={`生成結果 ${i + 1}`}
@@ -579,7 +579,7 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
           ) : (
             <>
               {resultImages.map((url, i) => (
-                <div key={url} className="relative">
+                <div key={`${i}-${url}`} className="relative">
                   <WithImagePreview
                     src={url}
                     label={`生成結果 ${i + 1}`}

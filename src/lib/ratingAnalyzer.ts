@@ -16,7 +16,7 @@
  *   - 高評価=5, 普通=3, 低評価=2/1
  */
 import type { PromptHistoryItem } from "../types";
-import { getRatingAt, getResultImages, getAxisRatingAt, AXIS_RATING_META, type RatingAxisKey } from "./history";
+import { getRatingAt, getResultImages, getAxisRatingAt, AXIS_RATING_META, isGoodRating, type RatingAxisKey } from "./history";
 
 /** 「好み分析レポート」を有効化する閾値（評価サンプル合計） */
 export const PREFERENCE_REPORT_THRESHOLD = 30;
@@ -217,7 +217,7 @@ export function analyzeRatings(items: readonly PromptHistoryItem[]): RatingAnaly
       const r = getRatingAt(item, i);
       if (r == null) continue;
       ratedHere++;
-      if (r >= 5)       { totalGood++; bucket = "good"; }   // 5=良い / 6=神 を good 扱い
+      if (isGoodRating(r)) { totalGood++; bucket = "good"; }   // 5=良い / 6=神 を good 扱い
       else if (r === 3) {                bucket = "normal"; }
       else              { totalBad++;   bucket = "bad"; }
 
@@ -453,7 +453,7 @@ const RATING_PERIODS: { key: RatingPeriodKey; label: string; maxAgeDays: number 
 ];
 
 function rtBucket(r: number): "good" | "normal" | "bad" {
-  if (r === 5) return "good";
+  if (isGoodRating(r)) return "good";
   if (r === 3) return "normal";
   return "bad"; // 1, 2
 }

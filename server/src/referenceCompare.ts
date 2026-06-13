@@ -143,7 +143,12 @@ export async function compareReference(
     },
   });
 
-  const text = response.text;
+  let text: string | null | undefined;
+  try {
+    text = response.text;
+  } catch {
+    // getter が throw した場合は null として扱い、後続の原因判定へ
+  }
   if (!text) {
     const candidate = response.candidates?.[0];
     const finishReason = candidate?.finishReason as string | undefined;

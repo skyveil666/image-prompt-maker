@@ -83,6 +83,11 @@ export function getRatingAt(
   return (v === 1 || v === 2 || v === 3 || v === 5 || v === 6) ? v : null;
 }
 
+/** 評価値が「良い以上（5=良い / 6=神）」かどうか。分析全体の成功判定に共用する。 */
+export function isGoodRating(r: number): boolean {
+  return r >= 5;
+}
+
 /** 指定インデックスのメモを取得（未設定は ""） */
 export function getMemoAt(
   item: { resultMemos?: (string | null)[] },
@@ -292,11 +297,10 @@ export async function updateItem(
   id: string,
   patch: Partial<PromptHistoryItem>
 ): Promise<PromptHistoryItem | null> {
-  const existing = await idb.get<PromptHistoryItem>(STORE_HISTORY, id);
-  if (!existing) return null;
-  const updated = { ...existing, ...patch };
-  await idb.put(STORE_HISTORY, updated);
-  return updated;
+  return idb.updateAtomic<PromptHistoryItem>(STORE_HISTORY, id, (existing) => {
+    if (!existing) return null;
+    return { ...existing, ...patch };
+  });
 }
 
 export async function deleteItem(id: string): Promise<void> {

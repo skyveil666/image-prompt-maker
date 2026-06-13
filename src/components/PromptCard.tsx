@@ -314,7 +314,7 @@ function GeneratedResultSlot({
             {resultImages.map((url, i) => {
               const rating = resultRatings[i] ?? null;
               return (
-                <div key={url} className="relative group">
+                <div key={`${i}-${url}`} className="relative group">
                   <img
                     src={url}
                     alt={`生成結果 ${i + 1}`}

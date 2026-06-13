@@ -195,6 +195,8 @@ export function HistoryView({
 
   const filtered = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
+    // 他のアイテムから派生元として参照されているIDセット（hasDerivedフィルタ用）
+    const derivedSourceIds = new Set(items.map((i) => i.derivedFromId).filter(Boolean) as string[]);
     return items.filter((it) => {
       // ステータスフィルタ
       if (filter === "favorites" && !it.isFavorite) return false;
@@ -212,7 +214,7 @@ export function HistoryView({
       if (extraFilters.has("hasProps")      && !it.scopes?.includes("props"))     return false;
       if (extraFilters.has("isArranged")    && !it.derivedFromId)                 return false;
       if (extraFilters.has("hasImage")      && !it.resultImageData)               return false;
-      if (extraFilters.has("hasDerived")    && !it.derivedFromId)                 return false;
+      if (extraFilters.has("hasDerived")    && !derivedSourceIds.has(it.id))       return false;
 
       // 検索
       if (q) {

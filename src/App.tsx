@@ -348,6 +348,7 @@ export default function App() {
    *  履歴/お気に入り画面から戻った時に items が空でも復元できるようにする。 */
   const lastItemsRef = useRef<PromptHistoryItem[]>([]);
   const [generating, setGenerating] = useState(false);
+  const generatingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [explorerOpen, setExplorerOpen] = useState<boolean>(() => {
     try {
@@ -764,6 +765,8 @@ export default function App() {
   /** API レスポンスの proposals を IndexedDB に保存しつつ state に格納する。 */
   const runGenerate = useCallback(
     async (inputs: PromptInputs) => {
+      if (generatingRef.current) return;
+      generatingRef.current = true;
       // 「今回だけ反映」(skyveilOneShot) は全生成経路が通る単一の出口であるここで1回消費する。
       // inputs は呼び出し側で buildInputs() により確定済みのため、ここで解除しても
       // 今回の生成への適用は維持され、次回以降だけ OFF になる（P1-5 / BUG-16）。
@@ -837,6 +840,7 @@ export default function App() {
         // エラー時は items をクリアしない：以前の生成結果を維持する。
         // （古い結果が残っていてもユーザーはエラーバナーで把握できる）
       } finally {
+        generatingRef.current = false;
         setGenerating(false);
         setArrangeSource(null);
       }

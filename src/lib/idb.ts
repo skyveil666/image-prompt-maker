@@ -204,3 +204,30 @@ export async function getByIndex<T>(
     req.onerror = () => reject(req.error);
   });
 }
+
+/**
+ * get + put を同一 readwrite トランザクション内で実行する（ロストアップデート防止）。
+ * transform が null を返した場合は put をスキップして null を返す。
+ */
+export async function updateAtomic<T extends { id: string }>(
+  storeName: StoreName,
+  id: string,
+  transform: (current: T | null) => T | null,
+): Promise<T | null> {
+  const db = await openDB();
+  return new Promise<T | null>((resolve, reject) => {
+    const tx = db.transaction(storeName, "readwrite");
+    const store = tx.objectStore(storeName);
+    const getReq = store.get(id);
+    getReq.onsuccess = () => {
+      const current = (getReq.result as T | undefined) ?? null;
+      const next = transform(current);
+      if (next === null) { resolve(null); return; }
+      const putReq = store.put(next);
+      putReq.onsuccess = () => resolve(next);
+      putReq.onerror = () => reject(putReq.error);
+    };
+    getReq.onerror = () => reject(getReq.error);
+    tx.onerror = () => reject(tx.error);
+  });
+}
