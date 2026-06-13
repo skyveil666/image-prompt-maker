@@ -71,7 +71,7 @@ export function SkyveilBar({
           <span className="text-[14px] leading-none">🧬</span>
           <span className="text-[13px] font-bold text-text-base leading-none">あなたの好み / skyveil傾向</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/12 text-violet-200/90 leading-none">確認用（読み取り専用）</span>
-          <span className="ml-auto text-[11px] text-text-muted/80 leading-none">
+          <span className="ml-auto text-[11px] text-text-desc leading-none">
             現在の反映：
             <span className={active ? "text-violet-200 font-semibold ml-1" : "text-text-muted ml-1"}>
               {enabled ? `ON / ${STRENGTH_LABEL[strength]}` : oneShotArmed ? `今回だけ / ${STRENGTH_LABEL[strength]}` : "OFF"}
@@ -80,7 +80,7 @@ export function SkyveilBar({
         </div>
         <div className="px-3.5 pb-3 pt-1 border-t border-violet-400/15 space-y-2.5">
           {!profile.hasData ? (
-            <p className="text-[12px] text-text-muted/80 leading-snug py-1">
+            <p className="text-[12px] text-text-desc leading-snug py-1">
               まだ好みデータが足りません。生成・お気に入り・評価を重ねると、ここに skyveil の好み傾向が表示されます。
             </p>
           ) : (
@@ -97,7 +97,7 @@ export function SkyveilBar({
               <ProfileRow color="sky"     label="未開拓おすすめ" items={profile.underusedRecommended} />
             </>
           )}
-          <div className="text-[11px] text-text-muted/70 leading-snug pt-1 border-t border-violet-400/10">
+          <div className="text-[11px] text-text-desc leading-snug pt-1 border-t border-violet-400/10">
             分析ソース：⭐お気に入り ・ 🆚Compare評価 ・ 📊画像評価 ・ 🕒履歴
           </div>
           <p className="text-[11px] text-violet-200/85 leading-snug">
@@ -234,7 +234,7 @@ export function SkyveilBar({
           </div>
 
           {/* 分析ソース（読み取り専用の説明）＋ 今回だけ反映の説明 */}
-          <div className="text-[11px] text-text-muted/70 leading-snug space-y-0.5">
+          <div className="text-[11px] text-text-desc leading-snug space-y-0.5">
             <div>分析ソース：⭐お気に入り ・ 🆚Compare評価 ・ 📊画像評価 ・ 🕒履歴（自動では反映しません）</div>
             <div>✨ 今回だけ反映＝保存せず、この1回だけ適用。反映は<span className="text-amber-200/90 font-semibold">あなたが押した時だけ</span>。</div>
           </div>
@@ -248,7 +248,7 @@ export function SkyveilBar({
 
           {/* プロファイル表示 */}
           {!profile.hasData ? (
-            <p className="text-[12px] text-text-muted/80 leading-snug py-1">
+            <p className="text-[12px] text-text-desc leading-snug py-1">
               まだ好みデータが足りません。生成・お気に入り・評価を重ねるか「好み分析を更新」を押すと、
               ここに skyveil の好みプロファイルが表示されます。
             </p>
@@ -310,7 +310,7 @@ export function SkyveilBar({
                       )}
                     </div>
                   ))}
-                  <p className="text-[10px] text-text-muted/55 leading-snug">
+                  <p className="text-[10px] text-text-desc leading-snug">
                     ※ 反映しても顔・同一性は保護。背景固定ON/衣装OFFの軸は反映されません。
                   </p>
                 </div>
@@ -319,12 +319,12 @@ export function SkyveilBar({
           )}
 
           {/* 現在の反映 */}
-          <div className="text-[12px] text-text-muted/85 pt-1 border-t border-violet-400/10">
+          <div className="text-[12px] text-text-desc pt-1 border-t border-violet-400/10">
             現在の反映：
             <span className={active ? "text-violet-200 font-semibold ml-1" : "text-text-muted ml-1"}>
               {enabled ? `ON / ${STRENGTH_LABEL[strength]}` : oneShotArmed ? `今回だけ / ${STRENGTH_LABEL[strength]}` : "OFF"}
             </span>
-            <span className="text-text-muted/60 ml-2">
+            <span className="text-text-desc ml-2">
               ※ 変更対象・固定ルールが最優先（対象外の軸には反映しません）
             </span>
           </div>
@@ -355,7 +355,7 @@ function ProfileRow({ color, label, items, note }: {
         {items.map((t, i) => (
           <span key={i} className={["text-[11px] px-1.5 py-0.5 rounded-full border leading-none", chip[color]].join(" ")}>{t}</span>
         ))}
-        {note && <span className="text-[10px] text-text-muted/55 w-full leading-snug">{note}</span>}
+        {note && <span className="text-[10px] text-text-desc w-full leading-snug">{note}</span>}
       </div>
     </div>
   );

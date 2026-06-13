@@ -286,7 +286,7 @@ export function ControlPanel({
             </span>
           )}
         </div>
-        <p className="text-[10px] text-text-muted/55 leading-snug mb-1 -mt-0.5">何を変えるかを選ぶ（例：衣装・背景・髪・小物）。細かい指定は下の「詳細設定」、その軸をおまかせで引くなら「神引き」</p>
+        <p className="text-[10px] text-text-desc leading-snug mb-1 -mt-0.5">何を変えるかを選ぶ（例：衣装・背景・髪・小物）。細かい指定は下の「詳細設定」、その軸をおまかせで引くなら「神引き」</p>
         <div className="flex flex-wrap items-center gap-1.5">
           {/* 衣装より前の軸 */}
           {SCOPE_OPTIONS.filter((o) => OUTFIT_GROUP_BEFORE.includes(o.id)).map(renderScopeBtn)}
@@ -413,7 +413,7 @@ export function ControlPanel({
               })}
             </div>
 
-            <p className="text-[13px] text-text-muted/80 leading-relaxed">
+            <p className="text-[13px] text-text-desc leading-relaxed">
               顔の造形・同一性は維持。表情ニュアンスのみ変更します。
             </p>
           </div>
@@ -462,7 +462,7 @@ export function ControlPanel({
           </div>
           {/* リアル度ヒント + 質感タイプ折りたたみ */}
           <div className={glossDimDisabled ? "opacity-30 pointer-events-none" : ""}>
-            <p className="text-[11px] text-text-muted/60 leading-snug">
+            <p className="text-[11px] text-text-desc leading-snug">
               💡 {REALISM_HINT[realismLevel]}
               {realismType && (
                 <span className="ml-2 text-violet-300/80">
@@ -471,7 +471,7 @@ export function ControlPanel({
               )}
             </p>
             <details className="mt-0.5">
-              <summary className="text-[11px] text-text-muted/55 hover:text-text-base cursor-pointer leading-none inline-block py-0.5">
+              <summary className="text-[11px] text-text-desc hover:text-text-base cursor-pointer leading-none inline-block py-0.5">
                 ▸ 質感タイプ（任意）{realismType && <span className="ml-1 text-violet-300/80">●</span>}
               </summary>
               <div className="flex flex-wrap gap-1 mt-1 pl-1">
@@ -558,7 +558,7 @@ export function ControlPanel({
           </span>
         )}
         {textureDisabled && (
-          <span className="text-[13px] text-text-muted/80 leading-none">
+          <span className="text-[13px] text-text-desc leading-none">
             質感/立体感はプロンプトに未反映
           </span>
         )}

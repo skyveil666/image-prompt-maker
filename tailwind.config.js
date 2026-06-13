@@ -20,6 +20,8 @@ export default {
           base: "#eceef4",
           // コントラスト改善：以前の #8b91a3 より明るくし、薄い不透明度でも読めるように
           muted: "#a7adbe",
+          // 説明文・補足テキスト用（muted より明るく、不透明度修飾子なしで使う）
+          desc: "#b8bdd0",
         },
       },
       boxShadow: {

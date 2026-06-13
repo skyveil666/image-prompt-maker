@@ -1,6 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { MiniExplorer } from "./components/MiniExplorer";
-import { FavoritesPanel } from "./components/FavoritesPanel";
 import { ImageSidebar } from "./components/ImageSidebar";
 import { PromptList } from "./components/PromptList";
 import { DetailsCard } from "./components/DetailsCard";
@@ -21,9 +20,7 @@ import { playCompletionSound } from "./lib/completionSound";
 import {
   buildAntiTemplateInputs,
   buildArrangeInputs,
-  buildCombinedEffectInputs,
   buildCombinedWorldInputs,
-  buildViralInputs,
   buildImageViralInputs,
   WORLD_PRESET_DISPLAY,
 } from "./lib/quickActions";
@@ -37,7 +34,7 @@ import {
   loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
   isApplied, setAppliedStorage,
   getMotifControls,
-  computeAutoAdjust, countLevels, countComboPolicies,
+  computeAutoAdjust,
   loadComboPolicies, saveComboPolicies, setComboPolicy as setComboPolicyFn,
   resetComboPolicies, getComboControls,
   type LevelMap, type MotifLevel,
@@ -49,7 +46,7 @@ import {
   mergeForbiddenIntoNgList,
 } from "./lib/forbiddenTokens";
 // MassProductionBanner は DuplicateAnalysisPanel に統合されました。
-import type { WorldPreset, EffectPreset } from "./components/QuickActions";
+import type { WorldPreset } from "./components/QuickActions";
 import { type VariationMemory, createEmptyMemory, updateMemory } from "./lib/variationEngine";
 import type { ColorStrategy, Expression } from "./types";
 import {
@@ -247,8 +244,6 @@ export default function App() {
   const [windLevel,         setWindLevel]         = useState<number>(s0.windLevel);
   // handleBoostToggle（被り回避/映え補正/顔映え/世界観を一新のUIトグル）は撤去。
   // boost の state 操作は分析センター handleAgentAction が直接 setActiveBoosts で行うため state/setter は温存。
-  /** アクティブな演出プリセット（マルチセレクト、最大2） */
-  const [activeEffectTypes, setActiveEffectTypes] = useState<EffectPreset[]>([]);
   // SNS/カルチャー state は撤去（重複整理。mood ID は VIRAL_MOOD_POOL 等で存続）。
   /** 量産AI / 偏り分析結果（バナー表示用） */
   const [massProductionResult, setMassProductionResult] = useState<BiasAnalysisResult | null>(null);
@@ -363,7 +358,6 @@ export default function App() {
       return false;
     }
   });
-  const [favPanelOpen, setFavPanelOpen] = useState(false);
   const [selectionModalOpen, setSelectionModalOpen] = useState(false);
   const [simpleEditorOpen,   setSimpleEditorOpen]   = useState(false);
   /** ⑤ 生成完了後1.5秒だけ true → ボタンを「✅ 完了！」表示 */
@@ -1616,29 +1610,6 @@ export default function App() {
     activeGodModes, showPresetToast,
   ]);
 
-  // ─── 🔥 一発バズり：ON/OFF 切り替え＋スコープをバズり向けに更新 ─────────────
-  const handleViral = useCallback(() => {
-    const next = buildViralInputs(buildInputs(), variationMemory);
-    setScopes(next.scopes);
-    setMoods(next.moods);
-    setAutoMoodCategories(next.autoMoodCategories ?? []);
-    setViralMode(true);
-    setActiveWorldPresets([]);
-    setWorldCombinedNote("");
-    setActiveGodModes([]);
-    setScopeFlashKey((k) => k + 1);
-    setVariationMemory((prev) => updateMemory(prev, {
-      moods:  next.moods,
-      scopes: next.scopes,
-    }));
-    showPresetToast("🔥 一発バズりモードをONにしました", APPLY_HINT);
-  }, [buildInputs, variationMemory, showPresetToast]);
-
-  const handleViralOff = useCallback(() => {
-    setViralMode(false);
-    showPresetToast("一発バズりモードをOFFにしました");
-  }, [showPresetToast]);
-
   // handleRandom（🎲おまかせ）・handleVariant（🔄別案）の UI トグルは撤去。
 
   // 👑 神引き（handleGodToggle）の UI トグルは撤去（神引き完全撤去）。
@@ -1692,45 +1663,6 @@ export default function App() {
     showPresetToast(msg, hint);
   }, [activeWorldPresets, buildInputs, variationMemory, showPresetToast]);
 
-  // ─── 演出プリセット：トグル選択（最大2コンボ）─────────────────────────────────
-
-  const handleEffectToggle = useCallback((effect: EffectPreset) => {
-    const prev = activeEffectTypes;
-    let next: EffectPreset[];
-    if (prev.includes(effect)) {
-      next = prev.filter((e) => e !== effect);
-    } else if (prev.length >= 2) {
-      next = [...prev.slice(1), effect];
-    } else {
-      next = [...prev, effect];
-    }
-    setActiveEffectTypes(next);
-
-    if (next.length === 0) {
-      showPresetToast("演出の設定をリセットしました");
-      return;
-    }
-
-    const combined = buildCombinedEffectInputs(buildInputs(), next, variationMemory);
-    setScopes(combined.scopes);
-    setMoods(combined.moods);
-    setAutoMoodCategories(combined.autoMoodCategories ?? []);
-    setDetails(combined.details);
-    setViralMode(combined.viralMode);
-    setExtraInstructions(combined.extraInstructions);
-    setScopeFlashKey((k) => k + 1);
-    setVariationMemory((prev) => updateMemory(prev, { scopes: combined.scopes }));
-
-    const EFFECT_DISPLAY: Record<EffectPreset, string> = {
-      fgrich: "🌀 前景盛り", microcyber: "🧬 うっすらメカ", clean: "🧊 清潔感",
-    };
-    const labels = next.map((e) => EFFECT_DISPLAY[e]);
-    const msg = next.length === 1
-      ? `${labels[0]} を適用しました`
-      : `演出コンボ：${labels.join(" × ")}`;
-    showPresetToast(msg, APPLY_HINT);
-  }, [activeEffectTypes, buildInputs, variationMemory, showPresetToast]);
-
   // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
   // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
   // assist の state（activeAssistModes）は生成送信・復元のため温存。
@@ -1751,7 +1683,6 @@ export default function App() {
     setActiveWorldPresets([]);
     setWorldCombinedNote("");
     setActiveGodModes([]);
-    setActiveEffectTypes([]);
     setScopeFlashKey((k) => k + 1);
     // 設定適用後に即座に生成実行
     pendingRunRef.current = next;
@@ -1779,7 +1710,6 @@ export default function App() {
     setWorldCombinedNote("");
     setActiveGodModes([]);
     setActiveBoosts([]);
-    setActiveEffectTypes([]);
     setChaosLabel(null);
     setMoods([]);
     setAutoMoodCategories([]);
@@ -1850,7 +1780,6 @@ export default function App() {
   const handleArrange = useCallback(
     (sourceItem: PromptHistoryItem) => {
       setView("main");
-      setFavPanelOpen(false);
       const arrangeInputs = buildArrangeInputs(buildInputs(), sourceItem);
       setScopes(arrangeInputs.scopes);
       setMoods(arrangeInputs.moods);
@@ -1874,7 +1803,6 @@ export default function App() {
   const handleRestoreFromHistory = useCallback(
     (item: PromptHistoryItem) => {
       setView("main");
-      setFavPanelOpen(false);
 
       // ── 基本設定（PromptHistoryItem に常にある） ─────────────────────────
       setScopes(item.scopes ?? []);
@@ -1919,7 +1847,7 @@ export default function App() {
       // 確認バナー表示用
       setRestoredItem(item);
     },
-    [setView, setFavPanelOpen, setScopes, setMoods, setDetails, setFaceLock,
+    [setView, setScopes, setMoods, setDetails, setFaceLock,
      setNgList, setViralMode, setExtraInstructions, setBodyPoseLock, setColorMoodLock,
      setCompositionLock, setRealismLevel, setRealismType, setGlossLevel,
      setTextureOriginal, setTextureDisabled, setPromptTarget, setImageDataUrl,
@@ -2377,27 +2305,10 @@ export default function App() {
               {/* 📡 現在の反映状態バー：今プロンプトに効く設定を一目で（読み取り専用） */}
               <ReflectionStatusBar
                 scopes={scopes}
-                faceLock={faceLock}
-                bodyPoseLock={bodyPoseLock}
-                colorMoodLock={colorMoodLock}
-                compositionLock={compositionLock}
-                avoidCliche={avoidCliche}
                 activeGodModes={activeGodModes}
                 chaosLabel={chaosLabel}
                 activeBoosts={activeBoosts}
-                viralMode={viralMode}
                 activeWorldPresets={activeWorldPresets}
-                favoriteEnabled={favoriteLearnEnabled}
-                favoriteProfile={favoriteProfile}
-                zozoApplied={zozoApplied}
-                realismLevel={realismLevel}
-                realismType={realismType}
-                glossLevel={glossLevel}
-                windLevel={windLevel}
-                policyApplied={policyApplied}
-                motifControlledCount={countLevels(levels).controlled}
-                comboControlCount={countComboPolicies(comboPolicies).block + countComboPolicies(comboPolicies).alt}
-                colorWeights={colorWeights}
                 onResetAll={handleResetAll}
                 worldCombinedNote={worldCombinedNote}
                 referenceNoteText={referenceNoteText}
@@ -2411,27 +2322,15 @@ export default function App() {
               {/* 🧬 skyveil好みAI はメインから撤去し、分析センターの専用タブへ集約（docs/32 §5.6） */}
 
               <QuickActions
-                viralMode={viralMode}
                 canUndo={undoStack.length > 0}
-                favPanelOpen={favPanelOpen}
                 disabled={generating}
                 activeWorldPresets={activeWorldPresets}
-                activeEffectTypes={activeEffectTypes}
-                onViral={handleViral}
-                onViralOff={handleViralOff}
                 onUndo={handleUndo}
-                onToggleFavPanel={() => setFavPanelOpen((v) => !v)}
-                onShowCalendar={() => {
-                  setHistoryFavoritesOnly(false);
-                  setView("history");
-                }}
                 onWorldPresetToggle={handleWorldPresetToggle}
-                onEffectToggle={handleEffectToggle}
                 avoidCliche={avoidCliche}
                 onAvoidClicheChange={setAvoidCliche}
                 avoidRealBackground={avoidRealBackground}
                 onAvoidRealBackgroundChange={setAvoidRealBackground}
-                onResetAll={handleResetAll}
               />
 
               {/* 📊 分析センター（全画面モーダル 95vw×92vh・docs/32 A1）。左メニューから開く。 */}
@@ -2877,18 +2776,6 @@ export default function App() {
           </>
         )}
       </main>
-
-      {/* ⭐ お気に入りプロンプト右スライドパネル（fixed） */}
-      <FavoritesPanel
-        key={`favorites-${dataVersion}`}
-        open={favPanelOpen}
-        onClose={() => setFavPanelOpen(false)}
-        onArrange={handleArrange}
-        onUseAsSource={(url) => {
-          setImageDataUrl(url);
-          setFavPanelOpen(false);
-        }}
-      />
 
       {/* 🖼 参照画像 / 要素抽出 右側固定パネル（fixed・新規要素・main view のみ） */}
       {view === "main" && (

@@ -1,29 +1,21 @@
 /**
- * QuickActions — クイック操作バー（カテゴリ別レイアウト）
+ * QuickActions — クイック操作バー（アクションバー + 世界観）
  *
- * ┌─ 世界観 ──────────────────────────────────────────────────────────────────┐
+ * ┌─ アクションバー ──────────────────────────────────────────────────────────┐
+ * │ 🛡テンプレ回避[▼テンプレ回避/被り回避/背景2D化]              ↩戻る        │
+ * ├─ 世界観 ──────────────────────────────────────────────────────────────────┤
  * │ 👗Y2K  🚀Y3K  🏙街  🎬映画  🌸和風  🖤ゴシック  📢広告  ✨幻想  📺レトロ │
- * ├─ 演出 ────────────────────────────────────────────────────────────────────┤
- * │ 🌀前景盛り  🧬微機械化  🧊清潔感                                         │
- * ├─ 映え ────────────────────────────────────────────────────────────────────┤
- * │ 🔥バズ最適化[▼バズモード/映え補正]   🎯顔映え                            │
- * ├─ 変化 ────────────────────────────────────────────────────────────────────┤
- * │ 👑神引き[▼おまかせ/カオス/大きく変える/軸別]   🔄別案                     │
- * ├─ 回避 ────────────────────────────────────────────────────────────────────┤
- * │ 🛡テンプレ回避[▼テンプレ回避/被り回避/AIっぽさチェック]                  │
- * ├─ ツール ──────────────────────────────────────────────────────────────────┤
- * │ ⭐お気に入り  📅履歴  ↩戻る  ↺プリセット解除                            │
  * └───────────────────────────────────────────────────────────────────────────┘
  *
  * 注: 📈SNSバズ / 🌐カルチャー は詳細設定(DetailsCard)の SNS / カルチャー タブ内
- *     「おまかせ」ボタンへ移設済み（1b）。内部関数名・フラグ・生成ロジックは不変。
+ *     「おまかせ」ボタンへ移設済み（1b）。↺全リセットは📡反映バー（RSB）に集約済み。
  */
 
 import { useState } from "react";
 import type { ReactNode } from "react";
-import type { WorldPreset, EffectPreset } from "../lib/quickActions";
+import type { WorldPreset } from "../lib/quickActions";
 
-export type { WorldPreset, EffectPreset };
+export type { WorldPreset };
 
 /** 旧型名エイリアス（外部コードとの互換性維持） */
 export type FashionPreset = WorldPreset;
@@ -31,30 +23,18 @@ export type FashionPreset = WorldPreset;
 // ── Props ──────────────────────────────────────────────────────────────────────
 
 interface QuickActionsProps {
-  viralMode:          boolean;
   canUndo:            boolean;
-  favPanelOpen:       boolean;
   disabled?:          boolean;
   activeWorldPresets?: WorldPreset[];
-  activeEffectTypes?:  EffectPreset[];
-  // 生成ロジック補助（バズモードは1クリック・onViral/onViralOff）
-  onViral:            () => void;
-  onViralOff:         () => void;
   onUndo:             () => void;
-  // 世界観・演出 トグル（マルチセレクト）
+  // 世界観 トグル（マルチセレクト）
   onWorldPresetToggle: (preset: WorldPreset) => void;
-  onEffectToggle:      (effect: EffectPreset) => void;
   /** 量産回避（avoidCliche・サーバ側 cliche 回避ブロック。既定ON） */
   avoidCliche?:        boolean;
   onAvoidClicheChange?: (v: boolean) => void;
   /** 🌆 リアル背景回避（既定ON）。背景が変更対象の時だけサーバ側で実写背景を強め抑制（表示トグル） */
   avoidRealBackground?: boolean;
   onAvoidRealBackgroundChange?: (v: boolean) => void;
-  // リセット
-  onResetAll: () => void;
-  // ツール
-  onToggleFavPanel:   () => void;
-  onShowCalendar:     () => void;
 }
 
 // ── ヘルパー ──────────────────────────────────────────────────────────────────
@@ -154,91 +134,24 @@ function CategoryRow({ label, children }: { label: string; children: ReactNode }
 // ── メインコンポーネント ───────────────────────────────────────────────────────
 
 export function QuickActions({
-  viralMode,
   canUndo,
-  favPanelOpen,
   disabled,
   activeWorldPresets  = [],
-  activeEffectTypes   = [],
-  onViral, onViralOff,
   onUndo,
-  onWorldPresetToggle, onEffectToggle,
+  onWorldPresetToggle,
   avoidCliche = true, onAvoidClicheChange,
   avoidRealBackground = true, onAvoidRealBackgroundChange,
-  onResetAll,
-  onToggleFavPanel, onShowCalendar,
 }: QuickActionsProps) {
-  // 回避 は展開パネル（ポップオーバー）。映え（バズモード1クリック）／変化（撤去）は展開不要に。
+  // 回避 は展開パネル（ポップオーバー）。変化（撤去済み）は展開不要。
   const [avoidOpen, setAvoidOpen] = useState(false);
 
   return (
     <div className="card !py-3 !px-4 space-y-2.5">
 
-      {/* ══════ 世界観 / ジャンル ══════ */}
-      <CategoryRow label="世界観">
-        <span className="w-full text-[10px] text-text-muted/55 leading-snug mb-0.5">最初の方向性（既成ジャンル）を選ぶ</span>
-        <TagBtn label="👗 Y2K"       title="2000年代ファッション：ポップ・メタリック・ラインストーン（最大3選択）"                                    onClick={() => onWorldPresetToggle("y2k")}        active={activeWorldPresets.includes("y2k")}        variant="pink"       disabled={disabled} />
-        <TagBtn label="🚀 Y3K"       title="近未来ハイファッション：透明素材・シルバー・sci-fi感（最大3選択）"                                         onClick={() => onWorldPresetToggle("y3k")}        active={activeWorldPresets.includes("y3k")}        variant="indigo"     disabled={disabled} />
-        <TagBtn label="🏙️ ストリート" title="都会・アーバン・ファッション誌風（最大3選択）"                                                              onClick={() => onWorldPresetToggle("street")}     active={activeWorldPresets.includes("street")}     variant="stone"      disabled={disabled} />
-        <TagBtn label="🎬 映画"      title="映画ポスター風。SF・ノワール・アート映画などジャンルを毎回変化させる（最大3選択）"                           onClick={() => onWorldPresetToggle("cinema")}     active={activeWorldPresets.includes("cinema")}     variant="violet"     disabled={disabled} />
-        <TagBtn label="🌸 和風"      title="和のテイストを軸にした多彩な世界観。京都・桜・竹林・和ゴシック等（最大3選択）"                              onClick={() => onWorldPresetToggle("wafuu")}      active={activeWorldPresets.includes("wafuu")}      variant="amber"      disabled={disabled} />
-        <TagBtn label="🖤 ゴシック"  title="ダーク・退廃美・建築的ゴシック。図書館・廃墟・美術館等（最大3選択）"                                        onClick={() => onWorldPresetToggle("gothic")}     active={activeWorldPresets.includes("gothic")}     variant="stone"      disabled={disabled} />
-        <TagBtn label="📢 広告"      title="ハイエンド広告・ファッション誌・ブランドビジュアル風（最大3選択）"                                           onClick={() => onWorldPresetToggle("ad")}         active={activeWorldPresets.includes("ad")}         variant="sky"        disabled={disabled} />
-        <TagBtn label="✨ 幻想"      title="神秘的・夢幻的な幻想世界観。光の森・月夜・花の嵐等（最大3選択・量産ファンタジードレス禁止）"                 onClick={() => onWorldPresetToggle("fantasy")}   active={activeWorldPresets.includes("fantasy")}   variant="teal"       disabled={disabled} />
-        <TagBtn label="📺 レトロ"    title="昭和・フィルム・80年代ポップ・ヴィンテージの世界観（最大3選択）"                                             onClick={() => onWorldPresetToggle("retro")}      active={activeWorldPresets.includes("retro")}      variant="gold"       disabled={disabled} />
-        <TagBtn label="🖤 地雷系"   title="かわいい×ダークの病みかわいい世界観。黒/白/ピンク/赤系・リボン・厚底（最大3選択）"                            onClick={() => onWorldPresetToggle("jirai")}      active={activeWorldPresets.includes("jirai")}      variant="jirai"      disabled={disabled} />
-        <TagBtn label="☠️ 世紀末系" title="荒廃都市・廃墟・錆・砂埃・終末ロードムービー感（最大3選択）"                                                  onClick={() => onWorldPresetToggle("seikimatsu")} active={activeWorldPresets.includes("seikimatsu")} variant="seikimatsu" disabled={disabled} />
-        {activeWorldPresets.length > 1 && (
-          <span className="text-[11px] text-indigo-300/70 font-semibold self-center ml-1">
-            {activeWorldPresets.length}選択中
-          </span>
-        )}
-      </CategoryRow>
-
-      <div className="border-t border-white/5" />
-
-      {/* ══════ 演出 / 効果 ══════ */}
-      <CategoryRow label="演出">
-        <span className="w-full text-[10px] text-text-muted/55 leading-snug mb-0.5">作品の雰囲気を足す演出補助（変更対象ではなく、前景/メカ/質感を自動セット）</span>
-        <TagBtn label="🌀 前景盛り" title="人物の前面に演出を追加。花びら・光・蝶・ガラス片・霧など毎回ランダムに選ぶ（最大2選択）"      onClick={() => onEffectToggle("fgrich")}     disabled={disabled} variant="cyan"   active={activeEffectTypes.includes("fgrich")} />
-        <TagBtn label="🧬 うっすらメカ" title="ガチサイボーグ禁止。目元・頬・首元など一部にだけ上品な未来感アクセサリーを追加（最大2選択）"   onClick={() => onEffectToggle("microcyber")} disabled={disabled} variant="indigo" active={activeEffectTypes.includes("microcyber")} />
-        <TagBtn label="🧊 清潔感"   title="上品でクリーン。白・シルバー・透明感・高級広告・Appleっぽい仕上がり（最大2選択）"             onClick={() => onEffectToggle("clean")}      disabled={disabled} variant="sky"    active={activeEffectTypes.includes("clean")} />
-        {activeEffectTypes.length > 1 && (
-          <span className="text-[11px] text-cyan-300/70 font-semibold self-center ml-1">
-            {activeEffectTypes.length}選択中
-          </span>
-        )}
-      </CategoryRow>
-
-      <div className="border-t border-white/5" />
-
-      {/* ══════ 映え（主役：この画像でバズる・1クリック） ══════ */}
-      <CategoryRow label="映え">
-        <span className="w-full text-[10px] text-text-muted/55 leading-snug mb-0.5">この画像でバズる方向に最適化（背景・ポーズ・服・カメラを自動でバンドル設定・1クリック）</span>
-        <button
-          type="button"
-          onClick={viralMode ? onViralOff : onViral}
-          disabled={disabled}
-          title={viralMode ? "バズモードをOFF（設定は維持）" : "この画像でバズる方向に最適化。背景・ポーズ・服・カメラを自動バンドル＋SNS映えmood＋4案を一括設定（1クリック）"}
-          className={[
-            "rounded-lg px-5 py-2.5 text-[15px] font-bold border leading-none whitespace-nowrap transition",
-            viralMode
-              ? "border-rose-500/80 bg-gradient-to-r from-rose-500 to-fuchsia-500 text-white shadow-[0_0_18px_rgba(244,63,94,0.5)]"
-              : "border-rose-500/55 bg-rose-500/15 text-rose-100 hover:bg-rose-500/25 hover:border-rose-500/80",
-            "disabled:opacity-40 disabled:cursor-not-allowed",
-          ].join(" ")}
-        >
-          {viralMode ? "🔥 バズモード ON（クリックで解除）" : "🔥 この画像でバズる"}
-        </button>
-      </CategoryRow>
-
-      <div className="border-t border-white/5" />
-
-      {/* 変化（神引き・別案）は撤去。神引きの裏ロジック（god/boost/assist state）は分析センターのAI分析アクションが使うため温存。 */}
-
-      {/* ══════ 回避 ══════ */}
-      <CategoryRow label="回避">
-        {/* 🛡 テンプレ回避（▼で テンプレ回避・被り回避・AIっぽさチェック。旧🛡量産回避＝同一フラグを「テンプレ回避」に統一表示） */}
+      {/* ── アクションバー：回避▼ + ↩戻る ──────────────────────────── */}
+      {/* ┌ 🛡テンプレ回避[▼]  既定ON ─────────────────────── ↩戻る ┐ */}
+      <div className="flex items-center flex-wrap gap-1.5">
+        {/* 🛡 テンプレ回避 ▼（▼でテンプレ回避/被り回避/背景2D化） */}
         <button
           type="button"
           onClick={() => setAvoidOpen((v) => !v)}
@@ -257,32 +170,42 @@ export function QuickActions({
         {avoidCliche && (
           <span className="text-[11px] text-amber-300/70 font-semibold self-center ml-0.5">既定ON</span>
         )}
-        {/* 展開：テンプレ回避（旧量産回避）＋被り回避＋AIっぽさチェック（旧量産AI検知・解析のみ） */}
-        {avoidOpen && (
-          <div className="w-full mt-1.5 p-2 rounded-lg border border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1.5">
-            <span className="w-full text-[10px] text-amber-300/60 leading-none mb-0.5">
-              ※ AIっぽい量産パターンを避ける常時補正（既定ON・サーバ側で全案に効く）。AIっぽさの確認は左メニューの「分析センターで見る」から。
-            </span>
-            <TagBtn label={avoidCliche ? "🛡 テンプレ回避 ON" : "🛡 テンプレ回避"} title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避ける常時補正（既定ON・サーバ側で全案に効く）" onClick={() => onAvoidClicheChange?.(!avoidCliche)} disabled={disabled} variant="amber" active={avoidCliche} />
-            <TagBtn label={avoidRealBackground ? "🌆 背景を2D/非写実に ON" : "🌆 背景を2D/非写実に"} title="背景の風景・空間だけを2D/イラスト調（アニメ背景・コンセプトアート・絵画調）に寄せる。人物・顔・肌は元画像の実写質感のまま固定。背景を変更対象にした時だけ効く・既定ON" onClick={() => onAvoidRealBackgroundChange?.(!avoidRealBackground)} disabled={disabled} variant="amber" active={avoidRealBackground} />
-          </div>
-        )}
-      </CategoryRow>
+        <div className="ml-auto">
+          <TagBtn label="↩ 戻る" title={canUndo ? "1つ前の生成結果に戻す" : "戻れる履歴がありません"} onClick={onUndo} variant="default" disabled={disabled || !canUndo} />
+        </div>
+      </div>
+      {/* 展開：テンプレ回避（旧量産回避）＋被り回避＋AIっぽさチェック（旧量産AI検知・解析のみ） */}
+      {avoidOpen && (
+        <div className="w-full p-2 rounded-lg border border-amber-400/20 bg-amber-500/5 flex flex-wrap gap-1.5">
+          <span className="w-full text-[10px] text-amber-300/60 leading-none mb-0.5">
+            ※ AIっぽい量産パターンを避ける常時補正（既定ON・サーバ側で全案に効く）。AIっぽさの確認は左メニューの「分析センターで見る」から。
+          </span>
+          <TagBtn label={avoidCliche ? "🛡 テンプレ回避 ON" : "🛡 テンプレ回避"} title="黒バラ・ステンドグラス・白ワンピ・ネオン刀などのAIテンプレを避ける常時補正（既定ON・サーバ側で全案に効く）" onClick={() => onAvoidClicheChange?.(!avoidCliche)} disabled={disabled} variant="amber" active={avoidCliche} />
+          <TagBtn label={avoidRealBackground ? "🌆 背景を2D/非写実に ON" : "🌆 背景を2D/非写実に"} title="背景の風景・空間だけを2D/イラスト調（アニメ背景・コンセプトアート・絵画調）に寄せる。人物・顔・肌は元画像の実写質感のまま固定。背景を変更対象にした時だけ効く・既定ON" onClick={() => onAvoidRealBackgroundChange?.(!avoidRealBackground)} disabled={disabled} variant="amber" active={avoidRealBackground} />
+        </div>
+      )}
 
       <div className="border-t border-white/5" />
 
-      {/* ══════ ツール ══════ */}
-      <CategoryRow label="ツール">
-        <TagBtn label="⭐ お気に入り" title="お気に入り登録したプロンプトを右パネルで表示"                                    onClick={onToggleFavPanel}      variant="amber"  active={favPanelOpen} />
-        <TagBtn label="📅 履歴"       title="月ごとのカレンダーで履歴を確認"                                                onClick={onShowCalendar}        variant="sky"    />
-        <TagBtn label="↩ 戻る"        title={canUndo ? "1つ前の生成結果に戻す" : "戻れる履歴がありません"}                  onClick={onUndo}                variant="default" disabled={disabled || !canUndo} />
-        <div className="w-px self-stretch bg-white/8 mx-0.5 shrink-0" />
-        <TagBtn
-          label="↺ プリセット解除"
-          title="神引き・バズり・SNS・生成補助などのプリセットを解除（全リセットは「現在の反映状態」パネルから）"
-          onClick={onResetAll}
-          variant="default"
-        />
+      {/* ══════ 世界観 / ジャンル ══════ */}
+      <CategoryRow label="世界観">
+        <span className="w-full text-[10px] text-text-desc leading-snug mb-0.5">最初の方向性（既成ジャンル）を選ぶ</span>
+        <TagBtn label="👗 Y2K"       title="2000年代ファッション：ポップ・メタリック・ラインストーン（最大3選択）"                                    onClick={() => onWorldPresetToggle("y2k")}        active={activeWorldPresets.includes("y2k")}        variant="pink"       disabled={disabled} />
+        <TagBtn label="🚀 Y3K"       title="近未来ハイファッション：透明素材・シルバー・sci-fi感（最大3選択）"                                         onClick={() => onWorldPresetToggle("y3k")}        active={activeWorldPresets.includes("y3k")}        variant="indigo"     disabled={disabled} />
+        <TagBtn label="🏙️ ストリート" title="都会・アーバン・ファッション誌風（最大3選択）"                                                              onClick={() => onWorldPresetToggle("street")}     active={activeWorldPresets.includes("street")}     variant="stone"      disabled={disabled} />
+        <TagBtn label="🎬 映画"      title="映画ポスター風。SF・ノワール・アート映画などジャンルを毎回変化させる（最大3選択）"                           onClick={() => onWorldPresetToggle("cinema")}     active={activeWorldPresets.includes("cinema")}     variant="violet"     disabled={disabled} />
+        <TagBtn label="🌸 和風"      title="和のテイストを軸にした多彩な世界観。京都・桜・竹林・和ゴシック等（最大3選択）"                              onClick={() => onWorldPresetToggle("wafuu")}      active={activeWorldPresets.includes("wafuu")}      variant="amber"      disabled={disabled} />
+        <TagBtn label="🖤 ゴシック"  title="ダーク・退廃美・建築的ゴシック。図書館・廃墟・美術館等（最大3選択）"                                        onClick={() => onWorldPresetToggle("gothic")}     active={activeWorldPresets.includes("gothic")}     variant="stone"      disabled={disabled} />
+        <TagBtn label="📢 広告"      title="ハイエンド広告・ファッション誌・ブランドビジュアル風（最大3選択）"                                           onClick={() => onWorldPresetToggle("ad")}         active={activeWorldPresets.includes("ad")}         variant="sky"        disabled={disabled} />
+        <TagBtn label="✨ 幻想"      title="神秘的・夢幻的な幻想世界観。光の森・月夜・花の嵐等（最大3選択・量産ファンタジードレス禁止）"                 onClick={() => onWorldPresetToggle("fantasy")}   active={activeWorldPresets.includes("fantasy")}   variant="teal"       disabled={disabled} />
+        <TagBtn label="📺 レトロ"    title="昭和・フィルム・80年代ポップ・ヴィンテージの世界観（最大3選択）"                                             onClick={() => onWorldPresetToggle("retro")}      active={activeWorldPresets.includes("retro")}      variant="gold"       disabled={disabled} />
+        <TagBtn label="🖤 地雷系"   title="かわいい×ダークの病みかわいい世界観。黒/白/ピンク/赤系・リボン・厚底（最大3選択）"                            onClick={() => onWorldPresetToggle("jirai")}      active={activeWorldPresets.includes("jirai")}      variant="jirai"      disabled={disabled} />
+        <TagBtn label="☠️ 世紀末系" title="荒廃都市・廃墟・錆・砂埃・終末ロードムービー感（最大3選択）"                                                  onClick={() => onWorldPresetToggle("seikimatsu")} active={activeWorldPresets.includes("seikimatsu")} variant="seikimatsu" disabled={disabled} />
+        {activeWorldPresets.length > 1 && (
+          <span className="text-[11px] text-indigo-300/70 font-semibold self-center ml-1">
+            {activeWorldPresets.length}選択中
+          </span>
+        )}
       </CategoryRow>
 
     </div>
