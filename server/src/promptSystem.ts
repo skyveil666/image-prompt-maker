@@ -1845,7 +1845,9 @@ const EXPRESSION_JA: Record<Expression, string> = {
  * expression が null の場合は「表情自由」指示を返す。
  */
 function expressionUnlockBlock(expression: Expression | null | undefined, pt: PromptTarget = "full"): string {
-  const exprLabel = expression ? EXPRESSION_JA[expression] : null;
+  const validExpr: Expression | null =
+    expression != null && (expression as string) in EXPRESSION_JA ? expression : null;
+  const exprLabel = validExpr ? EXPRESSION_JA[validExpr] : null;
 
   if (pt === "nano_safe") {
     return exprLabel

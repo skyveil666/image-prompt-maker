@@ -134,6 +134,20 @@ function awaitTx(tx: IDBTransaction): Promise<void> {
   });
 }
 
+export class StorageQuotaError extends Error {
+  constructor() {
+    super("QuotaExceeded");
+    this.name = "StorageQuotaError";
+  }
+}
+
+function rethrowQuota(err: unknown): never {
+  if (err instanceof DOMException && err.name === "QuotaExceededError") {
+    throw new StorageQuotaError();
+  }
+  throw err;
+}
+
 export async function put<T extends { id: string }>(
   storeName: StoreName,
   item: T
@@ -141,7 +155,11 @@ export async function put<T extends { id: string }>(
   const db = await openDB();
   const tx = db.transaction(storeName, "readwrite");
   tx.objectStore(storeName).put(item);
-  await awaitTx(tx);
+  try {
+    await awaitTx(tx);
+  } catch (err) {
+    rethrowQuota(err);
+  }
 }
 
 export async function putMany<T extends { id: string }>(
@@ -153,7 +171,11 @@ export async function putMany<T extends { id: string }>(
   const tx = db.transaction(storeName, "readwrite");
   const store = tx.objectStore(storeName);
   for (const item of items) store.put(item);
-  await awaitTx(tx);
+  try {
+    await awaitTx(tx);
+  } catch (err) {
+    rethrowQuota(err);
+  }
 }
 
 export async function get<T>(storeName: StoreName, id: string): Promise<T | null> {

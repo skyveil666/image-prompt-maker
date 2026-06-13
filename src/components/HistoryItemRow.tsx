@@ -179,7 +179,10 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore,
       <div className="px-3 pb-3 flex items-center gap-1.5 flex-wrap border-t border-bg-border/60 pt-3">
         <FavoriteButton
           active={item.isFavorite}
-          onToggle={() => onUpdate(item.id, { isFavorite: !item.isFavorite })}
+          onToggle={() => {
+            if (item.isFavorite && !window.confirm("お気に入りを解除しますか？")) return;
+            onUpdate(item.id, { isFavorite: !item.isFavorite });
+          }}
         />
         {onArrange && (
           <button

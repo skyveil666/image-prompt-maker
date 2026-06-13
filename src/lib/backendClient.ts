@@ -3,6 +3,7 @@ import type { GeneratedProposal, PromptInputs } from "../types";
 export interface BackendResponse {
   proposals: GeneratedProposal[];
   warnings?: string[];
+  retried?: boolean;
 }
 
 export interface BackendError {

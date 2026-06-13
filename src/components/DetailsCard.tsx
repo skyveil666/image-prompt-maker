@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useRef, useState } from "react";
 import type { ArtStyle, Camera3DState, ColorStrategy, DetailSettings, Mood, Scope } from "../types";
 import { DEFAULT_DETAILS, AUTO_DETAILS } from "../types";
 import { describeCameraAngle } from "../lib/cameraAngle";
@@ -1742,7 +1742,23 @@ export function DetailsCard({
   const openAll  = () => setOpenTabs(new Set(allTabs));
   const closeAll = () => setOpenTabs(new Set());
 
-  const resetAll = () => onChange({ ...AUTO_DETAILS, multiOverrides: undefined });
+  const [undoBuffer, setUndoBuffer] = useState<DetailSettings | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetAll = () => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoBuffer(value);
+    onChange({ ...AUTO_DETAILS, multiOverrides: undefined });
+    undoTimerRef.current = setTimeout(() => {
+      setUndoBuffer(null);
+      undoTimerRef.current = null;
+    }, 5000);
+  };
+
+  const undoReset = () => {
+    if (undoTimerRef.current) { clearTimeout(undoTimerRef.current); undoTimerRef.current = null; }
+    if (undoBuffer) { onChange(undoBuffer); setUndoBuffer(null); }
+  };
 
   // カテゴリ単位のクリア（スコープ系のみ）
   const resetScope = (t: TabId) => {
@@ -1810,7 +1826,7 @@ export function DetailsCard({
     <section className="card">
       {/* Header + utility buttons */}
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
-        <h2 className="section-title !mb-0">詳細設定</h2>
+        <h2 className="section-title !mb-0">雰囲気・スタイル</h2>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -1828,14 +1844,25 @@ export function DetailsCard({
           >
             すべて閉じる
           </button>
-          <button
-            type="button"
-            onClick={resetAll}
-            title="すべての詳細設定をおまかせに戻す"
-            className="px-2.5 py-1 text-[11px] rounded-md border border-bg-border/60 text-white/70 hover:text-white hover:border-bg-border hover:bg-bg-panel/40 transition-all leading-none"
-          >
-            すべておまかせ
-          </button>
+          {undoBuffer ? (
+            <button
+              type="button"
+              onClick={undoReset}
+              title="リセット前の状態に戻す（5秒間有効）"
+              className="px-2.5 py-1 text-[11px] rounded-md border border-amber-400/60 bg-amber-400/12 text-amber-200 hover:bg-amber-400/22 transition-all leading-none"
+            >
+              元に戻す
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={resetAll}
+              title="すべての雰囲気・スタイル設定をおまかせに戻す"
+              className="px-2.5 py-1 text-[11px] rounded-md border border-bg-border/60 text-white/70 hover:text-white hover:border-bg-border hover:bg-bg-panel/40 transition-all leading-none"
+            >
+              すべておまかせ
+            </button>
+          )}
         </div>
       </div>
 

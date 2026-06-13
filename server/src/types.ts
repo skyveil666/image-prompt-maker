@@ -662,4 +662,5 @@ export interface GeneratedProposal {
 export interface GenerateResponse {
   proposals: GeneratedProposal[];
   warnings?: string[];
+  retried?: boolean;
 }

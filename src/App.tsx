@@ -62,6 +62,7 @@ import { getRecentSubStyles, pushRecentSubStyles, clearRecentSubStyles } from ".
 import { runAutoCleanup, getAutoCleanupEnabled } from "./lib/cleanup";
 import { makeThumbnail } from "./lib/imageThumb";
 import { saveReferenceRecord } from "./lib/referenceRecords";
+import { StorageQuotaError } from "./lib/idb";
 import { loadReferenceLearning, type ReferenceLearning } from "./lib/referenceLearning";
 import {
   type AppView,
@@ -365,6 +366,8 @@ export default function App() {
   const [justCompleted, setJustCompleted] = useState(false);
   /** ③ インクリメントするたびトーストを1回表示 */
   const [toastTrigger, setToastTrigger] = useState(0);
+  const [cleanupToastTrigger, setCleanupToastTrigger] = useState(0);
+  const [cleanupToastMsg,     setCleanupToastMsg]     = useState("");
   /** Explorer パネル幅（localStorage に永続化） */
   const [explorerWidth, setExplorerWidth] = useState<number>(() => {
     try {
@@ -404,7 +407,12 @@ export default function App() {
   // 起動時に自動クリーンアップを実行（設定が ON の場合のみ）
   useEffect(() => {
     if (getAutoCleanupEnabled()) {
-      void runAutoCleanup();
+      void runAutoCleanup().then((n) => {
+        if (n > 0) {
+          setCleanupToastMsg(`${n}件の履歴を整理しました`);
+          setCleanupToastTrigger((c) => c + 1);
+        }
+      });
     }
   }, []);
 
@@ -822,6 +830,11 @@ export default function App() {
         const recentGenres    = getRecentGenres();
         const recentSubStyles = getRecentSubStyles();
         const result = await generateViaBackend(inputs, imageDataUrl, recentGenres, recentSubStyles);
+        if (result.retried) {
+          setFashionToastMsg("再試行しました（1回目は失敗しましたが成功しました）");
+          setFashionToastHint("");
+          setFashionToastTrigger((n) => n + 1);
+        }
         const usedGenres = result.proposals
           .map((p) => p.genre)
           .filter((g): g is string => Boolean(g));
@@ -874,8 +887,14 @@ export default function App() {
         const currentTexts = built.map((i) => i.promptText);
         void runBiasAnalysis(currentTexts, batchId);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        setError(msg);
+        if (err instanceof StorageQuotaError) {
+          setFashionToastMsg("ストレージが不足しています。履歴の整理または書き出しをしてください");
+          setFashionToastHint("");
+          setFashionToastTrigger((n) => n + 1);
+        } else {
+          const msg = err instanceof Error ? err.message : String(err);
+          setError(msg);
+        }
         // エラー時は items をクリアしない：以前の生成結果を維持する。
         // （古い結果が残っていてもユーザーはエラーバナーで把握できる）
       } finally {
@@ -2864,6 +2883,9 @@ export default function App() {
 
       {/* ✨ プリセット適用トースト（上部中央・2.8秒） */}
       <PresetAppliedToast trigger={fashionToastTrigger} message={fashionToastMsg} hint={fashionToastHint} />
+
+      {/* 🗂 自動クリーンアップ完了トースト */}
+      <PresetAppliedToast trigger={cleanupToastTrigger} message={cleanupToastMsg} />
 
       {/* Nano Banana 軽量化おすすめ警告（変更項目が多い時のみ） */}
       {promptTarget === "nano_safe" && scopes.length >= 4 && (

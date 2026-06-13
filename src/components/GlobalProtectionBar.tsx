@@ -47,6 +47,10 @@ interface Props {
   faceLock: boolean;
   /** analyzeIdentityRisk("", currentLock) の結果（設定ベースのライブ採点） */
   risk: IdentityRiskResult;
+  /** 左端ブランド（IPMアイコン＋アプリ名）。UI配置のみ・保護ロジックには無関係。 */
+  brand?: ReactNode;
+  /** ブランド横の接続状況（Gemini）。UI配置のみ・保護ロジックには無関係。 */
+  connection?: ReactNode;
   /** P4: 上部1段統合。ヘッダ行に内包する AI分析の要約（🤖 分析 N件・最新 等） */
   analysisSummary?: ReactNode;
   /** P4: 展開時に表示する AI分析の詳細（5分析チップ＋ライブビュー誘導） */
@@ -55,7 +59,7 @@ interface Props {
   actions?: ReactNode;
 }
 
-export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisDetail, actions }: Props) {
+export function GlobalProtectionBar({ faceLock, risk, brand, connection, analysisSummary, analysisDetail, actions }: Props) {
   const [open, setOpen] = useState(false);
   const lvl = LEVEL_STYLE[risk.level];
 
@@ -65,34 +69,14 @@ export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisD
         "rounded-2xl border backdrop-blur-md transition-colors",
         faceLock ? "border-emerald-500/40 bg-[#0f1218]/95" : "border-amber-500/45 bg-[#0f1218]/95",
       ].join(" ")}>
-        {/* ── 常時表示（顔・同一性 / Identity Shield） ───────────────── */}
+        {/* ── 常時表示（ブランド / Gemini接続 / AI分析要約 / 生成アクション） ─────── */}
         <div className="flex items-center gap-2 px-3 py-2 flex-wrap">
 
-          {/* ① 顔・同一性 */}
-          <div className={[
-            "flex items-center gap-1.5 rounded-lg px-2.5 py-1 border shrink-0",
-            faceLock ? "border-emerald-400/35 bg-emerald-500/10" : "border-amber-400/40 bg-amber-500/10",
-          ].join(" ")}>
-            <span className="text-[13px] leading-none">🛡</span>
-            <span className="text-[11px] text-text-muted/70 leading-none">顔・同一性</span>
-            <span className={[
-              "text-[12px] font-bold leading-none tabular-nums",
-              faceLock ? "text-emerald-200" : "text-amber-200",
-            ].join(" ")}>
-              {faceLock ? "ON" : "OFF"}
-            </span>
-          </div>
+          {/* ブランド（IPMアイコン＋アプリ名）：左端。UI配置のみ。 */}
+          {brand}
 
-          {/* ② Identity Shield */}
-          <div className={["flex items-center gap-1.5 rounded-lg px-2.5 py-1 border shrink-0", lvl.bg, lvl.border].join(" ")}>
-            <span className="text-[13px] leading-none">{lvl.icon}</span>
-            <span className="text-[11px] text-text-muted/70 leading-none">Identity&nbsp;Shield</span>
-            <span className="inline-flex items-center gap-1 leading-none">
-              <span className={["inline-block w-1.5 h-1.5 rounded-full", lvl.dot].join(" ")} />
-              <span className={["text-[12px] font-bold leading-none", lvl.text].join(" ")}>{lvl.label}</span>
-              <span className="text-[10px] text-text-muted/55 tabular-nums leading-none">{risk.score}</span>
-            </span>
-          </div>
+          {/* Gemini接続状況：ブランド横。UI配置のみ。 */}
+          {connection}
 
           {/* AI分析の要約（P4：上部1段統合。区切り＋🤖 分析 N件・最新） */}
           {analysisSummary && (
@@ -137,6 +121,35 @@ export function GlobalProtectionBar({ faceLock, risk, analysisSummary, analysisD
                 {analysisDetail}
               </div>
             )}
+
+            {/* 顔・同一性 / Identity Shield バッジ（生成バー常時行から移設） */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* ① 顔・同一性 */}
+              <div className={[
+                "flex items-center gap-1.5 rounded-lg px-2.5 py-1 border shrink-0",
+                faceLock ? "border-emerald-400/35 bg-emerald-500/10" : "border-amber-400/40 bg-amber-500/10",
+              ].join(" ")}>
+                <span className="text-[13px] leading-none">🛡</span>
+                <span className="text-[11px] text-text-muted/70 leading-none">顔・同一性</span>
+                <span className={[
+                  "text-[12px] font-bold leading-none tabular-nums",
+                  faceLock ? "text-emerald-200" : "text-amber-200",
+                ].join(" ")}>
+                  {faceLock ? "ON" : "OFF"}
+                </span>
+              </div>
+
+              {/* ② Identity Shield */}
+              <div className={["flex items-center gap-1.5 rounded-lg px-2.5 py-1 border shrink-0", lvl.bg, lvl.border].join(" ")}>
+                <span className="text-[13px] leading-none">{lvl.icon}</span>
+                <span className="text-[11px] text-text-muted/70 leading-none">Identity&nbsp;Shield</span>
+                <span className="inline-flex items-center gap-1 leading-none">
+                  <span className={["inline-block w-1.5 h-1.5 rounded-full", lvl.dot].join(" ")} />
+                  <span className={["text-[12px] font-bold leading-none", lvl.text].join(" ")}>{lvl.label}</span>
+                  <span className="text-[10px] text-text-muted/55 tabular-nums leading-none">{risk.score}</span>
+                </span>
+              </div>
+            </div>
 
             {/* 顔・同一性 */}
             <p className="text-[12px] text-text-base/90 leading-snug">

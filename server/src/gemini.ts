@@ -23,6 +23,14 @@ export class BlockedError extends Error {
   }
 }
 
+/** リトライで回復できる可能性のある一時的な生成失敗（空応答・区切り失敗）。 */
+class RetryableGenerateError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RetryableGenerateError";
+  }
+}
+
 /**
  * Gemini レスポンスから safetyRatings を抽出する。
  * promptFeedback（入力ブロック）と candidates[0]（出力ブロック）の両方を試みる。
@@ -218,6 +226,69 @@ function parseDataUrl(url: string): { mimeType: string; data: string } | null {
   return { mimeType: m[1], data: m[2] };
 }
 
+/** Gemini を1回呼び出してテキストを返す。安全ブロック等の非回復エラーはそのまま throw、
+ *  空応答など一時的な失敗は RetryableGenerateError として throw する。 */
+async function callGeminiRaw(systemPrompt: string, parts: Part[]): Promise<string> {
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ role: "user", parts }],
+    config: {
+      systemInstruction: systemPrompt,
+      temperature: 0.95,
+      topP: 0.95,
+    },
+  });
+
+  let text = "";
+  try {
+    text = (response.text ?? "").trim();
+  } catch {
+    // getter が throw した場合は空文字として扱い、後続の原因判定へ
+  }
+
+  if (!text) {
+    const candidate = response.candidates?.[0];
+    const finishReason = candidate?.finishReason as string | undefined;
+
+    if (finishReason === "SAFETY" || finishReason === "PROHIBITED_CONTENT") {
+      throw new BlockedError(
+        `プロンプトがブロックされました（PROHIBITED_CONTENT）。` +
+        "入力画像・追加指示・NG指定を変更してお試しください。",
+        extractSafetyCategories(response),
+      );
+    }
+    if (finishReason === "RECITATION") {
+      throw new Error(
+        "著作権保護コンテンツの引用と判定されブロックされました（RECITATION）。" +
+        "追加指示の内容を変えてお試しください。"
+      );
+    }
+    if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
+      throw new Error(
+        `Gemini の生成が異常終了しました（finishReason: ${finishReason}）。` +
+        "しばらく待ってから再試行してください。"
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const blockReason = (response as any).promptFeedback?.blockReason as string | undefined;
+    if (blockReason) {
+      throw new BlockedError(
+        `プロンプトがブロックされました（${blockReason}）。` +
+        "入力画像・追加指示・NG指定を変更してお試しください。",
+        extractSafetyCategories(response),
+      );
+    }
+
+    // 原因不明の空応答 → リトライで回復できる可能性あり
+    throw new RetryableGenerateError(
+      "Gemini が空のレスポンスを返しました。"
+    );
+  }
+
+  return text;
+}
+
 /**
  * Gemini が返す本文を提案 N 件に分割する。
  * Gemini は指示通りに区切り行を入れないことがあるため、複数戦略でフォールバックする：
@@ -261,7 +332,7 @@ function normalizeChunk(s: string): string {
  * 統一プロンプト生成。
  * 1回の Gemini 呼び出しで N 案を取得し、target="unified" でラベリングして返す。
  */
-export async function generate(req: GenerateRequest): Promise<GeneratedProposal[]> {
+export async function generate(req: GenerateRequest, onRetry?: () => void): Promise<GeneratedProposal[]> {
   // マンネリ回避エンジン：ジャンル抽選をコード側で実施（単純ランダム禁止）。
   // シーン系スコープ or 神引き時のみ適用。髪だけ等の部分編集ではシーンを変えない
   // （固定軸の維持に反するため）ので plan は undefined にする。
@@ -282,74 +353,31 @@ export async function generate(req: GenerateRequest): Promise<GeneratedProposal[
     }
   }
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: [{ role: "user", parts }],
-    config: {
-      systemInstruction: systemPrompt,
-      temperature: 0.95,
-      topP: 0.95,
-    },
-  });
-
-  // response.text は安全フィルター発動時に null / undefined になる。
-  // SDK によっては getter が throw することもあるので try/catch で保護。
-  let text = "";
+  // 1回目の Gemini 呼び出し。空応答・区切り失敗は RetryableGenerateError → 1回だけ再試行。
+  let text: string;
+  let retriedOnce = false;
   try {
-    text = (response.text ?? "").trim();
-  } catch {
-    // getter が throw した場合は空文字として扱い、後続の原因判定へ
+    text = await callGeminiRaw(systemPrompt, parts);
+  } catch (e) {
+    if (!(e instanceof RetryableGenerateError)) throw e;
+    onRetry?.();
+    retriedOnce = true;
+    text = await callGeminiRaw(systemPrompt, parts);
   }
 
-  // テキストが空の場合は finishReason / blockReason から原因を特定して
-  // ユーザーが対処できる日本語メッセージを返す。
-  if (!text) {
-    const candidate = response.candidates?.[0];
-    const finishReason = candidate?.finishReason as string | undefined;
-
-    if (finishReason === "SAFETY" || finishReason === "PROHIBITED_CONTENT") {
-      // エラーメッセージに PROHIBITED_CONTENT を含める（クライアント側の検知に使用）
-      // BlockedError で包むことで safetyCategories をクライアントへ転送する
-      throw new BlockedError(
-        `プロンプトがブロックされました（PROHIBITED_CONTENT）。` +
-        "入力画像・追加指示・NG指定を変更してお試しください。",
-        extractSafetyCategories(response),
-      );
-    }
-    if (finishReason === "RECITATION") {
-      throw new Error(
-        "著作権保護コンテンツの引用と判定されブロックされました（RECITATION）。" +
-        "追加指示の内容を変えてお試しください。"
-      );
-    }
-    if (finishReason && finishReason !== "STOP" && finishReason !== "MAX_TOKENS") {
-      throw new Error(
-        `Gemini の生成が異常終了しました（finishReason: ${finishReason}）。` +
-        "しばらく待ってから再試行してください。"
-      );
-    }
-
-    // promptFeedback はSDKの型に含まれないため any でアクセス
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const blockReason = (response as any).promptFeedback?.blockReason as string | undefined;
-    if (blockReason) {
-      // BlockedError で包むことで safetyCategories をクライアントへ転送する
-      throw new BlockedError(
-        `プロンプトがブロックされました（${blockReason}）。` +
-        "入力画像・追加指示・NG指定を変更してお試しください。",
-        extractSafetyCategories(response),
-      );
-    }
-
-    throw new Error(
-      "Gemini が空のレスポンスを返しました。" +
-      "しばらく待ってから再試行するか、画像や指示の内容を変えてお試しください。"
-    );
+  let proposals = splitProposals(text, req.count);
+  if (proposals.length === 0 && !retriedOnce) {
+    onRetry?.();
+    retriedOnce = true;
+    const text2 = await callGeminiRaw(systemPrompt, parts);
+    proposals = splitProposals(text2, req.count);
   }
-
-  const proposals = splitProposals(text, req.count);
   if (proposals.length === 0) {
-    throw new Error("レスポンスを案に分割できませんでした。もう一度生成してください。");
+    throw new Error(
+      retriedOnce
+        ? "再試行後もレスポンスを案に分割できませんでした。もう一度生成してください。"
+        : "レスポンスを案に分割できませんでした。もう一度生成してください。"
+    );
   }
 
   const result: GeneratedProposal[] = proposals.map((body, idx) => {

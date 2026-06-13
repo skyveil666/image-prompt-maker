@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImageUploader, type UploadedMeta } from "./ImageUploader";
 import { RecentImages } from "./RecentImages";
-import { BackendStatus } from "./BackendStatus";
 import {
   addRecentImage,
   clearRecentImages,
@@ -194,17 +193,6 @@ export function ImageSidebar({
 
   return (
     <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start lg:max-h-screen lg:overflow-y-auto lg:pr-1">
-
-      {/* ── IPM ブランド（デスクトップ、ヘッダー代わり） ────────────── */}
-      <div className="hidden lg:flex items-center justify-between gap-2 px-1 pb-1 border-b border-bg-border/40">
-        <div className="flex items-center gap-2">
-          <img src="/icon.svg" alt="IPM" className="w-6 h-6 rounded-md shrink-0" />
-          <span className="text-[13px] font-bold tracking-tight text-text-base/90">
-            Image Prompt Maker
-          </span>
-        </div>
-        <BackendStatus compact />
-      </div>
 
       {/* ナビゲーションショートカット */}
       <div className="space-y-2">

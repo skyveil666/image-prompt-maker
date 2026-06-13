@@ -4,9 +4,11 @@ import { checkBackendHealth } from "../lib/backendClient";
 interface Props {
   /** compact=true: ドット＋短いラベルのみ（サイドバー用） */
   compact?: boolean;
+  /** prominent=true: カラーバッジ形式（ヘッダーバー用） */
+  prominent?: boolean;
 }
 
-export function BackendStatus({ compact = false }: Props) {
+export function BackendStatus({ compact = false, prominent = false }: Props) {
   const [state, setState] = useState<"checking" | "ok" | "down">("checking");
 
   useEffect(() => {
@@ -48,6 +50,25 @@ export function BackendStatus({ compact = false }: Props) {
       : state === "down"
       ? "未接続"
       : "…";
+
+  // prominent: ヘッダーバー用カラーバッジ
+  if (prominent) {
+    const badge =
+      state === "ok"
+        ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/40"
+        : state === "down"
+        ? "bg-rose-500/15 text-rose-300 border border-rose-400/40"
+        : "bg-amber-500/15 text-amber-200 border border-amber-400/40";
+    return (
+      <div
+        className={`flex items-center gap-2 px-3 py-1 rounded-full text-[13px] font-semibold shrink-0 ${badge}`}
+        title={fullLabel}
+      >
+        <span className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
+        <span>Gemini {shortLabel}</span>
+      </div>
+    );
+  }
 
   if (compact) {
     return (

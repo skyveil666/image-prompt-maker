@@ -734,7 +734,10 @@ function FavCard({ item, onUpdate, onArrange, onUseAsSource, onCompare }: FavCar
         {/* ★ お気に入り解除 */}
         <button
           type="button"
-          onClick={() => void onUpdate(item.id, { isFavorite: false })}
+          onClick={() => {
+            if (!window.confirm("お気に入りを解除しますか？")) return;
+            void onUpdate(item.id, { isFavorite: false });
+          }}
           title="お気に入りから削除"
           className="ml-auto rounded-lg px-2.5 py-1.5 text-[11px] border border-bg-border text-amber-300/60 hover:text-rose-300 hover:border-rose-400/40 transition"
         >

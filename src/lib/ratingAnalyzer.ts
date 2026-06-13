@@ -38,6 +38,8 @@ export interface RatingCategoryStat {
   normal: number;
   /** 低評価（2 or 1）の件数 */
   bad: number;
+  /** 神評価（6）の件数 */
+  kami: number;
   /** 加重スコア：(good*2 + normal*0 - bad*2) / total */
   score: number;
 }
@@ -97,6 +99,10 @@ export interface RatingAnalysis {
   totalGood: number;
   /** 全体での低評価件数 */
   totalBad: number;
+  /** 神評価（6）の件数 */
+  totalKami: number;
+  /** 神率: totalKami / totalRatedImages（0-1） */
+  kamiRate: number;
   /** 軸別統計（details カテゴリの集計） */
   axes: RatingAxisStat[];
   /** 全軸まとめて「推奨カテゴリ TOP5」 */
@@ -193,7 +199,7 @@ function labelFor(axis: RatingAxis, value: string): string {
  */
 export function analyzeRatings(items: readonly PromptHistoryItem[]): RatingAnalysis {
   // 軸 × カテゴリ値 → { good, normal, bad }
-  const tally: Record<RatingAxis, Map<string, { good: number; normal: number; bad: number }>> = {
+  const tally: Record<RatingAxis, Map<string, { good: number; normal: number; bad: number; kami: number }>> = {
     background: new Map(),
     outfit:     new Map(),
     hair:       new Map(),
@@ -203,6 +209,7 @@ export function analyzeRatings(items: readonly PromptHistoryItem[]): RatingAnaly
   let totalRatedImages = 0;
   let totalGood = 0;
   let totalBad = 0;
+  let totalKami = 0;
 
   for (const item of items) {
     const images = getResultImages(item);
@@ -220,14 +227,16 @@ export function analyzeRatings(items: readonly PromptHistoryItem[]): RatingAnaly
       if (isGoodRating(r)) { totalGood++; bucket = "good"; }   // 5=良い / 6=神 を good 扱い
       else if (r === 3) {                bucket = "normal"; }
       else              { totalBad++;   bucket = "bad"; }
+      if (r === 6) totalKami++;
 
       // この画像の評価を、案の details 各軸へ 1票投じる
       for (const axis of Object.keys(tally) as RatingAxis[]) {
         const v = pickAxis(item, axis);
         if (!v || SKIP_VALUES.has(v)) continue;
         let entry = tally[axis].get(v);
-        if (!entry) { entry = { good: 0, normal: 0, bad: 0 }; tally[axis].set(v, entry); }
+        if (!entry) { entry = { good: 0, normal: 0, bad: 0, kami: 0 }; tally[axis].set(v, entry); }
         entry[bucket!]++;
+        if (r === 6) entry.kami++;
       }
     }
     totalRatedImages += ratedHere;
@@ -242,7 +251,7 @@ export function analyzeRatings(items: readonly PromptHistoryItem[]): RatingAnaly
       const score = total > 0 ? (counts.good * 2 - counts.bad * 2) / total : 0;
       categories.push({
         value, jp: labelFor(axis, value),
-        total, good: counts.good, normal: counts.normal, bad: counts.bad,
+        total, good: counts.good, normal: counts.normal, bad: counts.bad, kami: counts.kami,
         score,
       });
     }
@@ -300,6 +309,8 @@ export function analyzeRatings(items: readonly PromptHistoryItem[]): RatingAnaly
 
   return {
     totalRatedImages, totalGood, totalBad,
+    totalKami,
+    kamiRate: totalRatedImages > 0 ? totalKami / totalRatedImages : 0,
     axes,
     topRecommended: allRecommended.slice(0, 5),
     topAvoid:       allAvoid.slice(0, 5),
@@ -407,6 +418,10 @@ export interface RatingPeriodStat {
   good: number;
   normal: number;
   bad: number;
+  /** 神評価（6）の件数 */
+  kami: number;
+  /** 神率: kami / rated（0-1） */
+  kamiRate: number;
   /** 全体評価の平均（rated>0 のとき） */
   avg: number;
   /** 成功率 good/(good+bad) */
@@ -468,7 +483,7 @@ function computePeriodStat(
   label: string,
   items: readonly PromptHistoryItem[],
 ): RatingPeriodStat {
-  let rated = 0, good = 0, normal = 0, bad = 0, sum = 0;
+  let rated = 0, good = 0, normal = 0, bad = 0, sum = 0, kami = 0;
 
   const axisGB: Record<RatingAxisKey, { good: number; bad: number }> = {
     bg: { good: 0, bad: 0 }, outfit: { good: 0, bad: 0 }, pose: { good: 0, bad: 0 },
@@ -490,6 +505,7 @@ function computePeriodStat(
       const r = getRatingAt(item, i);
       if (r == null) continue;
       rated++; sum += r;
+      if (r === 6) kami++;
       const b = rtBucket(r);
       if (b === "good") good++;
       else if (b === "normal") normal++;
@@ -532,7 +548,8 @@ function computePeriodStat(
   });
 
   return {
-    key, label, rated, good, normal, bad,
+    key, label, rated, good, normal, bad, kami,
+    kamiRate: rated > 0 ? kami / rated : 0,
     avg: rated > 0 ? sum / rated : 0,
     rate: (good + bad) > 0 ? good / (good + bad) : 0,
     axisGoodBad, axisSuccess,

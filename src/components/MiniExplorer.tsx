@@ -549,6 +549,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
   const fsaOk       = isFSASupported();
 
   const folderName = currentHandle?.name ?? "";
+  const folderPath = (currentNav?.pathHandles ?? []).map((h) => h.name).join("/");
 
   // ── Hover helpers ────────────────────────────────────────────────────
   const clearAllTimers = useCallback(() => {
@@ -772,8 +773,9 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
 
   // ── Favorites ────────────────────────────────────────────────────────
   const handleToggleFav = useCallback(async (img: ExplorerImage) => {
-    if (favNames.has(img.name)) {
-      const next = await removeExplorerFavorite(`img:${img.name}`);
+    const favKey = `${folderPath}/${img.name}`;
+    if (favNames.has(favKey)) {
+      const next = await removeExplorerFavorite(`img:${favKey}`);
       setFavorites(next); setFavNames(new Set(next.map((f) => f.name)));
     } else {
       const [thumb, full] = await Promise.all([
@@ -781,12 +783,12 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
         compressToDataUrl(img.objectUrl, 1024, 0.88),
       ]);
       const next = await addExplorerFavorite({
-        id: `img:${img.name}`, name: img.name,
+        id: `img:${favKey}`, name: favKey,
         thumbDataUrl: thumb, fullDataUrl: full, addedAt: Date.now(),
       });
       setFavorites(next); setFavNames(new Set(next.map((f) => f.name)));
     }
-  }, [favNames]);
+  }, [favNames, folderPath]);
 
   const handleCopy = useCallback(async (img: ExplorerImage) => {
     try {
@@ -803,7 +805,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
     const q = query.trim().toLowerCase();
     const list = images.filter((img) =>
       !hiddenIds.has(img.id) &&
-      (!favOnly || favNames.has(img.name)) &&
+      (!favOnly || favNames.has(`${folderPath}/${img.name}`)) &&
       (!q || img.name.toLowerCase().includes(q))
     );
     const copy = [...list];
@@ -814,14 +816,15 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
       case "fav": {
         const order = new Map(favorites.map((f, i) => [f.name, i]));
         copy.sort((a, b) => {
-          const ai = order.get(a.name) ?? 99999, bi = order.get(b.name) ?? 99999;
+          const ai = order.get(`${folderPath}/${a.name}`) ?? 99999;
+          const bi = order.get(`${folderPath}/${b.name}`) ?? 99999;
           return ai !== bi ? ai - bi : a.name.localeCompare(b.name, "ja");
         });
         break;
       }
     }
     return copy;
-  }, [images, hiddenIds, sort, favorites, query, favOnly, favNames]);
+  }, [images, hiddenIds, sort, favorites, query, favOnly, favNames, folderPath]);
 
   // ── Derived ──────────────────────────────────────────────────────────
   const sortLabel   = SORT_OPTIONS.find((s) => s.id === sort)?.label ?? "並替";
@@ -1056,7 +1059,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
                       key={img.id}
                       image={img}
                       selected={selectedId === img.id}
-                      isFav={favNames.has(img.name)}
+                      isFav={favNames.has(`${folderPath}/${img.name}`)}
                       onSelect={() => void handleSelect(img)}
                       onDoubleClick={() => handleDoubleClick(img)}
                       onHover={() => startHover(img)}

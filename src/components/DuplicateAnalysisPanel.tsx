@@ -457,6 +457,15 @@ function RatingTrendsSection({ trends }: { trends: RatingTrends }) {
                 <div className="text-[10px] text-slate-400">平均評価</div>
                 <div className="text-[20px] font-bold text-slate-100 leading-none tabular-nums">{p.avg.toFixed(2)}</div>
               </div>
+              {p.kami > 0 && (
+                <div>
+                  <div className="text-[10px] text-slate-400">神率（評価6）</div>
+                  <div className="text-[20px] font-bold text-amber-300 leading-none tabular-nums">
+                    {Math.round(p.kamiRate * 100)}<span className="text-[13px]">%</span>
+                    <span className="text-[11px] text-slate-400 ml-1">({p.kami}枚)</span>
+                  </div>
+                </div>
+              )}
               <div className="text-[11px] text-slate-300 ml-auto text-right leading-relaxed">
                 評価枚数 <span className="font-bold text-slate-100">{p.rated}</span><br />
                 <span className="text-emerald-200">成功 {p.good}</span> ・ <span className="text-slate-400">中立 {p.normal}</span> ・ <span className="text-rose-200">失敗 {p.bad}</span>
