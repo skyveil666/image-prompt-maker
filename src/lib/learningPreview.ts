@@ -10,6 +10,7 @@
 
 import type { Scope } from "../types";
 import type { SuccessPromptPattern } from "./successPatterns";
+import { ALL_SCOPE_LABELS as SCOPE_LABEL } from "./scopeLabels";
 import type { LockState } from "./promptLockCheck";
 
 export type LearningApplySource =
@@ -36,11 +37,7 @@ export interface LearningApplyPreviewResult {
   canApply: boolean;
 }
 
-const SCOPE_LABEL: Record<string, string> = {
-  background: "背景", foreground: "前景演出", pose: "ポーズ", hair: "髪", outfit: "衣装",
-  cosplay: "コスプレ", cyber: "🦾 メカ", camera: "カメラ", props: "小物", big_object: "大物",
-  vehicle: "乗り物", myth: "神話/幻獣", lighting: "ライティング", aspect_ratio: "アスペクト比",
-};
+// Scope→ラベルは scopeLabels.ts に一本化（SCOPE_LABEL は別名 import）。
 
 /**
  * 成功パターンを現在のスコープへ反映する場合の差分プレビュー。

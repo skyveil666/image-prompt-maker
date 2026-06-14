@@ -10,30 +10,14 @@
  */
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PromptHistoryItem, Mood, Scope } from "../types";
+import type { PromptHistoryItem, Mood } from "../types";
 import { getAll, updateItem, getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES } from "../lib/history";
 import { makeThumbnail } from "../lib/imageThumb";
 import { confirmUnfavorite } from "../lib/favoriteConfirm";
+import { ALL_SCOPE_LABELS as SCOPE_LABEL } from "../lib/scopeLabels";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 
-// ── ラベルマップ ──────────────────────────────────────────────────────────────
-
-const SCOPE_LABEL: Record<Scope, string> = {
-  background:   "背景",
-  foreground:   "前景",
-  pose:         "ポーズ",
-  hair:         "髪",
-  outfit:       "衣装",
-  cosplay:      "コスプレ",
-  cyber:        "🦾 メカ",
-  camera:       "カメラ",
-  props:        "持ち物",
-  big_object:   "大物",
-  vehicle:      "乗り物",
-  myth:         "神話/幻獣",
-  lighting:     "ライティング",
-  aspect_ratio: "比率",
-};
+// Scope→ラベルは scopeLabels.ts に一本化（SCOPE_LABEL は別名 import）。
 
 const MOOD_LABEL: Partial<Record<Mood, string>> = {
   sns_pop: "SNS映え", cool: "クール", dark: "ダーク",

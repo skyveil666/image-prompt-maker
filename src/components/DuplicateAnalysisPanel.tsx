@@ -26,6 +26,7 @@ import { type PreferenceProfile } from "../lib/preferenceProfile";
 import type { ColorAnalysis, ColorAxis, ColorSuccessAnalysis } from "../lib/colorAnalyzer";
 import type { CandidateMotif } from "../lib/discoveryMotifs";
 import { COLOR_GROUPS, COLOR_AXES } from "../lib/colorAnalyzer";
+import { ALL_SCOPE_LABELS } from "../lib/scopeLabels";
 import type { ColorWeight, ColorWeightMap, ColorAxisCtrl } from "../lib/colorPolicy";
 import { WEIGHT_META, COLOR_AXIS_CTRL, getColorEntry, countWeights } from "../lib/colorPolicy";
 import { MonthlyCalendarSection } from "./MonthlyCalendarSection";
@@ -2243,10 +2244,8 @@ function DuplicateAnalysisPanelInner({
 
   // ── 現在生成に「反映中」の要素を名前付きで集計（スコープ考慮） ──
   // policyApplied のときだけ生成に効く。変更対象外の軸は「未反映」として分ける。
-  const AXIS_JP: Record<string, string> = {
-    background: "背景", outfit: "衣装", hair: "髪", camera: "カメラ",
-    lighting: "ライティング", pose: "ポーズ", props: "小物", foreground: "前景",
-  };
+  // Scope→ラベルは scopeLabels.ts に一本化。string インデックス維持のため Record<string,string> 受け。
+  const AXIS_JP: Record<string, string> = ALL_SCOPE_LABELS;
   // BUG-5: imageAnalyzer の axis は日本語（背景/衣装/髪型/カメラ/ライティング）だが
   // activeScopes(=scopeSet) は英語（background/outfit/...）。そのまま has() すると常に不一致になり
   // 「反映中」バナーが誤って「未反映（変更対象外）」と表示される。日本語軸→英語scopeキーで揃える。

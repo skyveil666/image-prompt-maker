@@ -78,6 +78,7 @@ import {
 } from "./types";
 import { DEFAULT_DETAILS } from "./types";
 import { computeChangedAxes, arrangeCandidateScopes, buildElementFilterInstruction } from "./lib/arrange";
+import { ALL_SCOPE_LABELS } from "./lib/scopeLabels";
 import { buildFavoriteProfile, type FavoriteProfile } from "./lib/favoriteProfile";
 import { analyzeAgent, type AgentActionId } from "./lib/aiAgent";
 import { BoostControls } from "./components/BoostControls";
@@ -2064,25 +2065,10 @@ export default function App() {
 
   const hasResults = items.length > 0;
 
-  const scopeLabel = useMemo(() => {
-    const map: Record<Scope, string> = {
-      background: "背景",
-      foreground: "前景演出",
-      pose: "ポーズ",
-      hair: "髪",
-      outfit: "衣装",
-      cosplay: "コスプレ",
-      cyber: "機械化",
-      camera: "カメラアングル",
-      props: "持ち物・小物",
-      big_object: "大物",
-      vehicle: "乗り物",
-      myth: "神話/幻獣",
-      lighting: "ライティング",
-      aspect_ratio: "アスペクト比",
-    };
-    return scopes.map((s) => map[s]).join(" + ") || "—";
-  }, [scopes]);
+  const scopeLabel = useMemo(
+    () => scopes.map((s) => ALL_SCOPE_LABELS[s]).join(" + ") || "—",
+    [scopes]
+  );
 
   // P4: 出力先ラベル（表示のみ。promptTarget は安全フィルタモードで生成ロジックは不変）
   const outputTargetLabel = useMemo(() => {

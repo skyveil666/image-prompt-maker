@@ -7,6 +7,7 @@
  * LLMは呼ばない（即応答・コスト0）。すべて履歴ベースの観測ロジック。
  */
 import type { Scope, LockKey } from "../types";
+import { ALL_SCOPE_LABELS as SCOPE_LABEL } from "./scopeLabels";
 import type { FullHistoryAnalysis } from "./historyAnalyzer";
 import type { FavoriteProfile } from "./favoriteProfile";
 import type { ColorAnalysis } from "./colorAnalyzer";
@@ -88,12 +89,7 @@ export interface AgentAnalysis {
 
 // ── 分析ロジック ──────────────────────────────────────────────────────────────
 
-const SCOPE_LABEL: Record<Scope, string> = {
-  background: "背景", foreground: "前景演出", pose: "ポーズ", hair: "髪",
-  outfit: "衣装", cosplay: "コスプレ", cyber: "🦾 メカ", camera: "カメラ",
-  props: "持ち物", big_object: "大物", vehicle: "乗り物", myth: "神話",
-  lighting: "ライティング", aspect_ratio: "比率",
-};
+// Scope→ラベルは scopeLabels.ts に一本化（SCOPE_LABEL は別名 import）。
 
 /**
  * 観察 + 提案を生成する。

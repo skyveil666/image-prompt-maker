@@ -14,6 +14,7 @@
  */
 
 import type { Scope } from "../types";
+import { ALL_SCOPE_LABELS } from "./scopeLabels";
 
 // ── ロック状態 ───────────────────────────────────────────────────────────────
 
@@ -156,11 +157,8 @@ function isProtectiveLine(line: string): boolean {
   return PROTECTIVE_LINE_HINTS.some((h) => l.includes(h.toLowerCase()));
 }
 
-/** axis → 日本語ラベル（警告メッセージ用） */
-const AXIS_JP: Record<keyof ChangeTargets, string> = {
-  hair: "髪", outfit: "衣装", background: "背景", props: "小物",
-  lighting: "ライティング", camera: "カメラ", foreground: "前景演出", pose: "ポーズ",
-};
+/** axis → 日本語ラベル（警告メッセージ用）。Scope→ラベルは scopeLabels.ts に一本化。 */
+const AXIS_JP: Record<keyof ChangeTargets, string> = ALL_SCOPE_LABELS;
 
 // ── 検査結果型 ───────────────────────────────────────────────────────────────
 
@@ -261,10 +259,8 @@ export function cleanForbidden(promptText: string, lock: LockState): string {
 
 // ── ロック一覧の表示用ラベル ─────────────────────────────────────────────────
 
-const CHANGE_LABEL: Record<keyof ChangeTargets, string> = {
-  hair: "髪型", outfit: "衣装", background: "背景", props: "小物",
-  lighting: "ライティング", camera: "カメラ", foreground: "前景演出", pose: "ポーズ",
-};
+// ロック一覧の表示用ラベルも scopeLabels.ts に一本化（AXIS_JP と同一ソース）。
+const CHANGE_LABEL: Record<keyof ChangeTargets, string> = ALL_SCOPE_LABELS;
 
 const PROTECTED_LABEL: Record<keyof ProtectedTargets, string> = {
   face: "顔", identity: "同一性", expression: "表情", bodyShape: "体型",

@@ -1,9 +1,10 @@
 import { useState } from "react";
-import type { PromptHistoryItem, Scope } from "../types";
+import type { PromptHistoryItem } from "../types";
 import { FavoriteButton } from "./FavoriteButton";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 import { getResultImages } from "../lib/history";
 import { confirmUnfavorite } from "../lib/favoriteConfirm";
+import { ALL_SCOPE_LABELS as SCOPE_LABEL } from "../lib/scopeLabels";
 
 interface Props {
   item: PromptHistoryItem;
@@ -18,22 +19,7 @@ interface Props {
   busy?: boolean;
 }
 
-const SCOPE_LABEL: Record<Scope, string> = {
-  background: "背景",
-  foreground: "前景",
-  pose: "ポーズ",
-  hair: "髪",
-  outfit: "衣装",
-  cosplay: "コスプレ",
-  cyber: "🦾 メカ",
-  camera: "カメラ",
-  props: "持ち物",
-  big_object: "大物",
-  vehicle: "乗り物",
-  myth: "神話/幻獣",
-  lighting: "ライティング",
-  aspect_ratio: "アスペクト比",
-};
+// Scope→ラベルは scopeLabels.ts に一本化（SCOPE_LABEL は別名 import）。
 
 function formatDateTime(ts: number): string {
   const d = new Date(ts);

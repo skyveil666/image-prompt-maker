@@ -34,7 +34,7 @@ const SCOPE_OPTIONS: { id: Scope; label: string; hint: string }[] = [
   { id: "cosplay",      label: "コスプレ",   hint: "コスプレ衣装・小物・スタイル" },
   { id: "cyber",        label: "🦾 メカ",    hint: "体の一部をSF的にメカ化・デジタル化" },
   { id: "camera",       label: "カメラ",     hint: "視点・構図のみ変更" },
-  { id: "props",        label: "小物",       hint: "刀・小物・SNS映えアイテム追加" },
+  { id: "props",        label: "持ち物",     hint: "刀・小物・SNS映えアイテム追加" },
   { id: "big_object",   label: "🧸 大物",    hint: "人物より大きい大道具・巨大オブジェ・大型アート作品を配置" },
   { id: "vehicle",      label: "🚗 乗り物",  hint: "乗り物・背景の乗り物を追加。人物が主役で乗り物は脇役" },
   { id: "myth",         label: "🐉 神話",    hint: "神話・幻獣を画面に追加。神獣・龍・精霊等を配置" },
