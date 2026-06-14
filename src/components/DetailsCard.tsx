@@ -989,10 +989,10 @@ function MythContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
         onChange={mc("myth.region", "region")} />
       <MultiFieldSection fieldKey="myth.creature" label="幻獣種別" singleValue={d.myth.creature} multiValues={d.multiOverrides?.["myth.creature"] ?? []} options={MYTH_CREATURES}
         onChange={mc("myth.creature", "creature")} />
-      <FieldSection fieldKey="myth.interaction" label="配置・関わり方" value={d.myth.interaction} options={MYTH_INTERACTIONS}
-        onChange={(v) => upd("myth", { interaction: v as DetailSettings["myth"]["interaction"] })} />
-      <FieldSection fieldKey="myth.style" label="描写スタイル" value={d.myth.style} options={MYTH_STYLES}
-        onChange={(v) => upd("myth", { style: v as DetailSettings["myth"]["style"] })} />
+      <MultiFieldSection fieldKey="myth.interaction" label="配置・関わり方" singleValue={d.myth.interaction} multiValues={d.multiOverrides?.["myth.interaction"] ?? []} options={MYTH_INTERACTIONS}
+        onChange={mc("myth.interaction", "interaction")} />
+      <MultiFieldSection fieldKey="myth.style" label="描写スタイル" singleValue={d.myth.style} multiValues={d.multiOverrides?.["myth.style"] ?? []} options={MYTH_STYLES}
+        onChange={mc("myth.style", "style")} />
       <FieldSection fieldKey="myth.size" label="サイズ感" value={d.myth.size} options={MYTH_SIZES}
         onChange={(v) => upd("myth", { size: v as DetailSettings["myth"]["size"] })} />
     </div>

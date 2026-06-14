@@ -1693,9 +1693,13 @@ function describeDetails(
     } else if (m.creature !== "auto" && m.creature !== "skip") {
       fixed.push(`幻獣種別：${ml("creature", m.creature)}（固定）`);
     } else if (m.creature === "auto") vary.push("幻獣種別");
-    if (m.interaction !== "auto" && m.interaction !== "skip") fixed.push(`配置：${ml("interaction", m.interaction)}（固定）`);
+    const myInterVals = getMultiVals(details.multiOverrides, "myth.interaction");
+    if (myInterVals.length >= 2) fixed.push(`配置：${myInterVals.map(v => ml("interaction", v)).join("・")}（複数の関わり方を併用）`);
+    else if (m.interaction !== "auto" && m.interaction !== "skip") fixed.push(`配置：${ml("interaction", m.interaction)}（固定）`);
     else if (m.interaction === "auto") vary.push("配置");
-    if (m.style !== "auto" && m.style !== "skip") fixed.push(`描写スタイル：${ml("style", m.style)}（固定）`);
+    const myStyleVals = getMultiVals(details.multiOverrides, "myth.style");
+    if (myStyleVals.length >= 2) fixed.push(`描写スタイル：${myStyleVals.map(v => ml("style", v)).join("×")}（複数スタイルを融合）`);
+    else if (m.style !== "auto" && m.style !== "skip") fixed.push(`描写スタイル：${ml("style", m.style)}（固定）`);
     else if (m.style === "auto") vary.push("描写スタイル");
     if (m.size !== "auto" && m.size !== "skip") fixed.push(`サイズ感：${ml("size", m.size)}（固定）`);
     else if (m.size === "auto") vary.push("サイズ感");

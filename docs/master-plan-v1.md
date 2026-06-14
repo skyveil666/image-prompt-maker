@@ -838,3 +838,7 @@ live.complete(message);
 
 - **変換1フィールド**: 空気感 を MultiFieldSection 化（光源方向/強さ/色温度/影/反射は既存 multi）。server に additive 結合分岐
 - **検証**: tsc(both)/build exit0（additive＝非multi時は出力不変・既存4カテゴリで runtime 実証済の同一パターン）
+
+### 2026-06-14: 複数選択(最大3)拡張② — 神話カテゴリ（配置・関わり方/描写スタイル）
+
+- 配置・関わり方/描写スタイル を MultiFieldSection 化（神話地域/幻獣種別は既存 multi・サイズ感は据え置き）。server additive 結合分岐。tsc(both)/build exit0（非multi出力不変）
