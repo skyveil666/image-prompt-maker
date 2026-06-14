@@ -864,3 +864,13 @@ live.complete(message);
 - **成果**: App.tsx **2876 → 2286 行（−590行・約20%減）**。新規 `src/components/main/`（6ファイル）＋`src/lib/usePersistedSettings.ts`
 - **検証（各段 §6）**: 全段で front tsc / vite build exit0。Playwright隔離(4330・空DB)＝5a/5c: 常時描画＋案数4→3切替＋console0／4a・4b: マウント復元・保存(localStorage 30キー)・リロード復元・別タブstorage同期・console0／5b: fetch横取り400 PROHIBITED_CONTENT で isBlocked分岐＋safe-retryボタン描画・クリックで再試行トースト発火・console error0。後片付け済（4330のみ停止・5173/3001不可侵）
 - **保留（§3該当・別途承認前提）**: 分析センターModalラッパ（~45 props パススルー・低利得）／ControlPanel boostArea（showPresetToast クロージャ密結合）／メイン列・左レール全体の分割。当初 Phase4系で構想した「buildInputs の入力組み立てを純lib化」は今回 buildInputs 不可触の制約により未実施（将来の再挑戦余地）
+
+### 2026-06-14: App.tsx 分割 #2 — boostArea を BoostArea へ抽出（見送り項目の安全分に着手）
+
+- **背景**: Phase 5a/5c/4a/4b/5b 完了後、§15 見送り4項目（分析センターModalラッパ／ControlPanel boostArea／メイン列・左レール全体分割／buildInputs純lib化）をリスク/作業量/効果で再評価。**boostArea が「安全×価値」の最良**と判断し着手（buildInputs純lib化は出力感度が高く要厳密diff＋承認で保留、全体分割は §3 のため incremental 継続、Modalラッパは低利得）
+- **commit `045356d`**: ControlPanel の `boostArea` スロット（SkyveilBar＋BoostControls＋トグル/トーストのクロージャ9本・約80行）を **`src/components/main/BoostArea.tsx`** へ集約（アプローチB＝カプセル化）。App は値・setter・showPresetToast の **24 props** を渡すのみ
+- **設計**: 9クロージャ（onToggle/onStrength/onOneShot/onReset/onZozoApply/onZozoSetPriority/onZozoClear）＋ outfitConflict/windApplicable 判定を BoostArea 内へ逐語移送（5b の handleSafeRetry 引き上げと同手法）。`MIN_SAMPLES`/`STRENGTH_TO_FAVORITE` はコンポーネントで import。App から未使用化した `BoostControls`/`STRENGTH_TO_FAVORITE` import を除去。**ControlPanel/SkyveilBar/BoostControls 本体は無変更**（boostArea は ReactNode のまま受け渡し）
+- **成果**: App.tsx 2286→2235行（−51）。新規 BoostArea.tsx
+- **不変条件**: buildInputs/runGenerate/handleGenerate/runBiasAnalysis 無変更・生成ペイロード不変・サーバ無変更・新規「見えない支配」設定なし
+- **検証**: front tsc / vite build exit0。Playwright隔離(4330): 好み/ZOZO/風の3セクション描画・skyveilトグルON→favoriteLearnEnabled＋トースト「あなたの好み（skyveil）反映 ON」・**風=3 が /api/generate body.windLevel=3 に反映（抽出後も buildInputs を正しく駆動）**・console error 0。後片付け済(4330のみ停止・5173/3001不可侵)
+- **残りの見送り**: buildInputs純lib化（高価値・要 payload-diff 厳密検証＋承認）／メイン列・左レール全体分割（§3・incremental 継続）／分析センターModalラッパ（低利得・やるなら汎用 ModalShell 化が高ROI）
