@@ -12,6 +12,7 @@ import { ArrangeSourceBanner } from "./components/main/ArrangeSourceBanner";
 import { GenerationSummary } from "./components/main/GenerationSummary";
 import { NanoBananaWarning } from "./components/main/NanoBananaWarning";
 import { GenerationActionBar } from "./components/main/GenerationActionBar";
+import { GenerationErrorPanel } from "./components/main/GenerationErrorPanel";
 import { PromptTargetSelector } from "./components/PromptTargetSelector";
 import { SelectionPromptModal } from "./components/SelectionPromptModal";
 import { SimpleImageEditor } from "./components/SimpleImageEditor";
@@ -1984,6 +1985,91 @@ export default function App() {
     }
   }, [promptTarget]);
 
+  // 🛡 生成エラー時の「安全寄りに自動修正して再試行」。複数の刺激要因を一度に外し、
+  // 調整済みの inputs を override で直接組み立てて再生成する（state 非同期問題を回避）。
+  // 表示は GenerationErrorPanel、ロジックはここ（App）に保持し onSafeRetry で渡す。
+  const handleSafeRetry = () => {
+    // ── 安全化する値を先にローカルで計算 ──
+    const nextViralMode = false;
+    const nextGodModes: string[] = [];
+    const nextBoosts = activeBoosts.filter((b) => b !== "buzz" && b !== "other_world");
+    const nextWorldPresets: import("./components/QuickActions").WorldPreset[] = [];
+    const nextWorldNote = "";
+
+    // スコープ：3軸まで絞る
+    const priorityOrder: Scope[] = [
+      "outfit", "background", "lighting", "camera", "hair",
+      "pose", "foreground", "cosplay", "props", "myth",
+      "big_object", "vehicle", "cyber", "aspect_ratio",
+    ];
+    const nextScopes = scopes.length > 3
+      ? priorityOrder.filter((s) => scopes.includes(s)).slice(0, 3)
+      : scopes;
+
+    // リアル度：4以上なら 2 に
+    const nextRealismLevel = realismLevel >= 4 ? 2 : realismLevel;
+
+    // 雰囲気：フィルタを引きやすい dark/gothic/emo/decadent を外す
+    const HIGH_RISK_MOODS = ["dark", "gothic", "emo", "decadent"];
+    const nextMoods = moods.filter((m) => !HIGH_RISK_MOODS.includes(m));
+
+    // NG：感度を引く可能性のある明示語を除去（書くだけで Gemini が反応する）
+    const TRIGGER_WORDS_TO_STRIP = [
+      "sensual", "suggestive", "intimate", "erotic",
+      "swimwear", "lingerie", "underwear", "panties", "bra",
+      "cleavage", "exposed", "topless", "nude", "naked",
+      "セクシー", "扇情", "下着", "水着",
+    ];
+    const nextNgList = ngList
+      .split(/[、,\n]+/)
+      .map((s) => s.trim())
+      .filter((s) => s && !TRIGGER_WORDS_TO_STRIP.some((w) => s.toLowerCase() === w.toLowerCase()))
+      .join(", ");
+
+    // 追加指示：肯定的な方向指示を注入（禁止語を書かず「上品寄り」を誘導）
+    const POSITIVE_DIRECTION =
+      "衣装は常識的な日常着。雑誌の表紙レベルの上品さで統一する。" +
+      "全体トーンは clean / editorial / artistic にする。";
+    const nextExtra = extraInstructions.includes(POSITIVE_DIRECTION)
+      ? extraInstructions
+      : (extraInstructions ? `${extraInstructions}\n${POSITIVE_DIRECTION}` : POSITIVE_DIRECTION);
+
+    // ── state を更新（次回以降の通常生成にも反映） ──
+    setViralMode(nextViralMode);
+    setActiveGodModes(nextGodModes);
+    setChaosLabel(null);
+    setActiveBoosts(nextBoosts);
+    setActiveWorldPresets(nextWorldPresets);
+    setWorldCombinedNote(nextWorldNote);
+    setScopes(nextScopes);
+    setRealismLevel(nextRealismLevel);
+    setMoods(nextMoods);
+    setNgList(nextNgList);
+    setExtraInstructions(nextExtra);
+
+    // ── エラー解除 ──
+    setError(null);
+    showPresetToast(
+      "🛡 安全寄り設定に切り替えて再生成します",
+      "バズり/神引き/世界観 OFF・スコープ縮小・暗い雰囲気を緩和・NG露骨語除去・上品方向追加",
+    );
+
+    // ── 調整済みの inputs で即再生成（state 反映を待たずに直接組み立て） ──
+    // buildInputs は現 state を読むが、上記 setState はまだ反映されていないため、
+    // 変更した値を override で直接渡す。
+    const safeInputs = buildInputs({
+      viralMode: nextViralMode,
+      scopes: nextScopes,
+      moods: nextMoods,
+      extraInstructions: nextExtra,
+      ngList: nextNgList,
+      realismLevel: nextRealismLevel,
+      realismType,                    // 変更なし
+    });
+    pendingRunRef.current = safeInputs;
+    setPendingRunKey((k) => k + 1);
+  };
+
   return (
     <div className="min-h-screen">
       <main className="w-full px-2 py-2">
@@ -2434,142 +2520,9 @@ export default function App() {
                 onComplete={handleGenerationComplete}
               />
 
-              {error && (() => {
-                const isBlocked =
-                  error.includes("PROHIBITED_CONTENT") ||
-                  error.includes("SAFETY") ||
-                  error.includes("ブロックされました");
-
-                // 「安全寄りに再試行」：複数の刺激要因を一度に外し、
-                // 調整済みの inputs を直接組み立てて再生成する（state 非同期問題を回避）
-                const handleSafeRetry = () => {
-                  // ── 安全化する値を先にローカルで計算 ──
-                  const nextViralMode = false;
-                  const nextGodModes: string[] = [];
-                  const nextBoosts = activeBoosts.filter((b) => b !== "buzz" && b !== "other_world");
-                  const nextWorldPresets: import("./components/QuickActions").WorldPreset[] = [];
-                  const nextWorldNote = "";
-
-                  // スコープ：3軸まで絞る
-                  const priorityOrder: Scope[] = [
-                    "outfit", "background", "lighting", "camera", "hair",
-                    "pose", "foreground", "cosplay", "props", "myth",
-                    "big_object", "vehicle", "cyber", "aspect_ratio",
-                  ];
-                  const nextScopes = scopes.length > 3
-                    ? priorityOrder.filter((s) => scopes.includes(s)).slice(0, 3)
-                    : scopes;
-
-                  // リアル度：4以上なら 2 に
-                  const nextRealismLevel = realismLevel >= 4 ? 2 : realismLevel;
-
-                  // 雰囲気：フィルタを引きやすい dark/gothic/emo/decadent を外す
-                  const HIGH_RISK_MOODS = ["dark", "gothic", "emo", "decadent"];
-                  const nextMoods = moods.filter((m) => !HIGH_RISK_MOODS.includes(m));
-
-                  // NG：感度を引く可能性のある明示語を除去（書くだけで Gemini が反応する）
-                  const TRIGGER_WORDS_TO_STRIP = [
-                    "sensual", "suggestive", "intimate", "erotic",
-                    "swimwear", "lingerie", "underwear", "panties", "bra",
-                    "cleavage", "exposed", "topless", "nude", "naked",
-                    "セクシー", "扇情", "下着", "水着",
-                  ];
-                  const nextNgList = ngList
-                    .split(/[、,\n]+/)
-                    .map((s) => s.trim())
-                    .filter((s) => s && !TRIGGER_WORDS_TO_STRIP.some((w) => s.toLowerCase() === w.toLowerCase()))
-                    .join(", ");
-
-                  // 追加指示：肯定的な方向指示を注入（禁止語を書かず「上品寄り」を誘導）
-                  const POSITIVE_DIRECTION =
-                    "衣装は常識的な日常着。雑誌の表紙レベルの上品さで統一する。" +
-                    "全体トーンは clean / editorial / artistic にする。";
-                  const nextExtra = extraInstructions.includes(POSITIVE_DIRECTION)
-                    ? extraInstructions
-                    : (extraInstructions ? `${extraInstructions}\n${POSITIVE_DIRECTION}` : POSITIVE_DIRECTION);
-
-                  // ── state を更新（次回以降の通常生成にも反映） ──
-                  setViralMode(nextViralMode);
-                  setActiveGodModes(nextGodModes);
-                  setChaosLabel(null);
-                  setActiveBoosts(nextBoosts);
-                  setActiveWorldPresets(nextWorldPresets);
-                  setWorldCombinedNote(nextWorldNote);
-                  setScopes(nextScopes);
-                  setRealismLevel(nextRealismLevel);
-                  setMoods(nextMoods);
-                  setNgList(nextNgList);
-                  setExtraInstructions(nextExtra);
-
-                  // ── エラー解除 ──
-                  setError(null);
-                  showPresetToast(
-                    "🛡 安全寄り設定に切り替えて再生成します",
-                    "バズり/神引き/世界観 OFF・スコープ縮小・暗い雰囲気を緩和・NG露骨語除去・上品方向追加",
-                  );
-
-                  // ── 調整済みの inputs で即再生成（state 反映を待たずに直接組み立て） ──
-                  // buildInputs は現 state を読むが、上記 setState はまだ反映されていないため、
-                  // 変更した値を override で直接渡す。
-                  const safeInputs = buildInputs({
-                    viralMode: nextViralMode,
-                    scopes: nextScopes,
-                    moods: nextMoods,
-                    extraInstructions: nextExtra,
-                    ngList: nextNgList,
-                    realismLevel: nextRealismLevel,
-                    realismType,                    // 変更なし
-                  });
-                  pendingRunRef.current = safeInputs;
-                  setPendingRunKey((k) => k + 1);
-                };
-
-                return (
-                  <section className="card border-rose-500/50 bg-rose-500/10 space-y-2">
-                    <h3 className="text-sm font-semibold text-rose-300">
-                      {isBlocked ? "🛑 Gemini の安全フィルタにブロックされました" : "⚠ 生成に失敗しました"}
-                    </h3>
-                    <p className="text-xs text-rose-200/90 break-all">{error}</p>
-
-                    {isBlocked ? (
-                      <>
-                        <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-[12px] text-amber-100/95 leading-relaxed space-y-1">
-                          <p className="font-bold">よくある原因（多い順）：</p>
-                          <ol className="list-decimal list-inside space-y-0.5 text-amber-100/85">
-                            <li><b>一発バズりモード</b>が ON ← 最も引きやすい</li>
-                            <li><b>変更対象が 4軸以上</b>（プロンプトが長く誤判定されやすい）</li>
-                            <li><b>リアル度 4-5</b>（写真リアル）＋ 元画像が女性キャラ</li>
-                            <li>履歴の <b>黒系・ゴシック・露出系</b>の偏りが累積</li>
-                            <li>元画像に <b>露出多めの服</b>・水着など</li>
-                          </ol>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={handleSafeRetry}
-                            className="rounded-lg px-3 py-1.5 text-[12px] font-bold border border-emerald-400/65 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30 hover:border-emerald-400 transition shadow-[0_0_10px_-2px_rgba(52,211,153,0.4)]"
-                          >
-                            🛡 安全寄りに自動修正して再試行
-                          </button>
-                          <span className="text-[11px] text-text-muted/65">
-                            （バズり/神引き/世界観OFF・3軸まで・リアル度↓・NG露骨語を除去＋肯定方向追加）
-                          </span>
-                        </div>
-
-                        <p className="text-[11px] text-text-muted/55 pt-1">
-                          ※ プロジェクト方針として、フィルタを回避する目的の改造は行いません。
-                          このボタンは「より穏当な表現に寄せて再依頼」するだけです。
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-xs text-text-muted mt-2">
-                        `npm run dev:all` でサーバーが起動しているか、`server/.env` のキーが有効か確認してください。
-                      </p>
-                    )}
-                  </section>
-                );
-              })()}
+              {error && (
+                <GenerationErrorPanel error={error} onSafeRetry={handleSafeRetry} />
+              )}
 
               {hasResults && (
                 <section className="space-y-5">
