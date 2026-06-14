@@ -97,13 +97,13 @@ const pk = (handles: FileSystemDirectoryHandle[]): string =>
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function fmtSize(bytes: number): string {
+function formatFileSize(bytes: number): string {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
   if (bytes >= 1024)        return `${(bytes / 1024).toFixed(0)}KB`;
   return `${bytes}B`;
 }
 
-function fmtDate(ms: number): string {
+function formatDate(ms: number): string {
   return new Date(ms).toLocaleDateString("ja-JP", {
     year: "numeric", month: "2-digit", day: "2-digit",
   });
@@ -266,8 +266,8 @@ function LargePreview({
                 {dims.w.toLocaleString()}×{dims.h.toLocaleString()}
               </span>
             )}
-            {fileSize !== null && <span className="shrink-0">{fmtSize(fileSize)}</span>}
-            <span className="shrink-0">{fmtDate(state.image.lastModified)}</span>
+            {fileSize !== null && <span className="shrink-0">{formatFileSize(fileSize)}</span>}
+            <span className="shrink-0">{formatDate(state.image.lastModified)}</span>
             {folderName && (
               <span className="truncate max-w-[150px]" title={folderName}>
                 📁 {folderName}

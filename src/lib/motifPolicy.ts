@@ -158,7 +158,7 @@ export interface AutoAdjustInput {
   preferIds?: string[];
 }
 
-export interface AutoAdjustResult {
+export interface MotifAutoAdjustResult {
   /** 新しい LevelMap（手動を残す場合は手動を保持した結果） */
   next: LevelMap;
   /** 変更された motifId（ハイライト用） */
@@ -197,7 +197,7 @@ export function computeAutoAdjust(
   current: LevelMap,
   input: AutoAdjustInput,
   preserveManual: boolean
-): AutoAdjustResult {
+): MotifAutoAdjustResult {
   const next: LevelMap = { ...current };
   const changedIds: string[] = [];
   const preservedIds: string[] = [];

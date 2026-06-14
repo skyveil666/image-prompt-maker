@@ -342,9 +342,9 @@ export default function App() {
     setAppliedStorage(false);
   }, []);
   /** ファッションプリセット適用トースト */
-  const [fashionToastTrigger, setFashionToastTrigger] = useState(0);
-  const [fashionToastMsg,     setFashionToastMsg]     = useState("");
-  const [fashionToastHint,    setFashionToastHint]    = useState("");
+  const [presetToastTrigger, setPresetToastTrigger] = useState(0);
+  const [presetToastMsg,     setPresetToastMsg]     = useState("");
+  const [presetToastHint,    setPresetToastHint]    = useState("");
   const [items, setItems] = useState<PromptHistoryItem[]>([]);
   /** 最後に正常生成できた items のバックアップ。
    *  履歴/お気に入り画面から戻った時に items が空でも復元できるようにする。 */
@@ -832,9 +832,9 @@ export default function App() {
         const recentSubStyles = getRecentSubStyles();
         const result = await generateViaBackend(inputs, imageDataUrl, recentGenres, recentSubStyles);
         if (result.retried) {
-          setFashionToastMsg("再試行しました（1回目は失敗しましたが成功しました）");
-          setFashionToastHint("");
-          setFashionToastTrigger((n) => n + 1);
+          setPresetToastMsg("再試行しました（1回目は失敗しましたが成功しました）");
+          setPresetToastHint("");
+          setPresetToastTrigger((n) => n + 1);
         }
         const usedGenres = result.proposals
           .map((p) => p.genre)
@@ -889,9 +889,9 @@ export default function App() {
         void runBiasAnalysis(currentTexts, batchId);
       } catch (err) {
         if (err instanceof StorageQuotaError) {
-          setFashionToastMsg("ストレージが不足しています。履歴の整理または書き出しをしてください");
-          setFashionToastHint("");
-          setFashionToastTrigger((n) => n + 1);
+          setPresetToastMsg("ストレージが不足しています。履歴の整理または書き出しをしてください");
+          setPresetToastHint("");
+          setPresetToastTrigger((n) => n + 1);
         } else {
           const msg = err instanceof Error ? err.message : String(err);
           setError(msg);
@@ -997,9 +997,9 @@ export default function App() {
 
   // ─── 共通トーストヘルパー ──────────────────────────────────────────────────
   const showPresetToast = useCallback((msg: string, hint?: string) => {
-    setFashionToastMsg(msg);
-    setFashionToastHint(hint ?? "");
-    setFashionToastTrigger((n) => n + 1);
+    setPresetToastMsg(msg);
+    setPresetToastHint(hint ?? "");
+    setPresetToastTrigger((n) => n + 1);
   }, []);
 
   const APPLY_HINT = "「プロンプトを生成」ボタンで反映します";
@@ -2868,7 +2868,7 @@ export default function App() {
       <CompletionToast trigger={toastTrigger} count={count} />
 
       {/* ✨ プリセット適用トースト（上部中央・2.8秒） */}
-      <PresetAppliedToast trigger={fashionToastTrigger} message={fashionToastMsg} hint={fashionToastHint} />
+      <PresetAppliedToast trigger={presetToastTrigger} message={presetToastMsg} hint={presetToastHint} />
 
       {/* 🗂 自動クリーンアップ完了トースト */}
       <PresetAppliedToast trigger={cleanupToastTrigger} message={cleanupToastMsg} />

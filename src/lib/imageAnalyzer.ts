@@ -13,6 +13,7 @@
 import type { PromptHistoryItem } from "../types";
 import { put, getAll as idbGetAll, STORE_IMAGE_FEATURES } from "./idb";
 import { getResultImages } from "./history";
+import { SKIP_VALUES } from "./skipValues";
 
 /** 解析対象の画像（1アイテムにつき最初の登録画像のみ）を取得。
  *  複数枚登録されていてもクラスタリング自体は単純化のため代表1枚で行う。 */
@@ -238,8 +239,7 @@ function clusterByHash(features: ImageFeature[]): Map<number, number[]> {
 }
 
 // ── カテゴリ出現率（details から集計） ─────────────────────────────────
-
-const SKIP_VALUES = new Set(["auto", "skip", "", null, undefined]);
+// SKIP_VALUES は skipValues.ts に共通化（ratingAnalyzer と共有）。
 
 function isMeaningful(v: unknown): v is string {
   return typeof v === "string" && !SKIP_VALUES.has(v);

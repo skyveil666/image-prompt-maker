@@ -17,6 +17,7 @@
  */
 import type { PromptHistoryItem } from "../types";
 import { getRatingAt, getResultImages, getAxisRatingAt, AXIS_RATING_META, isGoodRating, type RatingAxisKey } from "./history";
+import { SKIP_VALUES } from "./skipValues";
 
 /** 「好み分析レポート」を有効化する閾値（評価サンプル合計） */
 export const PREFERENCE_REPORT_THRESHOLD = 30;
@@ -165,8 +166,7 @@ const LIGHTING_DIR_JP: Record<string, string> = {
 };
 
 // ── ユーティリティ ──────────────────────────────────────────────────────────
-
-const SKIP_VALUES = new Set(["auto", "skip", "", null, undefined]);
+// SKIP_VALUES は skipValues.ts に共通化（imageAnalyzer と共有）。
 
 function pickAxis(item: PromptHistoryItem, axis: RatingAxis): string | undefined {
   switch (axis) {
