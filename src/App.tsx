@@ -19,7 +19,8 @@ import { CompletionToast } from "./components/CompletionToast";
 import { PresetAppliedToast } from "./components/PresetAppliedToast";
 import { ReflectionStatusBar } from "./components/ReflectionStatusBar";
 import { generateViaBackend, analyzePreferencesViaBackend } from "./lib/backendClient";
-import { loadSettings, saveSettings, type PersistedSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY } from "./lib/settingsPersist";
+import { loadSettings, saveSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY } from "./lib/settingsPersist";
+import { usePersistedSettings } from "./lib/usePersistedSettings";
 import { getNotifSettings } from "./lib/notificationSettings";
 import { playCompletionSound } from "./lib/completionSound";
 import {
@@ -53,7 +54,6 @@ import {
 // MassProductionBanner は DuplicateAnalysisPanel に統合されました。
 import type { WorldPreset } from "./components/QuickActions";
 import { type VariationMemory, createEmptyMemory, updateMemory } from "./lib/variationEngine";
-import type { ColorStrategy, Expression } from "./types";
 import {
   buildHistoryItems,
   getAll,
@@ -72,11 +72,8 @@ import { loadReferenceLearning, type ReferenceLearning } from "./lib/referenceLe
 import {
   type AppView,
   type Count,
-  type DetailSettings,
-  type Mood,
   type PromptHistoryItem,
   type PromptInputs,
-  type PromptTarget,
   type Scope,
   type ArrangeResult,
   type GeneratedProposal,
@@ -87,7 +84,6 @@ import { ALL_SCOPE_LABELS } from "./lib/scopeLabels";
 import { buildFavoriteProfile, type FavoriteProfile } from "./lib/favoriteProfile";
 import { analyzeAgent, type AgentActionId } from "./lib/aiAgent";
 import { BoostControls } from "./components/BoostControls";
-import type { ZozoTrend } from "./lib/zozoTrend";
 import { analyzeColors, analyzeColorSuccess, type ColorAnalysis, type ColorSuccessAnalysis } from "./lib/colorAnalyzer";
 import {
   loadAllFeatures, buildAnalysis as buildImageAnalysis,
@@ -138,38 +134,48 @@ import {
 // SNS/カルチャープリセットは撤去（重複整理：SNS系はバズボタン・世界観はQuickActionsプリセットに一本化）。
 
 export default function App() {
-  const [s0] = useState<PersistedSettings>(() => loadSettings());
+  // 永続設定（30項目）は usePersistedSettings() に集約（App分割 Phase4a）。
+  // 戻り値を「同名で分割代入」して受け取ることで buildInputs / JSX / 各ハンドラは無変更。
+  // dimensionLevel は互換のため値のみ（setter なし）。
+  const {
+    scopes, setScopes,
+    moods, setMoods,
+    autoMoodCategories, setAutoMoodCategories,
+    count, setCount,
+    details, setDetails,
+    extraInstructions, setExtraInstructions,
+    ngList, setNgList,
+    bodyPoseLock, setBodyPoseLock,
+    colorMoodLock, setColorMoodLock,
+    compositionLock, setCompositionLock,
+    viralMode, setViralMode,
+    avoidCliche, setAvoidCliche,
+    strength, setStrength,
+    glossLevel, setGlossLevel,
+    dimensionLevel,
+    realismLevel, setRealismLevel,
+    realismType, setRealismType,
+    textureOriginal, setTextureOriginal,
+    textureDisabled, setTextureDisabled,
+    promptTarget, setPromptTarget,
+    faceLock, setFaceLock,
+    expression, setExpression,
+    colorStrategy, setColorStrategy,
+    artStyle, setArtStyle,
+    defaultAspectRatio, setDefaultAspectRatio,
+    favoriteLearnEnabled, setFavoriteLearnEnabled,
+    favoriteStrength, setFavoriteStrength,
+    zozoApplied, setZozoApplied,
+    activeBoosts, setActiveBoosts,
+    windLevel, setWindLevel,
+  } = usePersistedSettings();
 
   const [view, setView] = useState<AppView>("main");
   const [historyFavoritesOnly, setHistoryFavoritesOnly] = useState(false);
 
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
-  const [scopes, setScopes] = useState<Scope[]>(s0.scopes);
-  const [moods, setMoods] = useState<Mood[]>(s0.moods);
-  const [autoMoodCategories, setAutoMoodCategories] = useState<string[]>(s0.autoMoodCategories);
-  const [count, setCount] = useState<Count>(s0.count);
-  const [details, setDetails] = useState<DetailSettings>(s0.details);
-  const [extraInstructions, setExtraInstructions] = useState(s0.extraInstructions);
-  const [ngList, setNgList] = useState(s0.ngList);
-  const [bodyPoseLock,    setBodyPoseLock]    = useState(s0.bodyPoseLock);
-  const [colorMoodLock,   setColorMoodLock]   = useState(s0.colorMoodLock);
-  const [compositionLock, setCompositionLock] = useState(s0.compositionLock);
-  const [viralMode, setViralMode] = useState(s0.viralMode);
-  const [avoidCliche, setAvoidCliche] = useState(s0.avoidCliche);
   /** 🌆 背景を2D/非写実に（既定ON・非永続）。背景が変更対象の時だけ、背景の風景・空間を2D/イラスト調へ寄せる（avoidRealBackgroundBlock）。人物・顔・肌は元画像の実写質感を厳守（ブロック内で明記）。 */
   const [avoidRealBackground, setAvoidRealBackground] = useState(true);
-  const [strength, setStrength] = useState(s0.strength);
-  const [glossLevel,       setGlossLevel]       = useState(s0.glossLevel);      // 1-5, 3=標準
-  // dimensionLevel は互換のため state に持つ（旧履歴・旧設定の保存のため）。UI からは外した。
-  const [dimensionLevel]                        = useState(s0.dimensionLevel);  // 1-5, 3=2.5D
-  /** 質感・リアル度（1=完全2D ↔ 5=写真リアル）。既定 3 = 2.5D */
-  const [realismLevel,     setRealismLevel]     = useState<number>(s0.realismLevel ?? 3);  // 既定Lv3＝2.5D（realismBlockが空＝元画像の実写質感をそのまま維持。6/3基準へ復元）
-  /** 質感タイプ（"anime_bg" 等、null = 指定なし） */
-  const [realismType,      setRealismType]      = useState<string | null>(s0.realismType ?? null);
-  const [textureOriginal,  setTextureOriginal]  = useState(s0.textureOriginal); // 元画像維持
-  const [textureDisabled,  setTextureDisabled]  = useState(s0.textureDisabled); // プロンプトに反映しない
-  /** 出力先プラットフォームに合わせた安全モード（null = 解除済み・フィルタなし） */
-  const [promptTarget, setPromptTarget] = useState<PromptTarget | null>(s0.promptTarget);
   /** アクティブな世界観プリセット（マルチセレクト、最大3） */
   const [activeWorldPresets, setActiveWorldPresets] = useState<WorldPreset[]>([]);
   /** 世界観プリセット由来の指示文（extraInstructions と分離して管理） */
@@ -210,36 +216,17 @@ export default function App() {
   const [scopeFlashKey, setScopeFlashKey] = useState(0);
   /** 多様性エンジン：直近の背景/衣装/ムード/前景エフェクトを記憶して連発を防ぐ */
   const [variationMemory, setVariationMemory] = useState<VariationMemory>(createEmptyMemory);
-  /** 顔/同一性ロック（初期ON）*/
-  const [faceLock, setFaceLock] = useState<boolean>(s0.faceLock);
-  /** 表情指定（faceLock: false 時のみ有効）*/
-  const [expression, setExpression] = useState<Expression | null>(s0.expression);
   // 時代軸（era）は完全撤去（dead code整理・生成にも不使用だった）。
-  /** 色戦略（null = 設定なし）*/
-  const [colorStrategy, setColorStrategy] = useState<ColorStrategy | null>(s0.colorStrategy);
-  /** 絵柄スタイル（null = 設定なし）*/
-  const [artStyle, setArtStyle] = useState<import("./types").ArtStyle | null>(s0.artStyle);
-  /** デフォルトアスペクト比（null = なし）*/
-  const [defaultAspectRatio, setDefaultAspectRatio] = useState<import("./types").AspectRatioPreset | null>(s0.defaultAspectRatio);
-  /** お気に入り学習：反映ON/OFF・強度・プロファイル */
-  const [favoriteLearnEnabled, setFavoriteLearnEnabled] = useState<boolean>(s0.favoriteLearnEnabled);
-  const [favoriteStrength, setFavoriteStrength] = useState<number>(s0.favoriteStrength);
   const [favoriteProfile, setFavoriteProfile] = useState<FavoriteProfile | null>(null);
   // skyveil好みAI：ON/OFF と強度は既存の favoriteLearnEnabled / favoriteStrength を流用（単一の真実）。
   // oneShot は「今回だけ反映」用の一時フラグ（生成後にクリア）。
   const [skyveilOneShot, setSkyveilOneShot] = useState<boolean>(false);
-  /** ZOZOトレンド：反映中のトレンド（null = 未反映）。衣装ON時のみ送信。永続化 */
-  const [zozoApplied, setZozoApplied] = useState<ZozoTrend | null>(s0.zozoApplied);
   /** 禁止トークン（意味ベースで類語展開してプロンプトから除外） */
   const [forbiddenTokens, setForbiddenTokens] = useState<string[]>(() => loadForbiddenTokens());
   /** カオス神引きのラベル（直前の融合結果表示） */
   const [chaosLabel, setChaosLabel] = useState<string | null>(null);
   /** アクティブな神引きモード配列（最大2コンボ。solo: normal/chaos/composition、combo: outfit/bg/color/world_god/props/bigobject/myth/movie） */
   const [activeGodModes,    setActiveGodModes]    = useState<string[]>([]);
-  /** 神引き補助モディファイア（複数選択可。avoid_overlap/other_world/buzz/face_pop）。永続化 */
-  const [activeBoosts,      setActiveBoosts]      = useState<string[]>(s0.activeBoosts);
-  /** 風の強さ 0–5（初期0）。永続化 */
-  const [windLevel,         setWindLevel]         = useState<number>(s0.windLevel);
   // handleBoostToggle（被り回避/映え補正/顔映え/世界観を一新のUIトグル）は撤去。
   // boost の state 操作は分析センター handleAgentAction が直接 setActiveBoosts で行うため state/setter は温存。
   // SNS/カルチャー state は撤去（重複整理。mood ID は VIRAL_MOOD_POOL 等で存続）。
