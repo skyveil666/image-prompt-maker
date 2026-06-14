@@ -6,7 +6,11 @@ import { DetailsCard } from "./components/DetailsCard";
 import { QuickActions } from "./components/QuickActions";
 import { ControlPanel } from "./components/ControlPanel";
 import { HistoryView } from "./components/HistoryView";
-import { GenerationProgress } from "./components/GenerationProgress";
+import { RestoredItemBanner } from "./components/main/RestoredItemBanner";
+import { PatternPreviewBanner } from "./components/main/PatternPreviewBanner";
+import { ArrangeSourceBanner } from "./components/main/ArrangeSourceBanner";
+import { GenerationSummary } from "./components/main/GenerationSummary";
+import { NanoBananaWarning } from "./components/main/NanoBananaWarning";
 import { PromptTargetSelector } from "./components/PromptTargetSelector";
 import { SelectionPromptModal } from "./components/SelectionPromptModal";
 import { SimpleImageEditor } from "./components/SimpleImageEditor";
@@ -2254,87 +2258,27 @@ export default function App() {
 
               {/* 🔁 復元確認バナー：「同じ構成で再生成」後に表示 */}
               {restoredItem && (
-                <div className="rounded-2xl border border-sky-400/45 bg-sky-500/10 px-4 py-3 flex items-center gap-3 flex-wrap shadow-[0_0_20px_-4px_rgba(56,189,248,0.35)]">
-                  <span className="text-[18px] shrink-0">🔁</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-bold text-sky-100 leading-snug">
-                      この構成を復元しました
-                    </p>
-                    <p className="text-[12px] text-sky-200/70 leading-snug">
-                      {restoredItem.settingsSnapshot
-                        ? `${new Date(restoredItem.createdAt).toLocaleDateString("ja-JP")} 生成 — 変更対象・詳細設定・元画像・全設定を復元しました`
-                        : `${new Date(restoredItem.createdAt).toLocaleDateString("ja-JP")} 生成（古い履歴のため一部設定は復元できません）`}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const inputs = buildInputs();
-                        setRestoredItem(null);
-                        void runGenerate(inputs);
-                      }}
-                      disabled={!canGenerate || generating}
-                      className="rounded-lg px-3 py-1.5 text-[13px] font-bold border border-sky-400/65 bg-sky-500/22 text-sky-100 hover:bg-sky-500/35 transition disabled:opacity-50 leading-none"
-                    >
-                      🚀 このまま生成
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRestoredItem(null)}
-                      className="rounded-lg px-3 py-1.5 text-[12px] border border-white/15 bg-white/5 text-text-muted hover:text-text-base transition leading-none"
-                    >
-                      ✕ 閉じる
-                    </button>
-                  </div>
-                </div>
+                <RestoredItemBanner
+                  item={restoredItem}
+                  canGenerate={canGenerate}
+                  generating={generating}
+                  onGenerate={() => {
+                    const inputs = buildInputs();
+                    setRestoredItem(null);
+                    void runGenerate(inputs);
+                  }}
+                  onClose={() => setRestoredItem(null)}
+                />
               )}
 
               {/* 🏆 学習反映差分プレビュー（成功パターン）：反映前に必ず差分確認 */}
               {patternPreview && (
-                <div className="rounded-2xl border border-emerald-400/45 bg-emerald-500/8 px-4 py-3 space-y-2 shadow-[0_0_20px_-4px_rgba(52,211,153,0.3)]">
-                  <p className="text-[14px] font-bold text-emerald-100">
-                    学習反映プレビュー — {patternPreview.pattern.title}
-                  </p>
-                  {patternPreview.preview.diffs.length > 0 ? (
-                    <div className="space-y-0.5">
-                      <p className="text-[12px] text-emerald-200/80 font-semibold">変更予定（反映されます）：</p>
-                      {patternPreview.preview.diffs.map((d, i) => (
-                        <p key={i} className="text-[12px] text-text-base/90 leading-snug">
-                          ・{d.label}（{String(d.before)} → {String(d.after)}）<span className="text-text-muted/60 text-[10px]">Risk:{d.risk}</span>
-                        </p>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-[12px] text-text-muted/75">追加される変更対象はありません（すべて現状維持またはブロック）。</p>
-                  )}
-                  {patternPreview.preview.blockedDiffs.length > 0 && (
-                    <div className="space-y-0.5">
-                      <p className="text-[12px] text-rose-200 font-semibold">ブロック（保護対象のため反映不可）：</p>
-                      {patternPreview.preview.blockedDiffs.map((d, i) => (
-                        <p key={i} className="text-[12px] text-rose-200/90 leading-snug">⚠️ {d.label} — {d.warning}</p>
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleConfirmPattern}
-                      disabled={!patternPreview.preview.canApply}
-                      className="rounded-lg px-3 py-1.5 text-[13px] font-bold border border-emerald-400/60 bg-emerald-500/22 text-emerald-50 hover:bg-emerald-500/35 transition disabled:opacity-40 disabled:cursor-not-allowed leading-none"
-                    >
-                      ✓ この変更を反映
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPatternPreview(null)}
-                      className="rounded-lg px-3 py-1.5 text-[12px] border border-white/15 bg-white/5 text-text-muted hover:text-text-base transition leading-none"
-                    >
-                      キャンセル
-                    </button>
-                    <span className="text-[10px] text-text-muted/55 ml-1">※ 反映ボタンを押すまで設定は変わりません</span>
-                  </div>
-                </div>
+                <PatternPreviewBanner
+                  pattern={patternPreview.pattern}
+                  preview={patternPreview.preview}
+                  onConfirm={handleConfirmPattern}
+                  onCancel={() => setPatternPreview(null)}
+                />
               )}
 
               {/* 📡 現在の反映状態バー：今プロンプトに効く設定を一目で（読み取り専用） */}
@@ -2606,51 +2550,18 @@ export default function App() {
 
               {/* ✨ アレンジ元プロンプト表示バナー */}
               {arrangeSource && (
-                <div className="rounded-xl border border-violet-400/40 bg-violet-400/10 px-3.5 py-2.5 flex items-center gap-2.5 text-xs">
-                  <span className="text-base shrink-0">✨</span>
-                  <div className="flex-1 min-w-0">
-                    <span className="text-violet-200 font-semibold">アレンジ生成中</span>
-                    <span className="text-text-muted ml-2">
-                      元プロンプト: 案{arrangeSource.proposalIndex} ·{" "}
-                      {new Date(arrangeSource.createdAt).toLocaleDateString("ja-JP", {
-                        month: "numeric",
-                        day: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setArrangeSource(null)}
-                    className="shrink-0 text-text-muted hover:text-text-base transition"
-                  >
-                    ✕
-                  </button>
-                </div>
+                <ArrangeSourceBanner source={arrangeSource} onClear={() => setArrangeSource(null)} />
               )}
 
               {/* 設定サマリー（P4：出力先ラベルを追加・表示のみ） */}
-              <div className="px-1 space-y-1.5">
-                <div className="text-sm text-text-muted flex flex-wrap items-center gap-2">
-                  <span className="text-text-base font-semibold">{scopeLabel}</span>
-                  <span>/</span>
-                  <span>{count}案 ・ 統一プロンプト</span>
-                  <span className="text-text-muted/60">・ 出力先：{outputTargetLabel}</span>
-                  {viralMode && (
-                    <span className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-rose-500/15 text-rose-200 border border-rose-500/40">
-                      🔥 一発バズりモード
-                    </span>
-                  )}
-                </div>
-                <GenerationProgress
-                  generating={generating}
-                  count={count}
-                  onComplete={handleGenerationComplete}
-                  animationEnabled={true}
-                  info={`${outputTargetLabel}向け / 統一プロンプト`}
-                />
-              </div>
+              <GenerationSummary
+                scopeLabel={scopeLabel}
+                count={count}
+                outputTargetLabel={outputTargetLabel}
+                viralMode={viralMode}
+                generating={generating}
+                onComplete={handleGenerationComplete}
+              />
 
               {error && (() => {
                 const isBlocked =
@@ -2861,12 +2772,7 @@ export default function App() {
 
       {/* Nano Banana 軽量化おすすめ警告（変更項目が多い時のみ） */}
       {promptTarget === "nano_safe" && scopes.length >= 4 && (
-        <div className="fixed bottom-[92px] right-6 z-[100] max-w-[360px] rounded-xl border border-amber-400/50 bg-amber-500/12 backdrop-blur-md px-3 py-2 shadow-[0_8px_24px_rgba(0,0,0,0.55)]">
-          <p className="text-[11px] text-amber-100 leading-snug">
-            ⚠️ Nano Banana は変更項目が多いと顔や服の品質が崩れやすいです。
-            変更を2〜3個に絞ると安定します（現在 {scopes.length}項目）。
-          </p>
-        </div>
+        <NanoBananaWarning scopeCount={scopes.length} />
       )}
 
       {/* ✨ 生成操作（出力先 / 案数 / プロンプト生成）は上部ヘッダー（GlobalProtectionBar の actions スロット）へ移設。
