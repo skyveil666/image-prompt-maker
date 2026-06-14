@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { useEffect, useState } from "react";
+import { useToastPhase } from "../lib/useToastPhase";
 
 interface Props {
   /** インクリメントするたびにトーストを1回表示する */
@@ -7,27 +7,13 @@ interface Props {
   count: number;
 }
 
-type Phase = "hidden" | "entering" | "visible" | "leaving";
-
 export function CompletionToast({ trigger, count }: Props) {
-  const [phase, setPhase] = useState<Phase>("hidden");
+  // 状態機械は useToastPhase に共通化（2.8s 表示 + 0.4s 退場・既定値）
+  const { mounted, visible } = useToastPhase(trigger);
 
-  useEffect(() => {
-    if (trigger === 0) return;
+  if (!mounted) return null;
 
-    setPhase("entering");
-    // 次フレームで "visible" に遷移 → CSS transition が発火
-    const t1 = setTimeout(() => setPhase("visible"),  30);
-    // 2.8s 後にフェードアウト開始
-    const t2 = setTimeout(() => setPhase("leaving"), 2800);
-    // 0.4s 後に DOM から消す
-    const t3 = setTimeout(() => setPhase("hidden"),  3200);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
-  }, [trigger]);
-
-  if (phase === "hidden") return null;
-
-  const shown = phase === "visible";
+  const shown = visible;
 
   return createPortal(
     <div

@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
+import { useToastPhase } from "../lib/useToastPhase";
 
 interface Props {
   /** インクリメントするたびにトーストを1回表示する */
@@ -10,32 +11,25 @@ interface Props {
   hint?: string;
 }
 
-type Phase = "hidden" | "entering" | "visible" | "leaving";
-
 /**
  * プリセット適用時などに上部中央に短時間表示されるトースト通知。
  * CompletionToast（右上）と干渉しないよう top-center に配置。
  */
 export function PresetAppliedToast({ trigger, message, hint }: Props) {
-  const [phase,     setPhase]     = useState<Phase>("hidden");
+  // 状態機械は useToastPhase に共通化（3.8s 表示 + 0.4s 退場）
+  const { mounted, visible } = useToastPhase(trigger, { durationMs: 3800 });
   const [shownMsg,  setShownMsg]  = useState("");
   const [shownHint, setShownHint] = useState("");
 
+  // trigger 発火タイミングで message / hint を snapshot（表示中に props が変わっても固定）
   useEffect(() => {
     if (trigger === 0) return;
-    // trigger 発火タイミングで message / hint を snapshot
     setShownMsg(message);
     setShownHint(hint ?? "");
-    setPhase("entering");
-    const t1 = setTimeout(() => setPhase("visible"),  30);
-    const t2 = setTimeout(() => setPhase("leaving"), 3800);
-    const t3 = setTimeout(() => setPhase("hidden"),  4200);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trigger]);
 
-  if (phase === "hidden") return null;
-  const visible = phase === "visible";
+  if (!mounted) return null;
 
   return createPortal(
     <div
