@@ -758,3 +758,14 @@ live.complete(message);
 - **理由（notif/Notification）**: lib の export は既に全て `Notif*` で統一済み。残る不一致はファイル名/コンポーネント名（完全形）のみで、完全形へ寄せると型 `NotificationSettings` がコンポーネント名と衝突して不可。略称へ寄せる＝ファイル名の可読性低下。クリーンな統一方向が存在しないため現状維持
 - **理由（バー系）**: state 名は GlobalProtectionBar/ZozoTrendBar/SkyveilBar とも既に `open` で統一済み。差は SkyveilBar のトグルが「▼ 設定／▲ 閉じる」とラベル付き（他は ▼/▲ のみ）だが、これは有用な説明ラベルで、揃えると UX 低下＋レイアウト制約（ボタン文言変更禁止）に抵触
 - **影響範囲**: コード変更なし（本ログのみ）
+
+### 2026-06-14: 型ミラー解消①「スカラー spine を shared/promptScalars.ts へ集約」実装完了（案A）
+
+- **背景**: front `src/types.ts` と server `server/src/types.ts` が手動同期ミラー。完全一致するスカラー型（Scope/OutputTarget/Mood/LockKey/SafetyMode/PromptTarget/Count/Expression/ColorStrategy/ArtStyle/AutoOr の11種・約150行）が二重定義で、enum 値追加時に二重編集が必要だった
+- **選択肢**: A=スカラー spine だけ中立ファイルへ集約し両 types.ts は import＋re-export ／ B=現状維持＋記録 ／ C=設定 interface まで含む完全共通化
+- **採用**: A
+- **理由**: 設定 interface（HairSettings 等）はサーバが意図的に loosening（AutoOrStr=string・union インライン化・一部フィールド省略）しており、完全共通化は設計と衝突（案C却下）。また front types.ts はフロント専用型（PromptHistoryItem 等）内で poseLib/zozoTrend/promptDiff を参照するため全体共有は不可。依存ゼロかつ完全一致のスカラー spine のみが安全に共通化できる
+- **実装**: `shared/promptScalars.ts`（純 type・依存ゼロ・約229行）を新設。両 types.ts は当該定義を削除し `import type {…} from "(../|../../)shared/promptScalars"` ＋ `export type {…}` で再エクスポート。**既存 consumer は無改修**（untouchable の promptSystem.ts / scopeFilter.ts も無改修＝`import { Scope } from "./types"` が継続動作）。これがフロント↔サーバ間で初の越境 import になるが、純 type ファイルのため runtime 連れ込みは無し
+- **影響範囲**: front −174行 / server −121行 / shared +229行。挙動は完全不変（型レベルのみ・ランタイムコード0）。front tsc / server tsc / vite build すべて exit 0
+- **副次発見（本件対象外・別途）**: server `BackgroundSettings` は textType/textMood/textLayout/textTexture を持たず promptSystem も未読（文字背景はサーバ未実装の機能ギャップ）。`Camera3DState.pose` 欠落・`DetailSettings.bigObject?` optional は promptSystem 側ガード済で良性
+- **保留**: 設定 interface の共通化（案C・非推奨）。型ミラーの残りはサーバの permissive 設計として意図的に維持

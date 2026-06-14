@@ -1,155 +1,35 @@
 /**
- * Server-side type mirror of the frontend types. Kept in sync manually — this
- * is a local-only project, so duplication is acceptable for clarity.
+ * 型定義（サーバ）。スカラー型（Scope / Mood / AutoOr 等）はフロントと共通の単一ソース
+ * shared/promptScalars.ts から import＋re-export する（型ミラー解消・案A / docs §15）。
+ * 設定 interface（HairSettings 等）はサーバ側で意図的に loosening（AutoOrStr=string・
+ * 一部フィールド省略）しているため、引き続き本ファイルで別表現として定義する。
  */
-
-export type Scope =
-  | "background"
-  | "foreground"
-  | "pose"
-  | "hair"
-  | "outfit"
-  | "cosplay"
-  | "cyber"
-  | "camera"
-  | "props"
-  | "big_object"
-  | "vehicle"
-  | "myth"
-  | "lighting"
-  | "aspect_ratio";
-/**
- * 新規生成は常に "unified"。"nano_gemini" / "chatgpt_image" は
- * 旧バージョン時に保存された履歴を読み出す際の互換のため残す。
- */
-export type OutputTarget = "unified" | "nano_gemini" | "chatgpt_image";
-export type Mood =
-  | "cool"
-  | "digital"
-  | "preserve_bg_color"
-  | "minimal"
-  | "japanese"
-  | "glitch"
-  | "fantasy"
-  | "sns_pop"
-  | "bright"
-  | "dark"
-  | "cyberpunk"
-  | "gothic"
-  | "translucent"
-  | "luxe"
-  | "cute"
-  | "stylish"
-  | "emo"
-  | "cinematic"
-  | "near_future"
-  | "retro"
-  | "pop"
-  | "monochrome"
-  | "pastel"
-  | "vivid"
-  | "mystic"
-  | "decadent"
-  | "street"
-  | "art"
-  | "fantasy_world"
-  | "noisy"
-  | "portrait"
-  | "wa_fantasy"
-  | "tiktok"
-  | "instagram"
-  | "pinterest"
-  | "x_buzz"
-  | "trend_2026"
-  | "clean" | "heavy" | "ephemeral"
-  | "contemporary" | "architectural" | "urban_fantasy" | "retro_future"
-  | "reflection_rich" | "whitespace" | "ad_visual" | "magazine_cover" | "movie_poster"
-  | "thumbnail_pop" | "scroll_stop" | "icon_pop"
-  | "refl_water" | "refl_glass" | "refl_mirror" | "refl_metal" | "refl_wet_floor" | "refl_car_window"
-  | "air_fog" | "air_smoke" | "air_after_rain" | "air_dust" | "air_light_particles" | "air_humid" | "air_cold"
-  | "grade_cinema" | "grade_ad" | "grade_low_sat" | "grade_high_sat" | "grade_blue" | "grade_red" | "grade_white" | "grade_black"
-  | "venue_wide" | "venue_narrow" | "venue_gallery" | "venue_hotel" | "venue_greenhouse" | "venue_station" | "venue_rooftop" | "venue_glass" | "venue_abstract";
-// 顔・同一性・表情は faceLock（単一の真実）で一元管理するため LockKey に含めない。
-// フロント src/types.ts と同期。参照: docs/09_face-lock統合.md
-export type LockKey =
-  | "body_shape"
-  | "color"
-  | "camera"
-  | "aspect_ratio";
-export type SafetyMode = "fictional_ai" | "real_person";
-
-/**
- * 出力先プラットフォームに合わせたプロンプト安全モード（フロントエンド src/types.ts と同期）。
- *  chatgpt_safe  : ChatGPT / DALL-E 向け（最も厳しい語句フィルタ）
- *  gemini_safe   : Gemini Image Generation 向け（やや緩い）
- *  nano_safe     : Nano Banana 向け（軽量・短文）
- *  full          : 従来通り（フィルタなし・詳細記述あり）
- */
-export type PromptTarget = "chatgpt_safe" | "gemini_safe" | "nano_safe" | "full";
-export type Count = 2 | 3 | 4 | 5 | 6;
-
-/**
- * 表情指定。faceLock: false 時のみ有効。
- * null = 表情自由（顔の造形のみ維持）
- */
-export type Expression =
-  | "neutral"      // 無表情
-  | "smile"        // 微笑み
-  | "cold"         // 冷たい
-  | "assertive"    // 強気
-  | "sad"          // 悲しげ
-  | "sleepy"       // 眠そう
-  | "elegant"      // 上品
-  | "cool"         // クール
-  | "ephemeral"    // 儚い
-  | "intimidating"; // 威圧感
-
-// 旧 type Era（グローバル時代軸）は撤去（dead code整理）。乗り物の「年代」(vehicle.era) は別物で存続。
-
-/**
- * 色戦略。肯定系は【色戦略】ブロックに、否定系は【NG指定】ブロックに追加。
- * null = 設定なし
- */
-export type ColorStrategy =
-  | "auto"          // おまかせ
-  | "red_only"      // 赤だけ
-  | "warm"          // 暖色
-  | "cool_tone"     // 寒色
-  | "complement"    // 補色
-  | "mono"          // モノクロ
-  | "pastel"        // パステル
-  | "vivid"         // 高彩度
-  | "muted"         // 低彩度
-  | "white_base"    // 白基調
-  | "black_base"    // 黒基調
-  | "no_color"      // 色禁止
-  | "no_blue"       // 青NG
-  | "no_purple"     // 紫NG
-  | "no_pink"       // ピンクNG
-  | "no_transparent"; // 透明素材NG
-
-/**
- * 絵柄スタイル。全体の描画スタイルを制御する。
- * null = 設定なし
- */
-export type ArtStyle =
-  | "auto"
-  | "photo"
-  | "illustration"
-  | "anime"
-  | "watercolor"
-  | "oil_painting"
-  | "sketch"
-  | "line_art"
-  | "3d_render"
-  | "concept_art"
-  | "manga"
-  | "game_art"
-  | "pixel"
-  | "flat_design"
-  | "ghibli_style";
-
-export type AutoOr<T extends string> = T | "auto" | "skip";
+import type {
+  AutoOr,
+  Scope,
+  OutputTarget,
+  Mood,
+  LockKey,
+  SafetyMode,
+  PromptTarget,
+  Count,
+  Expression,
+  ColorStrategy,
+  ArtStyle,
+} from "../../shared/promptScalars";
+export type {
+  AutoOr,
+  Scope,
+  OutputTarget,
+  Mood,
+  LockKey,
+  SafetyMode,
+  PromptTarget,
+  Count,
+  Expression,
+  ColorStrategy,
+  ArtStyle,
+};
 
 export interface HairSettings {
   length: AutoOr<
