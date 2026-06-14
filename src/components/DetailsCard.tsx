@@ -1091,11 +1091,12 @@ function CyberContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (
   );
 }
 
-function CosplayContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
+function CosplayContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
+  const mc = makeMultiChanger(d, chg, "cosplay");
   return (
     <div>
-      <FieldSection fieldKey="cosplay.genre" label="ジャンル系統" value={d.cosplay.genre} options={COSPLAY_GENRES} noTopMargin
-        onChange={(v) => upd("cosplay", { genre: v as DetailSettings["cosplay"]["genre"] })} />
+      <MultiFieldSection fieldKey="cosplay.genre" label="ジャンル系統" singleValue={d.cosplay.genre} multiValues={d.multiOverrides?.["cosplay.genre"] ?? []} options={COSPLAY_GENRES} noTopMargin
+        onChange={mc("cosplay.genre", "genre")} />
       <FieldSection fieldKey="cosplay.cuteStyle" label="かわいい系" value={d.cosplay.cuteStyle} options={COSPLAY_CUTE_STYLES}
         onChange={(v) => upd("cosplay", { cuteStyle: v as DetailSettings["cosplay"]["cuteStyle"] })} />
       <FieldSection fieldKey="cosplay.jobGenre" label="職種・役割系" value={d.cosplay.jobGenre} options={COSPLAY_JOB_GENRES}
@@ -1112,8 +1113,8 @@ function CosplayContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
         onChange={(v) => upd("cosplay", { occupation: v as DetailSettings["cosplay"]["occupation"] })} />
       <FieldSection fieldKey="cosplay.decoration" label="装飾レベル" value={d.cosplay.decoration} options={COSPLAY_DECORATIONS}
         onChange={(v) => upd("cosplay", { decoration: v as DetailSettings["cosplay"]["decoration"] })} />
-      <FieldSection fieldKey="cosplay.item" label="持ち物・小物" value={d.cosplay.item} options={COSPLAY_ITEMS}
-        onChange={(v) => upd("cosplay", { item: v as DetailSettings["cosplay"]["item"] })} />
+      <MultiFieldSection fieldKey="cosplay.item" label="持ち物・小物" singleValue={d.cosplay.item} multiValues={d.multiOverrides?.["cosplay.item"] ?? []} options={COSPLAY_ITEMS}
+        onChange={mc("cosplay.item", "item")} />
       {/* 露出：おまかせボタンなし（安全のため） */}
       <div>
         <CellSectionLabel label="露出" />
@@ -1140,8 +1141,8 @@ function CosplayContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
           ))}
         </CellGrid>
       </div>
-      <FieldSection fieldKey="cosplay.colorDir" label="カラー方向" value={d.cosplay.colorDir} options={COSPLAY_COLOR_DIRS}
-        onChange={(v) => upd("cosplay", { colorDir: v as DetailSettings["cosplay"]["colorDir"] })} />
+      <MultiFieldSection fieldKey="cosplay.colorDir" label="カラー方向" singleValue={d.cosplay.colorDir} multiValues={d.multiOverrides?.["cosplay.colorDir"] ?? []} options={COSPLAY_COLOR_DIRS}
+        onChange={mc("cosplay.colorDir", "colorDir")} />
     </div>
   );
 }
@@ -1863,7 +1864,7 @@ export function DetailsCard({
     switch (t) {
       case "hair":          return <HairContent       d={value} upd={update} chg={onChange} />;
       case "outfit":        return <OutfitContent     d={value} upd={update} chg={onChange} />;
-      case "cosplay":       return <CosplayContent    d={value} upd={update} />;
+      case "cosplay":       return <CosplayContent    d={value} upd={update} chg={onChange} />;
       case "cyber":         return <CyberContent      d={value} upd={update} chg={onChange} />;
       case "background":    return <BackgroundContent d={value} upd={update} chg={onChange} />;
       case "foreground":    return <ForegroundContent d={value} upd={update} chg={onChange} />;

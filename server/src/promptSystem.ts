@@ -1253,7 +1253,9 @@ function describeDetails(
       val: string
     ): string => (COSPLAY_LABELS[field] as Record<string, string>)[val] ?? val;
 
-    if (c.genre !== "auto" && c.genre !== "skip") fixed.push(`ジャンル系統：${cl("genre", c.genre)}（固定）`);
+    const coGenreVals = getMultiVals(details.multiOverrides, "cosplay.genre");
+    if (coGenreVals.length >= 2) fixed.push(`ジャンル系統：${coGenreVals.map(v => cl("genre", v)).join("×")}（複数ジャンルを融合）`);
+    else if (c.genre !== "auto" && c.genre !== "skip") fixed.push(`ジャンル系統：${cl("genre", c.genre)}（固定）`);
     else if (c.genre === "auto") vary.push("ジャンル系統");
     if (c.cuteStyle !== "auto" && c.cuteStyle !== "skip") fixed.push(`かわいい系スタイル：${cl("cuteStyle", c.cuteStyle)}（固定）`);
     else if (c.cuteStyle === "auto") vary.push("かわいい系サブスタイル");
@@ -1271,11 +1273,15 @@ function describeDetails(
     else if (c.occupation === "auto") vary.push("職業コスプレ");
     if (c.decoration !== "auto" && c.decoration !== "skip") fixed.push(`装飾レベル：${cl("decoration", c.decoration)}（固定）`);
     else if (c.decoration === "auto") vary.push("装飾レベル");
-    if (c.item !== "auto" && c.item !== "skip") fixed.push(`持ち物・小物：${cl("item", c.item)}（固定）`);
+    const coItemVals = getMultiVals(details.multiOverrides, "cosplay.item");
+    if (coItemVals.length >= 2) fixed.push(`持ち物・小物：${coItemVals.map(v => cl("item", v)).join("・")}（複数を併用）`);
+    else if (c.item !== "auto" && c.item !== "skip") fixed.push(`持ち物・小物：${cl("item", c.item)}（固定）`);
     else if (c.item === "auto") vary.push("持ち物・小物");
     // 露出：skip か具体値のみ（"auto" は使わない）
     if (c.exposure !== "skip") fixed.push(`${COSPLAY_LABELS.exposure[c.exposure]}（固定）`);
-    if (c.colorDir !== "auto" && c.colorDir !== "skip") fixed.push(`カラー方向：${cl("colorDir", c.colorDir)}（固定）`);
+    const coColorVals = getMultiVals(details.multiOverrides, "cosplay.colorDir");
+    if (coColorVals.length >= 2) fixed.push(`カラー方向：${coColorVals.map(v => cl("colorDir", v)).join("×")}（複数色を併用）`);
+    else if (c.colorDir !== "auto" && c.colorDir !== "skip") fixed.push(`カラー方向：${cl("colorDir", c.colorDir)}（固定）`);
     else if (c.colorDir === "auto") vary.push("カラー方向");
 
     if (fixed.length > 0 || vary.length > 0) {
