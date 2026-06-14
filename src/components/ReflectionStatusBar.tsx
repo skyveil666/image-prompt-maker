@@ -11,6 +11,7 @@
  */
 import { useCallback, useState } from "react";
 import type { Scope } from "../types";
+import { DominatorBadge, summarizeNote } from "./DominatorBadge";
 
 // ── ラベル ──────────────────────────────────────────────────────────────────
 
@@ -108,10 +109,6 @@ export function ReflectionStatusBar(p: Props) {
   const bgStylizeActive = p.avoidRealBackground && p.scopes.includes("background");
   const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
-  const summarize = (s: string) => {
-    const flat = s.replace(/【[^】]*】/g, "").replace(/\s+/g, " ").trim();
-    return flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
-  };
 
   return (
     <section className="rounded-lg border border-violet-400/25 bg-violet-500/5 overflow-hidden">
@@ -120,31 +117,31 @@ export function ReflectionStatusBar(p: Props) {
       {hasDominator && (
         <div className="flex flex-wrap items-center gap-1.5 px-2.5 py-1.5 bg-rose-500/12 border-b border-rose-400/30">
           {worldNote && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 text-[11px] font-medium">
-              <span className="font-bold">🌍 世界観：{worldLabel}</span>
-              <span className="text-rose-200/65 text-[10px] font-normal" title={p.worldCombinedNote}>（{summarize(worldNote)}）</span>
-              <button type="button" onClick={p.onClearWorld}
-                className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
-                title="この世界観を全案から解除する">× 解除</button>
-            </span>
+            <DominatorBadge
+              label={`🌍 世界観：${worldLabel}`}
+              summary={summarizeNote(worldNote)}
+              summaryTitle={p.worldCombinedNote}
+              onClear={p.onClearWorld}
+              clearTitle="この世界観を全案から解除する"
+            />
           )}
           {refNote && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 text-[11px] font-medium">
-              <span className="font-bold">🖼 参照画像から適用中</span>
-              <span className="text-rose-200/65 text-[10px] font-normal" title={p.referenceNoteText}>（{summarize(refNote)}）</span>
-              <button type="button" onClick={p.onClearReference}
-                className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
-                title="参照画像からの適用を全案から解除する">× 解除</button>
-            </span>
+            <DominatorBadge
+              label="🖼 参照画像から適用中"
+              summary={summarizeNote(refNote)}
+              summaryTitle={p.referenceNoteText}
+              onClear={p.onClearReference}
+              clearTitle="参照画像からの適用を全案から解除する"
+            />
           )}
           {bgStylizeActive && (
-            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 text-[11px] font-medium">
-              <span className="font-bold">🌆 背景を2D/非写実に</span>
-              <span className="text-rose-200/65 text-[10px] font-normal" title="背景の風景・空間をイラスト調に寄せる（人物・顔・肌は実写維持）。既定ON・背景が変更対象の時だけ全案に効く。">（既定ON・全案の背景をイラスト調に）</span>
-              <button type="button" onClick={p.onClearAvoidRealBg}
-                className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
-                title="背景2D化をOFFにする（実写背景を許可。回避▼トグルと同じ設定）">× 解除</button>
-            </span>
+            <DominatorBadge
+              label="🌆 背景を2D/非写実に"
+              summary="既定ON・全案の背景をイラスト調に"
+              summaryTitle="背景の風景・空間をイラスト調に寄せる（人物・顔・肌は実写維持）。既定ON・背景が変更対象の時だけ全案に効く。"
+              onClear={p.onClearAvoidRealBg}
+              clearTitle="背景2D化をOFFにする（実写背景を許可。回避▼トグルと同じ設定）"
+            />
           )}
         </div>
       )}

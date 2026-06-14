@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ArrangeResult, Count, GeneratedProposal, PromptHistoryItem, Scope } from "../types";
 import { ARRANGE_AXES, ALL_SCOPE_LABELS, arrangeCandidateScopes } from "../lib/arrange";
 import { WithImagePreview } from "./ImagePreviewTooltip";
+import { DominatorBadge, summarizeNote } from "./DominatorBadge";
 import {
   MAX_RESULT_IMAGES, RATING_LABELS,
   AXIS_RATING_META, type RatingAxisKey,
@@ -508,30 +509,7 @@ function ArrangeProposalCard({
 
 // ── 「見えない支配」バッジ（rose系・メイン ReflectionStatusBar 235-243 と同形式）─────────
 
-/** 指示文を【…】除去＋空白圧縮して24字に要約（ReflectionStatusBar と同ロジック）。 */
-function summarizeNote(s: string): string {
-  const flat = s.replace(/【[^】]*】/g, "").replace(/\s+/g, " ").trim();
-  return flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
-}
-
-/** 全案に効くのに画面に出ない設定の rose バッジ（ラベル＋要約＋「× 解除」）。 */
-function DominatorBadge({
-  label, summary, summaryTitle, onClear, clearTitle,
-}: {
-  label: string; summary?: string; summaryTitle?: string; onClear: () => void; clearTitle: string;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border border-rose-400/55 bg-rose-500/15 text-rose-100 text-[11px] font-medium">
-      <span className="font-bold">{label}</span>
-      {summary && (
-        <span className="text-rose-200/65 text-[10px] font-normal" title={summaryTitle}>（{summary}）</span>
-      )}
-      <button type="button" onClick={onClear}
-        className="ml-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded border border-rose-300/50 bg-rose-400/15 text-rose-100 hover:bg-rose-400/30 transition leading-none"
-        title={clearTitle}>× 解除</button>
-    </span>
-  );
-}
+// DominatorBadge / summarizeNote は src/components/DominatorBadge.tsx に共有（ReflectionStatusBar と同形・§5鉄則）。
 
 // ── メインパネル ───────────────────────────────────────────────────────────────
 
