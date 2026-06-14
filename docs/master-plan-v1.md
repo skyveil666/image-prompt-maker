@@ -815,3 +815,9 @@ live.complete(message);
 - **除外（精査で判明）**: 文字背景4種(種類/雰囲気/配置/質感)＝**サーバが完全に未処理**(textType 等 grep 0)で multi 化しても生成無効果のため据え置き。時間帯/天候＝準排他(1画像1つ)。密度/奥行き/情報量＝スカラー
 - **検証**: front/server tsc・vite build exit0。runtime: multi「水彩画風×コラージュ（複数スタイルを自然に融合）／青系×ピンク系の配色／霧と光の粒子（複数効果を重ねる）」・single「水彩画風（固定）／青系（固定）／霧（固定）」＝**非multi出力不変**を実証。Playwright隔離: 背景スタイルで2選択→2/3・4つ目で FIFO→3/3・NG(機能①)併用で除外も動作。console0。後片付け済(4330停止・5173/3001不可侵)
 - **次カテゴリ候補**: 前景演出(エフェクト/回転渦/HUD/アート/位置/動き/色方向)→ポーズ(印象/手/足/動き)→小物/大物/乗り物/神話/コスプレ等
+
+### 2026-06-14: 複数選択(最大3)拡張② — 前景演出カテゴリ（7軸）
+
+- **変換7フィールド**: エフェクト種類/回転・渦/HUD・デジタル/アート表現/位置/動き/色方向 を MultiFieldSection(最大3)化。ForegroundContent に chg を配線し makeMultiChanger("foreground") 使用。server promptSystem に getMultiVals 結合分岐を additive 追加
+- **据え置き**: preset(他フィールド一括上書きの特殊)・密度/奥行き(スカラー)・視認性(顔保護・準排他)
+- **検証**: front/server tsc・vite build exit0。runtime: multi「花びら・雪（複数を重ねる）／青白×ゴールド（複数色を併用）」・single「花びら（固定）／青白（固定）」＝非multi出力不変を実証

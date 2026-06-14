@@ -1203,7 +1203,8 @@ function AspectRatioContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
   );
 }
 
-function ForegroundContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
+function ForegroundContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
+  const mc = makeMultiChanger(d, chg, "foreground");
   return (
     <div>
       {/* 安全ルール注記 */}
@@ -1212,22 +1213,22 @@ function ForegroundContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
       </div>
       <FieldSection fieldKey="foreground.preset" label="プリセット" value={d.foreground.preset} options={FG_PRESETS} noTopMargin
         onChange={(v) => upd("foreground", { preset: v as DetailSettings["foreground"]["preset"] })} />
-      <FieldSection fieldKey="foreground.effectType" label="エフェクト種類" value={d.foreground.effectType} options={FG_EFFECT_TYPES}
-        onChange={(v) => upd("foreground", { effectType: v as DetailSettings["foreground"]["effectType"] })} />
-      <FieldSection fieldKey="foreground.swirlType" label="回転・渦" value={d.foreground.swirlType} options={FG_SWIRL_TYPES}
-        onChange={(v) => upd("foreground", { swirlType: v as DetailSettings["foreground"]["swirlType"] })} />
-      <FieldSection fieldKey="foreground.digitalType" label="HUD・デジタル" value={d.foreground.digitalType} options={FG_DIGITAL_TYPES}
-        onChange={(v) => upd("foreground", { digitalType: v as DetailSettings["foreground"]["digitalType"] })} />
-      <FieldSection fieldKey="foreground.artType" label="アート表現" value={d.foreground.artType} options={FG_ART_TYPES}
-        onChange={(v) => upd("foreground", { artType: v as DetailSettings["foreground"]["artType"] })} />
-      <FieldSection fieldKey="foreground.position" label="位置" value={d.foreground.position} options={FG_POSITIONS}
-        onChange={(v) => upd("foreground", { position: v as DetailSettings["foreground"]["position"] })} />
+      <MultiFieldSection fieldKey="foreground.effectType" label="エフェクト種類" singleValue={d.foreground.effectType} multiValues={d.multiOverrides?.["foreground.effectType"] ?? []} options={FG_EFFECT_TYPES}
+        onChange={mc("foreground.effectType", "effectType")} />
+      <MultiFieldSection fieldKey="foreground.swirlType" label="回転・渦" singleValue={d.foreground.swirlType} multiValues={d.multiOverrides?.["foreground.swirlType"] ?? []} options={FG_SWIRL_TYPES}
+        onChange={mc("foreground.swirlType", "swirlType")} />
+      <MultiFieldSection fieldKey="foreground.digitalType" label="HUD・デジタル" singleValue={d.foreground.digitalType} multiValues={d.multiOverrides?.["foreground.digitalType"] ?? []} options={FG_DIGITAL_TYPES}
+        onChange={mc("foreground.digitalType", "digitalType")} />
+      <MultiFieldSection fieldKey="foreground.artType" label="アート表現" singleValue={d.foreground.artType} multiValues={d.multiOverrides?.["foreground.artType"] ?? []} options={FG_ART_TYPES}
+        onChange={mc("foreground.artType", "artType")} />
+      <MultiFieldSection fieldKey="foreground.position" label="位置" singleValue={d.foreground.position} multiValues={d.multiOverrides?.["foreground.position"] ?? []} options={FG_POSITIONS}
+        onChange={mc("foreground.position", "position")} />
       <FieldSection fieldKey="foreground.density" label="密度" value={d.foreground.density} options={FG_DENSITIES}
         onChange={(v) => upd("foreground", { density: v as DetailSettings["foreground"]["density"] })} />
-      <FieldSection fieldKey="foreground.motion" label="動き" value={d.foreground.motion} options={FG_MOTIONS}
-        onChange={(v) => upd("foreground", { motion: v as DetailSettings["foreground"]["motion"] })} />
-      <FieldSection fieldKey="foreground.color" label="色方向" value={d.foreground.color} options={FG_COLORS}
-        onChange={(v) => upd("foreground", { color: v as DetailSettings["foreground"]["color"] })} />
+      <MultiFieldSection fieldKey="foreground.motion" label="動き" singleValue={d.foreground.motion} multiValues={d.multiOverrides?.["foreground.motion"] ?? []} options={FG_MOTIONS}
+        onChange={mc("foreground.motion", "motion")} />
+      <MultiFieldSection fieldKey="foreground.color" label="色方向" singleValue={d.foreground.color} multiValues={d.multiOverrides?.["foreground.color"] ?? []} options={FG_COLORS}
+        onChange={mc("foreground.color", "color")} />
       <FieldSection fieldKey="foreground.depth" label="奥行き" value={d.foreground.depth} options={FG_DEPTHS}
         onChange={(v) => upd("foreground", { depth: v as DetailSettings["foreground"]["depth"] })} />
       <FieldSection fieldKey="foreground.visibility" label="視認性" value={d.foreground.visibility} options={FG_VISIBILITIES}
@@ -1861,7 +1862,7 @@ export function DetailsCard({
       case "cosplay":       return <CosplayContent    d={value} upd={update} />;
       case "cyber":         return <CyberContent      d={value} upd={update} chg={onChange} />;
       case "background":    return <BackgroundContent d={value} upd={update} chg={onChange} />;
-      case "foreground":    return <ForegroundContent d={value} upd={update} />;
+      case "foreground":    return <ForegroundContent d={value} upd={update} chg={onChange} />;
       case "pose":          return <PoseContent       d={value} upd={update} />;
       case "camera":        return <CameraContent     d={value} upd={update} chg={onChange} />;
       case "props":         return <PropsContent      d={value} upd={update} chg={onChange} />;
