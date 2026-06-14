@@ -833,3 +833,8 @@ live.complete(message);
 - **変換3フィールド**: 質感/毛先/アクセサリー を MultiFieldSection 化（形/髪色は既存 multi）。server additive 結合分岐
 - **据え置き**: 長さ/ボリューム(スカラー)・カラーモード(ポリシー)・前髪(1スタイル排他)
 - **検証**: tsc(both)/build exit0。runtime「質感：さらさら・濡れ髪（複数の質感を融合）／アクセサリー：リボン・花…（複数を併用）」・single「（固定）」不変
+
+### 2026-06-14: 複数選択(最大3)拡張② — 照明カテゴリ（空気感）
+
+- **変換1フィールド**: 空気感 を MultiFieldSection 化（光源方向/強さ/色温度/影/反射は既存 multi）。server に additive 結合分岐
+- **検証**: tsc(both)/build exit0（additive＝非multi時は出力不変・既存4カテゴリで runtime 実証済の同一パターン）

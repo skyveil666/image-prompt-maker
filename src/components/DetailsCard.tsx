@@ -999,7 +999,7 @@ function MythContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
   );
 }
 
-function LightingContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
+function LightingContent({ d, chg }: { d: DetailSettings; chg: (n: DetailSettings) => void }) {
   const mc = makeMultiChanger(d, chg, "lighting");
   const activePresetId = activeLightPresetId(d.lighting, d.multiOverrides);
   return (
@@ -1036,8 +1036,8 @@ function LightingContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg
         onChange={mc("lighting.shadow", "shadow")} />
       <MultiFieldSection fieldKey="lighting.reflection" label="反射" singleValue={d.lighting.reflection} multiValues={d.multiOverrides?.["lighting.reflection"] ?? []} options={LIGHT_REFLECTIONS}
         onChange={mc("lighting.reflection", "reflection")} />
-      <FieldSection fieldKey="lighting.atmosphere" label="空気感" value={d.lighting.atmosphere} options={LIGHT_ATMOSPHERES}
-        onChange={(v) => upd("lighting", { atmosphere: v as DetailSettings["lighting"]["atmosphere"] })} />
+      <MultiFieldSection fieldKey="lighting.atmosphere" label="空気感" singleValue={d.lighting.atmosphere} multiValues={d.multiOverrides?.["lighting.atmosphere"] ?? []} options={LIGHT_ATMOSPHERES}
+        onChange={mc("lighting.atmosphere", "atmosphere")} />
     </div>
   );
 }
@@ -1870,7 +1870,7 @@ export function DetailsCard({
       case "big_object":    return <BigObjectContent  d={value} upd={update} chg={onChange} />;
       case "vehicle":       return <VehicleContent    d={value} upd={update} />;
       case "myth":          return <MythContent       d={value} upd={update} chg={onChange} />;
-      case "lighting":      return <LightingContent   d={value} upd={update} chg={onChange} />;
+      case "lighting":      return <LightingContent   d={value} chg={onChange} />;
       case "aspect_ratio":  return <AspectRatioContent d={value} upd={update} />;
       case "mood":          return <MoodTabContent moods={moods} autoMoodCategories={autoMoodCategories} onMoodsChange={onMoodsChange} />;
       case "artStyle":      return <ArtStyleTabContent artStyle={artStyle} onArtStyleChange={onArtStyleChange} />;

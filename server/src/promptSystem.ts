@@ -1753,7 +1753,9 @@ function describeDetails(
     } else if (l.reflection !== "auto" && l.reflection !== "skip") {
       fixed.push(`反射：${LIGHTING_LABELS.reflection[l.reflection]}（固定）`);
     } else if (l.reflection === "auto") vary.push("反射");
-    if (l.atmosphere !== "auto" && l.atmosphere !== "skip") fixed.push(`空気感：${LIGHTING_LABELS.atmosphere[l.atmosphere]}（固定）`);
+    const ltAtmoVals = getMultiVals(details.multiOverrides, "lighting.atmosphere");
+    if (ltAtmoVals.length >= 2) fixed.push(`空気感：${ltAtmoVals.map(v => (LIGHTING_LABELS.atmosphere as Record<string, string>)[v] ?? v).join("・")}（複数の空気感を融合）`);
+    else if (l.atmosphere !== "auto" && l.atmosphere !== "skip") fixed.push(`空気感：${LIGHTING_LABELS.atmosphere[l.atmosphere]}（固定）`);
     else if (l.atmosphere === "auto") vary.push("空気感");
     if (fixed.length > 0 || vary.length > 0) {
       const parts = [
