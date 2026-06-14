@@ -14,6 +14,8 @@ interface Props {
   onArrange?: (item: PromptHistoryItem) => void;
   /** 同じ構成で再生成：全設定をメイン画面に復元する */
   onRestore?: (item: PromptHistoryItem) => void;
+  /** プロンプト全文をコピーした後の通知（トースト表示用） */
+  onCopied?: () => void;
   /** アレンジ元としてハイライト表示する */
   highlight?: boolean;
   /** このカードのアレンジが生成中 */
@@ -22,9 +24,18 @@ interface Props {
 
 // Scope→ラベルは scopeLabels.ts に一本化（SCOPE_LABEL は別名 import）。
 
-export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore, highlight, busy }: Props) {
+export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore, onCopied, highlight, busy }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+
+  // プロンプト全文をコピー。成功時のみ copied フラグを立て（既存「コピー済み」フィルタと整合）、トースト通知する。
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(item.promptText);
+      if (!item.copied) onUpdate(item.id, { copied: true });
+      onCopied?.();
+    } catch { /* clipboard 利用不可環境では無視 */ }
+  };
 
   const targetLabel =
     item.outputType === "unified"
@@ -190,6 +201,14 @@ export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore,
             🔁 同じ構成で再生成
           </button>
         )}
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="rounded-lg px-2.5 py-1.5 text-xs font-semibold border border-emerald-400/50 bg-emerald-400/10 text-emerald-200 hover:bg-emerald-400/20 hover:border-emerald-400/80 transition"
+          title="プロンプト全文をコピー"
+        >
+          📋 コピー
+        </button>
         <button
           type="button"
           className="rounded-lg px-2.5 py-1.5 text-xs font-semibold border border-bg-border bg-bg-panel/70 text-text-muted hover:text-text-base hover:border-accent/40 transition"

@@ -47,6 +47,8 @@ interface Props {
   onClearWorld?:        () => void;
   /** 参照画像適用の解除。 */
   onClearReference?:    () => void;
+  /** トースト表示（プロンプト全文コピー完了通知などに使用）。 */
+  onToast?: (msg: string) => void;
 }
 
 type FilterMode = "all" | "favorites" | "used" | "good" | "bad";
@@ -89,6 +91,7 @@ export function HistoryView({
   favoriteProfile = null, favoriteLearnEnabled = false,
   avoidRealBackground, worldCombinedNote, referenceNoteText,
   onClearAvoidRealBg, onClearWorld, onClearReference,
+  onToast,
 }: Props) {
   const [analysisOpen, setAnalysisOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -645,6 +648,7 @@ export function HistoryView({
                   onDelete={handleDelete}
                   onArrange={onArrangeInline ? handleArrangeSelect : undefined}
                   onRestore={onRestore}
+                  onCopied={() => onToast?.("✓ コピーしました")}
                   highlight={arrangeSource?.id === it.id}
                   busy={arrangeBusy && arrangeSource?.id === it.id}
                 />

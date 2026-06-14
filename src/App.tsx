@@ -2096,6 +2096,7 @@ export default function App() {
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
             onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
             onClearReference={() => setReferenceNote({})}
+            onToast={showPresetToast}
           />
         ) : (
           <>
