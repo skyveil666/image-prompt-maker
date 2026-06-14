@@ -1659,9 +1659,13 @@ function describeDetails(
     else if (v.interaction === "auto") vary.push("関わり方");
     if (v.era !== "auto" && v.era !== "skip") fixed.push(`時代感：${vl("era", v.era)}（固定）`);
     else if (v.era === "auto") vary.push("時代感");
-    if (v.material !== "auto" && v.material !== "skip") fixed.push(`素材感：${vl("material", v.material)}（固定）`);
+    const veMatVals = getMultiVals(details.multiOverrides, "vehicle.material");
+    if (veMatVals.length >= 2) fixed.push(`素材感：${veMatVals.map(x => vl("material", x)).join("・")}（複数素材を組み合わせ）`);
+    else if (v.material !== "auto" && v.material !== "skip") fixed.push(`素材感：${vl("material", v.material)}（固定）`);
     else if (v.material === "auto") vary.push("素材感");
-    if (v.atmosphere !== "auto" && v.atmosphere !== "skip") fixed.push(`雰囲気：${vl("atmosphere", v.atmosphere)}（固定）`);
+    const veAtmoVals = getMultiVals(details.multiOverrides, "vehicle.atmosphere");
+    if (veAtmoVals.length >= 2) fixed.push(`雰囲気：${veAtmoVals.map(x => vl("atmosphere", x)).join("・")}（複数の雰囲気を融合）`);
+    else if (v.atmosphere !== "auto" && v.atmosphere !== "skip") fixed.push(`雰囲気：${vl("atmosphere", v.atmosphere)}（固定）`);
     else if (v.atmosphere === "auto") vary.push("雰囲気");
 
     if (fixed.length > 0 || vary.length > 0) {

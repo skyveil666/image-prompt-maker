@@ -956,7 +956,8 @@ function BigObjectContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; ch
   );
 }
 
-function VehicleContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
+function VehicleContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
+  const mc = makeMultiChanger(d, chg, "vehicle");
   return (
     <div>
       {/* 安全ルール注記 */}
@@ -971,10 +972,10 @@ function VehicleContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
         onChange={(v) => upd("vehicle", { interaction: v as DetailSettings["vehicle"]["interaction"] })} />
       <FieldSection fieldKey="vehicle.era" label="時代感" value={d.vehicle.era} options={VEHICLE_ERAS}
         onChange={(v) => upd("vehicle", { era: v as DetailSettings["vehicle"]["era"] })} />
-      <FieldSection fieldKey="vehicle.material" label="素材感" value={d.vehicle.material} options={VEHICLE_MATERIALS}
-        onChange={(v) => upd("vehicle", { material: v as DetailSettings["vehicle"]["material"] })} />
-      <FieldSection fieldKey="vehicle.atmosphere" label="雰囲気" value={d.vehicle.atmosphere} options={VEHICLE_ATMOSPHERES}
-        onChange={(v) => upd("vehicle", { atmosphere: v as DetailSettings["vehicle"]["atmosphere"] })} />
+      <MultiFieldSection fieldKey="vehicle.material" label="素材感" singleValue={d.vehicle.material} multiValues={d.multiOverrides?.["vehicle.material"] ?? []} options={VEHICLE_MATERIALS}
+        onChange={mc("vehicle.material", "material")} />
+      <MultiFieldSection fieldKey="vehicle.atmosphere" label="雰囲気" singleValue={d.vehicle.atmosphere} multiValues={d.multiOverrides?.["vehicle.atmosphere"] ?? []} options={VEHICLE_ATMOSPHERES}
+        onChange={mc("vehicle.atmosphere", "atmosphere")} />
     </div>
   );
 }
@@ -1870,7 +1871,7 @@ export function DetailsCard({
       case "camera":        return <CameraContent     d={value} upd={update} chg={onChange} />;
       case "props":         return <PropsContent      d={value} upd={update} chg={onChange} />;
       case "big_object":    return <BigObjectContent  d={value} upd={update} chg={onChange} />;
-      case "vehicle":       return <VehicleContent    d={value} upd={update} />;
+      case "vehicle":       return <VehicleContent    d={value} upd={update} chg={onChange} />;
       case "myth":          return <MythContent       d={value} upd={update} chg={onChange} />;
       case "lighting":      return <LightingContent   d={value} chg={onChange} />;
       case "aspect_ratio":  return <AspectRatioContent d={value} upd={update} />;
