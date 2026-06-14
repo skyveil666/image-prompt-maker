@@ -874,3 +874,12 @@ live.complete(message);
 - **不変条件**: buildInputs/runGenerate/handleGenerate/runBiasAnalysis 無変更・生成ペイロード不変・サーバ無変更・新規「見えない支配」設定なし
 - **検証**: front tsc / vite build exit0。Playwright隔離(4330): 好み/ZOZO/風の3セクション描画・skyveilトグルON→favoriteLearnEnabled＋トースト「あなたの好み（skyveil）反映 ON」・**風=3 が /api/generate body.windLevel=3 に反映（抽出後も buildInputs を正しく駆動）**・console error 0。後片付け済(4330のみ停止・5173/3001不可侵)
 - **残りの見送り**: buildInputs純lib化（高価値・要 payload-diff 厳密検証＋承認）／メイン列・左レール全体分割（§3・incremental 継続）／分析センターModalラッパ（低利得・やるなら汎用 ModalShell 化が高ROI）
+
+### 2026-06-14: 履歴/お気に入りカードにプロンプトコピーボタン追加（HistoryItemRow・commit `c6f368c`）
+
+- **要望**: 履歴・お気に入りの各カードに ① プロンプト全文コピーボタン（アレンジ/再生成の並び・「コピーしました」トースト）② 削除確認ダイアログ。
+- **調査結果（重要）**: 「お気に入り画面」の実体は **HistoryView の favorites フィルタ**で、履歴もお気に入りも同じ **HistoryItemRow** カードを使用。`FavoritesPanel.tsx` は**未使用 dead code**（JSX/import 参照ゼロ・コメント言及のみ）。**② 削除確認は HistoryItemRow に既存実装済み**（インライン「削除しますか？」→「削除する/キャンセル」・キャンセルで no-op）＝**変更不要**。よって実作業は ① のみ。
+- **① 実装**: HistoryItemRow に「📋 コピー」ボタン追加（アレンジ/再生成の並び）。`item.promptText` 全文を `navigator.clipboard.writeText` へ。承認済み方針＝(a) 通知は App 汎用トースト `showPresetToast` を HistoryView 経由で再利用（HistoryView に `onToast` prop・App から配線・「✓ コピーしました」）(b) コピー成功時に `item.copied=true` を `onUpdate` で永続し既存「📋 コピー済み」フィルタと整合（PromptCard と同挙動）。
+- **不変条件**: ControlPanel系/生成/サーバ無関係。既存の削除確認・各ボタン・レイアウト不変。IDB は既存 updateItem 経由（copied のみ・非破壊）。PC専用。
+- **検証**: front tsc / vite build exit0。Playwright隔離(4330・合成履歴 seed): コピー→`writeText` 引数が当該カードの promptText 全文と完全一致・「コピーしました」トースト・copied=true 永続・既存削除確認(キャンセルで残存)無傷・console error0。seed に dateKey 欠落で CalendarView が `startsWith` で落ちる事象を発見したが、実データは buildHistoryItems が必ず dateKey 付与のため再現せず＝実装非該当（seed を dateKey/最近日時付きに修正して解消）。
+- **付随メモ**: `FavoritesPanel.tsx`（FavCard 含む）は未使用 dead code。別途削除は任意（今回は非対象）。
