@@ -831,6 +831,7 @@ function CameraContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
 }
 
 function PropsContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
+  const mc = makeMultiChanger(d, chg, "props");
   return (
     <div>
       <MultiFieldSection fieldKey="props.category" label="カテゴリ" singleValue={d.props.category} multiValues={d.multiOverrides?.["props.category"] ?? []} options={PROPS_CATEGORIES} noTopMargin
@@ -839,16 +840,16 @@ function PropsContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (
           if (multi.length < 2) delete mo["props.category"]; else mo["props.category"] = multi;
           chg({ ...d, props: { ...d.props, category: single as DetailSettings["props"]["category"] }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
         }} />
-      <FieldSection fieldKey="props.hold" label="持たせ方" value={d.props.hold} options={PROPS_HOLDS}
-        onChange={(v) => upd("props", { hold: v as DetailSettings["props"]["hold"] })} />
+      <MultiFieldSection fieldKey="props.hold" label="持たせ方" singleValue={d.props.hold} multiValues={d.multiOverrides?.["props.hold"] ?? []} options={PROPS_HOLDS}
+        onChange={mc("props.hold", "hold")} />
       <FieldSection fieldKey="props.size" label="サイズ" value={d.props.size} options={PROPS_SIZES}
         onChange={(v) => upd("props", { size: v as DetailSettings["props"]["size"] })} />
       <FieldSection fieldKey="props.glow" label="光り方" value={d.props.glow} options={PROPS_GLOWS}
         onChange={(v) => upd("props", { glow: v as DetailSettings["props"]["glow"] })} />
-      <FieldSection fieldKey="props.vibe" label="雰囲気" value={d.props.vibe} options={PROPS_VIBES}
-        onChange={(v) => upd("props", { vibe: v as DetailSettings["props"]["vibe"] })} />
-      <FieldSection fieldKey="props.placement" label="配置" value={d.props.placement} options={PROPS_PLACEMENTS}
-        onChange={(v) => upd("props", { placement: v as DetailSettings["props"]["placement"] })} />
+      <MultiFieldSection fieldKey="props.vibe" label="雰囲気" singleValue={d.props.vibe} multiValues={d.multiOverrides?.["props.vibe"] ?? []} options={PROPS_VIBES}
+        onChange={mc("props.vibe", "vibe")} />
+      <MultiFieldSection fieldKey="props.placement" label="配置" singleValue={d.props.placement} multiValues={d.multiOverrides?.["props.placement"] ?? []} options={PROPS_PLACEMENTS}
+        onChange={mc("props.placement", "placement")} />
       <FieldSection fieldKey="props.count" label="個数" value={d.props.count} options={PROPS_COUNTS}
         onChange={(v) => upd("props", { count: v as DetailSettings["props"]["count"] })} />
     </div>

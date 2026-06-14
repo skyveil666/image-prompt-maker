@@ -1577,11 +1577,17 @@ function describeDetails(
     } else if (p.category === "auto") {
       parts.push("カテゴリ：おまかせ（案ごとに異なるカテゴリを選び、被らないようにする）");
     }
-    if (p.hold !== "auto" && p.hold !== "skip") parts.push(`持たせ方：${PROPS_LABELS.hold[p.hold]}（固定）`);
+    const pHoldVals = getMultiVals(details.multiOverrides, "props.hold");
+    if (pHoldVals.length >= 2) parts.push(`持たせ方：${pHoldVals.map(v => (PROPS_LABELS.hold as Record<string, string>)[v] ?? v).join("・")}（複数を併用）`);
+    else if (p.hold !== "auto" && p.hold !== "skip") parts.push(`持たせ方：${PROPS_LABELS.hold[p.hold]}（固定）`);
     if (p.size !== "auto" && p.size !== "skip") parts.push(`サイズ：${PROPS_LABELS.size[p.size]}（固定）`);
     if (p.glow !== "auto" && p.glow !== "skip") parts.push(`光り方：${PROPS_LABELS.glow[p.glow]}（固定）`);
-    if (p.vibe !== "auto" && p.vibe !== "skip") parts.push(`雰囲気：${PROPS_LABELS.vibe[p.vibe]}（固定）`);
-    if (p.placement !== "auto" && p.placement !== "skip") parts.push(`配置：${PROPS_LABELS.placement[p.placement]}（固定）`);
+    const pVibeVals = getMultiVals(details.multiOverrides, "props.vibe");
+    if (pVibeVals.length >= 2) parts.push(`雰囲気：${pVibeVals.map(v => (PROPS_LABELS.vibe as Record<string, string>)[v] ?? v).join("・")}（複数の雰囲気を融合）`);
+    else if (p.vibe !== "auto" && p.vibe !== "skip") parts.push(`雰囲気：${PROPS_LABELS.vibe[p.vibe]}（固定）`);
+    const pPlaceVals = getMultiVals(details.multiOverrides, "props.placement");
+    if (pPlaceVals.length >= 2) parts.push(`配置：${pPlaceVals.map(v => (PROPS_LABELS.placement as Record<string, string>)[v] ?? v).join("・")}（複数箇所に配置）`);
+    else if (p.placement !== "auto" && p.placement !== "skip") parts.push(`配置：${PROPS_LABELS.placement[p.placement]}（固定）`);
     if (p.count !== "auto" && p.count !== "skip") parts.push(`個数：${PROPS_LABELS.count[p.count]}（固定）`);
     if (parts.length > 0) {
       lines.push(`持ち物・小物の指示：${parts.join(" / ")}`);
