@@ -13,6 +13,7 @@ import { GenerationSummary } from "./components/main/GenerationSummary";
 import { NanoBananaWarning } from "./components/main/NanoBananaWarning";
 import { GenerationActionBar } from "./components/main/GenerationActionBar";
 import { GenerationErrorPanel } from "./components/main/GenerationErrorPanel";
+import { BoostArea } from "./components/main/BoostArea";
 import { PromptTargetSelector } from "./components/PromptTargetSelector";
 import { SelectionPromptModal } from "./components/SelectionPromptModal";
 import { SimpleImageEditor } from "./components/SimpleImageEditor";
@@ -83,7 +84,6 @@ import { computeChangedAxes, arrangeCandidateScopes, buildElementFilterInstructi
 import { ALL_SCOPE_LABELS } from "./lib/scopeLabels";
 import { buildFavoriteProfile, type FavoriteProfile } from "./lib/favoriteProfile";
 import { analyzeAgent, type AgentActionId } from "./lib/aiAgent";
-import { BoostControls } from "./components/BoostControls";
 import { analyzeColors, analyzeColorSuccess, type ColorAnalysis, type ColorSuccessAnalysis } from "./lib/colorAnalyzer";
 import {
   loadAllFeatures, buildAnalysis as buildImageAnalysis,
@@ -96,7 +96,7 @@ import {
 } from "./lib/ratingAnalyzer";
 import { SkyveilBar } from "./components/SkyveilBar";
 import {
-  buildSkyveilProfile, favoriteToStrength, STRENGTH_TO_FAVORITE,
+  buildSkyveilProfile, favoriteToStrength,
   type SkyveilStrength, type SkyveilProfile,
 } from "./lib/skyveilProfile";
 import { logOperation } from "./lib/operationLog";
@@ -2381,84 +2381,32 @@ export default function App() {
                   setZozoApplied(null);
                 }}
                 boostArea={
-                  <div className="space-y-2">
-                    {/* 🧬 あなたの好み（skyveil）：好み最適化の主入口。反映はユーザー操作時のみ（自動反映しない） */}
-                    <SkyveilBar
-                      enabled={favoriteLearnEnabled}
-                      strength={skyveilStrength}
-                      profile={skyveilProfile}
-                      analyzing={analyzingProfile}
-                      sampleCount={profileSampleCount}
-                      minSamples={MIN_SAMPLES}
-                      oneShotArmed={skyveilOneShot}
-                      onToggle={(v) => {
-                        setFavoriteLearnEnabled(v);
-                        if (v) setSkyveilOneShot(false);
-                        showPresetToast(v ? "🧬 あなたの好み（skyveil）反映 ON" : "あなたの好み（skyveil）反映 OFF",
-                          v ? `${skyveilProfile.summary || "好みを次回生成に反映します"}` : "");
-                      }}
-                      onStrength={(s) => setFavoriteStrength(STRENGTH_TO_FAVORITE[s])}
-                      onUpdateAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
-                      onOneShot={() => {
-                        setSkyveilOneShot(true);
-                        showPresetToast("✨ 今回だけ あなたの好みを反映します", "次の生成にのみ適用されます（保存しません）。");
-                      }}
-                      onReset={() => {
-                        setFavoriteLearnEnabled(false);
-                        setSkyveilOneShot(false);
-                        showPresetToast("あなたの好み反映をリセットしました", "");
-                      }}
-                      profileError={profileError}
-                      autoLearnEnabled={autoLearnEnabled}
-                      onToggleAutoLearn={handleToggleAutoLearn}
-                      onClearProfile={handleClearPreferenceProfile}
-                      successPatterns={successPatterns}
-                      onApplyPattern={handleApplyPattern}
-                    />
-                  <BoostControls
-                    outfitScopeOn={scopes.includes("outfit")}
-                    outfitConflict={
-                      // 衣装に強い影響を与える指定がアクティブな時のみ「他指定が優先」を提示
-                      // （映画/レトロ等の世界観だけでは ZOZO 競合とはみなさない）
-                      activeGodModes.includes("outfit") ||
-                      activeWorldPresets.some((w) =>
-                        ["y2k", "y3k", "street", "gothic", "wafuu", "jirai"].includes(w)
-                      )
-                    }
+                  <BoostArea
+                    favoriteLearnEnabled={favoriteLearnEnabled}
+                    skyveilStrength={skyveilStrength}
+                    skyveilProfile={skyveilProfile}
+                    analyzingProfile={analyzingProfile}
+                    profileSampleCount={profileSampleCount}
+                    skyveilOneShot={skyveilOneShot}
+                    profileError={profileError}
+                    autoLearnEnabled={autoLearnEnabled}
+                    successPatterns={successPatterns}
+                    setFavoriteLearnEnabled={setFavoriteLearnEnabled}
+                    setSkyveilOneShot={setSkyveilOneShot}
+                    setFavoriteStrength={setFavoriteStrength}
+                    onUpdateAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
+                    onToggleAutoLearn={handleToggleAutoLearn}
+                    onClearProfile={handleClearPreferenceProfile}
+                    onApplyPattern={handleApplyPattern}
+                    scopes={scopes}
+                    activeGodModes={activeGodModes}
+                    activeWorldPresets={activeWorldPresets}
                     zozoApplied={zozoApplied}
-                    onZozoApply={(t) => {
-                      setZozoApplied(t);
-                      showPresetToast(
-                        t.mode === "priority"
-                          ? "⭐ ZOZOトレンドを優先反映に設定しました"
-                          : "✅ ZOZOトレンドを衣装プロンプトに反映しました",
-                        ""
-                      );
-                    }}
-                    onZozoSetPriority={(priority) => {
-                      if (!zozoApplied) return;
-                      const nextMode = priority ? "priority" : "assist";
-                      setZozoApplied({ ...zozoApplied, mode: nextMode });
-                      showPresetToast(
-                        priority
-                          ? "⭐ ZOZOを優先反映に切替"
-                          : "✅ ZOZOを補助反映に戻しました",
-                        ""
-                      );
-                    }}
-                    onZozoClear={() => {
-                      setZozoApplied(null);
-                      showPresetToast("ZOZOトレンドの反映を解除しました", "");
-                    }}
                     windLevel={windLevel}
-                    onWindLevelChange={setWindLevel}
-                    windApplicable={
-                      scopes.includes("hair") || scopes.includes("outfit") ||
-                      scopes.includes("foreground") || scopes.includes("pose") ||
-                      scopes.includes("camera")
-                    }
+                    setZozoApplied={setZozoApplied}
+                    setWindLevel={setWindLevel}
+                    showPresetToast={showPresetToast}
                   />
-                  </div>
                 }
                 scopeFlashKey={scopeFlashKey}
                 strength={strength}
