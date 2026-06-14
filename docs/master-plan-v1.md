@@ -726,6 +726,15 @@ live.complete(message);
 - **検証**: 段階実装ごとに tsc・vite build exit 0、起動コンソールエラー0、主要UI描画OK
 - **詳細記録**: [20_phase4-ui改善.md §7-8](./20_phase4-ui改善.md)
 
+### 2026-06-14: リファクタ監査🔥B「軸キー bg/background 統一」は見送り（保留）
+
+- **背景**: 監査で「3軸系（per-image👍👎/好みAI）の軸キーが `bg`、5軸系（details）や Scope は `background` で不統一」「`scopeOf`(ratingAnalyzer) が恒等写像」と指摘された
+- **選択肢**: A) 全面 bg→background 統一 / B) 安全な micro クリーンアップのみ / C) 見送り
+- **採用**: C（見送り）
+- **理由**: 機能バグは無く、得られるのは命名一貫のみ。一方 `bg` は (1) PreferenceProfile の **localStorage 永続キー**（likes/dislikes.bg）、(2) フロント↔サーバの **ワイヤ形式**（preferenceProfile / ratingBias.axes / samples）、(3) **Gemini の出力契約**（gemini.ts がモデルに `"bg"` を出力させ parse）であり、統一には §4 untouchable を6ファイル（history / preferenceProfile / ratingAnalyzer / skyveilProfile / gemini / promptSystem）＋ localStorage migration ＋ Gemini 契約変更が必要。費用対効果が著しく悪く、Gemini契約・永続データ・保護コアを巻き込むリスクが高い
+- **補足（既知の命名ワート）**: per-image 評価の保存フィールド名 `resultBgRatings` 等は別物で不変・安全。`scopeOf`（5軸系 RatingAxis）は既に恒等写像で `bg/background` とは無関係に削除可能（低優先・別タスク）。今後 `bg` を触るのは「永続形式やプロンプト契約を別目的で改訂する時」に同梱するのが妥当
+- **影響範囲**: コード変更なし（本ログのみ）。`bg` 命名は現状維持
+
 ---
 
 **End of Master Plan v1**
