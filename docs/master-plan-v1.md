@@ -751,6 +751,10 @@ live.complete(message);
 - **理由**: 2箇所は値セット（PromptCard=[6,5,3,2,1] 神6あり / Arrange=[5,3,2,1] 神なし）・サイズ（大/小）・装飾（shadow有/無）・付随機能（PromptCardのみ AI分析）が**すべて異なり**、共通なのは色の意味（5=emerald/3=sky/2=amber/1=rose/6=yellow）だけ。コア評価UIに variant コンポーネントを無理に作るとリスクが dedup 益を上回る
 - **影響範囲**: コード変更なし（本ログのみ）
 
----
+### 2026-06-14: 命名統一の一部（notif/Notification・バー系トグル）は見送り
 
-**End of Master Plan v1**
+- **背景**: 監査で「notificationSettings の notif/Notification 混在」「バー系のstate名・トグル絵文字不統一」の統一提案
+- **採用**: 両方 C（見送り）
+- **理由（notif/Notification）**: lib の export は既に全て `Notif*` で統一済み。残る不一致はファイル名/コンポーネント名（完全形）のみで、完全形へ寄せると型 `NotificationSettings` がコンポーネント名と衝突して不可。略称へ寄せる＝ファイル名の可読性低下。クリーンな統一方向が存在しないため現状維持
+- **理由（バー系）**: state 名は GlobalProtectionBar/ZozoTrendBar/SkyveilBar とも既に `open` で統一済み。差は SkyveilBar のトグルが「▼ 設定／▲ 閉じる」とラベル付き（他は ▼/▲ のみ）だが、これは有用な説明ラベルで、揃えると UX 低下＋レイアウト制約（ボタン文言変更禁止）に抵触
+- **影響範囲**: コード変更なし（本ログのみ）
