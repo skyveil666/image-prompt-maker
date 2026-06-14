@@ -14,6 +14,8 @@ import type { PromptHistoryItem, Mood } from "../types";
 import { getAll, updateItem, getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES } from "../lib/history";
 import { fileToThumbnail } from "../lib/imageFile";
 import { confirmUnfavorite } from "../lib/favoriteConfirm";
+import { formatDateTime } from "../lib/format";
+import { useEscapeKey } from "../lib/useEscapeKey";
 import { ALL_SCOPE_LABELS as SCOPE_LABEL } from "../lib/scopeLabels";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 
@@ -36,14 +38,6 @@ const OUTPUT_LABEL: Record<PromptHistoryItem["outputType"], string> = {
 };
 
 // ── ヘルパー ──────────────────────────────────────────────────────────────────
-
-function formatDateTime(ts: number): string {
-  const d = new Date(ts);
-  return (
-    `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ` +
-    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
-  );
-}
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -69,12 +63,7 @@ function CompareModal({
   // アイテムが変わったらコピー状態リセット
   useEffect(() => { setCopied(false); }, [item]);
 
-  useEffect(() => {
-    if (!item) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [item, onClose]);
+  useEscapeKey(onClose, !!item);
 
   const copyPrompt = async () => {
     if (!item) return;

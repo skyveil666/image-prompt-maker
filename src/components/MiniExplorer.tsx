@@ -16,6 +16,7 @@
  */
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEscapeKey } from "../lib/useEscapeKey";
 import type { ExplorerFavorite, ExplorerImage, ExplorerSubfolder } from "../lib/miniExplorer";
 import {
   addExplorerFavorite,
@@ -163,12 +164,7 @@ function LargePreview({
   }, []);
 
   // ── Esc closes pinned ─────────────────────────────────────────────
-  useEffect(() => {
-    if (!isPinned || !onClose) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, [isPinned, onClose]);
+  useEscapeKey(() => onClose?.(), !!isPinned && !!onClose);
 
   // ── Lazy-load file size ───────────────────────────────────────────
   useEffect(() => {

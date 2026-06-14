@@ -119,8 +119,6 @@ interface SlotProps {
   analyzeError: string | null;
 }
 
-const SLOT_MAX = 3;
-
 // 評価値 → 枠の Tailwind クラス（緑=良い / 青=普通 / 黄=微妙 / 赤=失敗）
 function ratingFrameClass(rating: number | null): string {
   switch (rating) {
@@ -215,7 +213,7 @@ function GeneratedResultSlot({
     }
   }, [replaceTarget]);
 
-  const canAdd = resultImages.length < SLOT_MAX;
+  const canAdd = resultImages.length < MAX_RESULT_IMAGES;
 
   // Clipboard paste — only fires when this slot (tabIndex=0) has focus
   useEffect(() => {
@@ -336,7 +334,7 @@ function GeneratedResultSlot({
               <button
                 type="button"
                 onClick={openAppendPicker}
-                title={`生成結果を追加（${resultImages.length}/${SLOT_MAX}）`}
+                title={`生成結果を追加（${resultImages.length}/${MAX_RESULT_IMAGES}）`}
                 className={[
                   "w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center transition",
                   isDragOver
@@ -352,7 +350,7 @@ function GeneratedResultSlot({
           <div className="flex-1 min-w-0 flex flex-col gap-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[13px] text-emerald-300/90 font-medium leading-none">
-                ✅ 生成結果 <span className="text-[11px] text-emerald-300/60">（{resultImages.length}/{SLOT_MAX}）</span>
+                ✅ 生成結果 <span className="text-[11px] text-emerald-300/60">（{resultImages.length}/{MAX_RESULT_IMAGES}）</span>
               </span>
               <span className="ml-auto flex items-center gap-1.5">
                 {canAdd && (
@@ -516,7 +514,7 @@ function GeneratedResultSlot({
             </div>
 
             <p className="text-[10px] text-text-muted/45 leading-snug">
-              画像クリックで差し替え・×で個別削除・最大{SLOT_MAX}枚 ／ 評価は次回プロンプト生成に反映
+              画像クリックで差し替え・×で個別削除・最大{MAX_RESULT_IMAGES}枚 ／ 評価は次回プロンプト生成に反映
             </p>
           </div>
         </div>
@@ -550,7 +548,7 @@ function GeneratedResultSlot({
       <span>
         {isDragOver
           ? "ドロップして登録"
-          : `生成結果画像をここに貼り付け（D&D / Ctrl+V / クリック・最大${SLOT_MAX}枚）`}
+          : `生成結果画像をここに貼り付け（D&D / Ctrl+V / クリック・最大${MAX_RESULT_IMAGES}枚）`}
       </span>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
     </div>

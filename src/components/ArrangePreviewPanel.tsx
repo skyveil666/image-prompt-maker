@@ -18,6 +18,7 @@ import {
   AXIS_RATING_META, type RatingAxisKey,
 } from "../lib/history";
 import { fileToThumbnail } from "../lib/imageFile";
+import { formatDateTime } from "../lib/format";
 
 /** 1案ごとの画像・評価ローカル state の型 */
 export interface ProposalLocalState {
@@ -80,14 +81,6 @@ interface Props {
   arrangeCount?:        Count;
   /** 生成枚数の変更。 */
   onArrangeCountChange?: (c: Count) => void;
-}
-
-function formatDateTime(ts: number): string {
-  const d = new Date(ts);
-  return (
-    `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ` +
-    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
-  );
 }
 
 // ── 要素選択チップ ────────────────────────────────────────────────────────────

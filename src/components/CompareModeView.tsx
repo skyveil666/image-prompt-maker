@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getReferenceRecords, updateReferenceRecord, type ReferenceRecord } from "../lib/referenceRecords";
+import { useEscapeKey } from "../lib/useEscapeKey";
 import { getByIndex, get, STORE_HISTORY } from "../lib/idb";
 import { getResultImages, getAxisRatingAt, buildAxisRatingPatch, updateItem, type RatingAxisKey } from "../lib/history";
 import { compareReferenceViaBackend } from "../lib/backendClient";
@@ -123,16 +124,7 @@ export function CompareModeView({ open, onClose }: Props) {
   }, [selected]);
 
   // Escape：ライトボックス優先で閉じ、無ければビューを閉じる。
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      if (lightbox) setLightbox(null);
-      else onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, lightbox, onClose]);
+  useEscapeKey(() => { if (lightbox) setLightbox(null); else onClose(); }, open);
 
   if (!open) return null;
 

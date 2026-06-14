@@ -4,6 +4,7 @@ import { FavoriteButton } from "./FavoriteButton";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 import { getResultImages } from "../lib/history";
 import { confirmUnfavorite } from "../lib/favoriteConfirm";
+import { formatDateTime } from "../lib/format";
 import { ALL_SCOPE_LABELS as SCOPE_LABEL } from "../lib/scopeLabels";
 
 interface Props {
@@ -20,14 +21,6 @@ interface Props {
 }
 
 // Scope→ラベルは scopeLabels.ts に一本化（SCOPE_LABEL は別名 import）。
-
-function formatDateTime(ts: number): string {
-  const d = new Date(ts);
-  return (
-    `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ` +
-    `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
-  );
-}
 
 export function HistoryItemRow({ item, onUpdate, onDelete, onArrange, onRestore, highlight, busy }: Props) {
   const [expanded, setExpanded] = useState(false);

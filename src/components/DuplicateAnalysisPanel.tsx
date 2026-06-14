@@ -27,6 +27,7 @@ import type { ColorAnalysis, ColorAxis, ColorSuccessAnalysis } from "../lib/colo
 import type { CandidateMotif } from "../lib/discoveryMotifs";
 import { COLOR_GROUPS, COLOR_AXES } from "../lib/colorAnalyzer";
 import { ALL_SCOPE_LABELS } from "../lib/scopeLabels";
+import { useEscapeKey } from "../lib/useEscapeKey";
 import type { ColorWeight, ColorWeightMap, ColorAxisCtrl } from "../lib/colorPolicy";
 import { WEIGHT_META, COLOR_AXIS_CTRL, getColorEntry, countWeights } from "../lib/colorPolicy";
 import { MonthlyCalendarSection } from "./MonthlyCalendarSection";
@@ -2205,12 +2206,7 @@ function DuplicateAnalysisPanelInner({
   const [expanded, setExpanded] = useState(false);
   const isExpanded = asModal ? true : expanded;
   // 全画面モーダル（分析センター）時は Esc で閉じる
-  useEffect(() => {
-    if (!asModal) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onCenterClose?.(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [asModal, onCenterClose]);
+  useEscapeKey(() => onCenterClose?.(), asModal);
   const [tab, setTab] = useState<"dup" | "discovery" | "agent" | "color" | "image" | "pref" | "rank" | "skyveil" | "plan">(initialTab ?? "dup");
   // 🔭発見タブ（未開拓発見担当）
   const [discSearch, setDiscSearch] = useState("");

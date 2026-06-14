@@ -9,6 +9,7 @@
  */
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState } from "react";
+import { useEscapeKey } from "../lib/useEscapeKey";
 
 export interface WithImagePreviewProps {
   src: string;
@@ -68,12 +69,7 @@ export function WithImagePreview({ src, label, sublabel, children }: WithImagePr
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   // Esc で拡大モーダルを閉じる
-  useEffect(() => {
-    if (!modalOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setModalOpen(false); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [modalOpen]);
+  useEscapeKey(() => setModalOpen(false), modalOpen);
 
   return (
     <div
