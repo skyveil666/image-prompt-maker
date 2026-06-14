@@ -1938,6 +1938,8 @@ function bodyFixBlock(): string {
     "─ 出力時の文例（そのまま使ってよい）─",
     "【人体補正】手は片手5本指・自然な関節構造・手首肘なめらか。脚・膝・足首・接地感を物理的に正確に整合。頭身は約8〜9頭身を維持し、元画像の体型比率・脚と顔の大きさを保つ（標準〜ポートレートレンズ使用・広角歪み・魚眼不使用）。" +
       " Anatomically correct hands (5 fingers each), wrists, elbows, legs, knees, ankles, grounding. Keep natural body proportions, realistic 8-9 head-to-body ratio, head/leg/face size matched to the reference; use standard-to-portrait lens only, do not apply fisheye or wide-angle distortion.",
+    "【脚部補正】脚は左右2本のみ。膝下〜足首の長さを自然に保ち、過度に長い脚・膝下の破綻・余分な輪郭線を排除。",
+    "Legs: exactly two legs, natural lower-leg length, no elongated or distorted limbs below knee, no ghost legs, no extra outlines.",
   ].join("\n");
 }
 

@@ -788,3 +788,13 @@ live.complete(message);
 - **理由**: 案B は挙動同一で App.tsx を約100行減らせるが、(1) フックが setter 数本を漏らす薄い「状態バッグ」で真の抽象化にならない、(2) buildInputs の変数源・JSX props・auto-adjust 尾部を広く配線変更、(3) §5 生成ペイロードに効くため Playwright 検証必須。クリーン版に必要な「buildInputs を 1000行以降へ移すリオーダー」は P7・§3 抵触。リスク／churn に見合う利得がない
 - **影響範囲**: コード変更なし（本ログのみ）。Phase 1a/1b（commit `2360ecd`）までで②は一旦完了とする
 - **再挑戦の前提**: もし将来やるなら、まず `buildInputs` の入力組み立てを別 lib（純関数）へ切り出して「状態を読む位置」と「組み立てロジック」を分離する設計（＝Phase 4 系）を先に承認・実施し、ゲートの前後関係を解いてから
+
+### 2026-06-14: 【人体補正】に【脚部補正】を追加（bodyFixBlock・全プロンプト常時出力）
+
+- **背景**: ユーザー要望。AI生成で頻出する脚アーティファクト（過度に長い脚・膝下の破綻・余分な輪郭線・3本目の脚＝ghost leg）を抑制するため、既存【人体補正】に脚部補正の文例を追加
+- **変更**: `server/src/promptSystem.ts` `bodyFixBlock()`（§4 untouchable・**ユーザー明示承認のうえ実施**）の文例末尾、英文「…wide-angle distortion.」の**直後に2行を追加のみ**（既存文は一切不変）:
+  - 「【脚部補正】脚は左右2本のみ。膝下〜足首の長さを自然に保ち、過度に長い脚・膝下の破綻・余分な輪郭線を排除。」
+  - 「Legs: exactly two legs, natural lower-leg length, no elongated or distorted limbs below knee, no ghost legs, no extra outlines.」
+- **全出力反映**: bodyFixBlock() は buildSystemPrompt 内で**無条件挿入**（4186・コメント「常時挿入」）。runtime 検証で scopes=[]/background/pose/hair+outfit+camera の全ケースで「distortion 直後」に出力を実証
+- **P8整合**: 解剖学的な「補正・中立化」（脚の本数・長さ・破綻の抑制）であり主役導線を支配するスタイル注入ではない。既存 bodyFixBlock（手指・等身補正）と同性質
+- **検証**: server tsc exit0／runtime ALL_OK（temp script 実行・削除済）。front は無関係（サーバのみ）
