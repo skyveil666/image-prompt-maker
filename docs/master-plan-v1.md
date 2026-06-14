@@ -851,3 +851,16 @@ live.complete(message);
 - **コスプレ**: ジャンル系統/持ち物・小物/カラー方向（7サブ系統＝特定コスチューム identity・装飾レベル/露出は据え置き）
 - 各 client は MultiFieldSection＋makeMultiChanger、server promptSystem は getMultiVals 結合分岐を **additive** 追加（非multi時は出力不変）。runtime で cosplay「かわいい系×ダーク系（複数ジャンルを融合）／魔法のステッキ・王冠（複数を併用）」等の融合出力＋single「（固定）」不変を実証。全カテゴリ front/server tsc・vite build exit0
 - **②完了**: 詳細設定の「組合せ可能フィールド」は全カテゴリで複数選択(最大3)対応完了。内訳＝既存multi(camera角度/距離/レンズ/構図・cyber4軸・outfit系統/色/素材/シルエット・背景place・lighting5軸・myth地域/種別・props/bigObjectカテゴリ＝計24軸)＋今回追加(背景スタイル/色/効果・前景7軸・ポーズ4軸・髪3軸・照明空気感・神話2軸・小物3軸・大物2軸・乗り物2軸・コスプレ3軸)。**据え置き**＝排他スカラー(長さ/密度/奥行き/情報量/サイズ/個数/露出/装飾量/季節感/高級感/比率/カラーモード/変化量/画角/視点高さ/コスプレ7サブ系統)・特殊(preset一括上書き/視認性/custom3D)・サーバ未処理(文字背景4種)
+
+### 2026-06-14: App.tsx 分割 Phase 5a/5c/4a/4b/5b 実装完了（バナー/アクション/エラー抽出＋永続設定フック化）
+
+- **背景**: App.tsx 2876行の god component を §3「無計画な大規模分割禁止」に従い、副作用の薄い純 move から段階分割（Phase 1a/1b に続く Phase 4/5）。ユーザー承認の実装順＝リスク順 **5a→5c→4a→4b→5b**。フック名は `usePersistedSettings`（`avoidRealBackground` は非永続のため除外）
+- **不変の鉄則（全段共通・実証済）**: `buildInputs`(586) / `runGenerate` / `handleGenerate` / `runBiasAnalysis` は一切編集せず。フックは戻り値を **App 側で同名分割代入** して受け取り、buildInputs/JSX/全ハンドラのクロージャは同一識別子を解決＝本体無変更。生成ペイロード不変・サーバ無変更・新規「見えない支配」設定なし
+- **5a（commit `deff7f4`）**: 表示専用バナー5個を `src/components/main/` へ純移設（RestoredItemBanner / PatternPreviewBanner / ArrangeSourceBanner / GenerationSummary / NanoBananaWarning）。条件ゲート・onClickクロージャは App 温存。GenerationProgress import は GenerationSummary 内へ移動
+- **5c（commit `e2c8593`）**: GlobalProtectionBar の actions スロットの案数セレクタ＋生成ボタンを `GenerationActionBar` へ抽出（PromptTargetSelector は App 温存・handleGenerate は onGenerate 参照渡し）
+- **4a（commit `a710f66`）**: 永続30state＋`loadSettings()` を `src/lib/usePersistedSettings.ts` へ移設（state宣言のみ・effect 3本は App 残置）。`s0` が初期化子のみで line237 以降未使用＝クリーン境界。`dimensionLevel` は値のみ返却（buildInputs 互換）。移設で未使用化した型 import 6種（ColorStrategy/Expression/DetailSettings/Mood/PromptTarget/ZozoTrend）を整理
+- **4b（commit `e018844`）**: 保存 / 別タブstorage同期 / アスペクト比自動記憶 の3 effect をフックへ移管しオーナー化。App から settingsPersist import 全廃。`defaultAspectRatio` はフック内専用化につき App 分割代入から除外
+- **5b（commit `7299798`）**: エラー IIFE を解体。表示シェルを `GenerationErrorPanel`（props: error/onSafeRetry）へ抽出、`handleSafeRetry` を App の return 直前へ引き上げ（buildInputs呼び出し・setter群・pendingRunRef を使うため App 保持）。ロジックは逐語移設で同一
+- **成果**: App.tsx **2876 → 2286 行（−590行・約20%減）**。新規 `src/components/main/`（6ファイル）＋`src/lib/usePersistedSettings.ts`
+- **検証（各段 §6）**: 全段で front tsc / vite build exit0。Playwright隔離(4330・空DB)＝5a/5c: 常時描画＋案数4→3切替＋console0／4a・4b: マウント復元・保存(localStorage 30キー)・リロード復元・別タブstorage同期・console0／5b: fetch横取り400 PROHIBITED_CONTENT で isBlocked分岐＋safe-retryボタン描画・クリックで再試行トースト発火・console error0。後片付け済（4330のみ停止・5173/3001不可侵）
+- **保留（§3該当・別途承認前提）**: 分析センターModalラッパ（~45 props パススルー・低利得）／ControlPanel boostArea（showPresetToast クロージャ密結合）／メイン列・左レール全体の分割。当初 Phase4系で構想した「buildInputs の入力組み立てを純lib化」は今回 buildInputs 不可触の制約により未実施（将来の再挑戦余地）
