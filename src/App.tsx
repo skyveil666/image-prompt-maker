@@ -421,11 +421,11 @@ export default function App() {
    *  ついでに色分析・画像分析・評価分析の入力 historyItemsForColor も同期する
    *  （履歴削除や評価更新が反映されないバグを防ぐため）。 */
   // 🛟 緊急復旧パネル：履歴/お気に入り表示の再読み込み用。
-  // dataVersion を key に渡して HistoryView / FavoritesPanel を再マウント＝IDB を再 getAll させる（リロードなし・非破壊）。
+  // dataVersion を key に渡して HistoryView を再マウント＝IDB を再 getAll させる（リロードなし・非破壊）。
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [dataVersion, setDataVersion] = useState(0);
   const reloadAllData = useCallback(() => {
-    setDataVersion((v) => v + 1);   // HistoryView / FavoritesPanel を再マウント → 再 getAll
+    setDataVersion((v) => v + 1);   // HistoryView を再マウント → 再 getAll
     void refreshFavoriteProfile();  // 分析・AI分析ストリップの件数も再読み込み
   // refreshFavoriteProfile は後方宣言だが、呼び出し時点では定義済み（実行は onClick）
   // eslint-disable-next-line react-hooks/exhaustive-deps

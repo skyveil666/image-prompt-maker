@@ -73,7 +73,7 @@ export function ImageSidebar({
   /**
    * imageDataUrl が変化するたびに recents を IDB から再同期する。
    * - 通常のアップロード（handleUpload）では setRecents 済みだが冪等で問題なし。
-   * - FavoritesPanel「元画像に」/ SimpleImageEditor 等の外部セット時は handleUpload を
+   * - SimpleImageEditor 等の外部セット時は handleUpload を
    *   経由しないため、ここで同期しないと一覧が古いままになる。
    * - 外部由来の URL（data:image/...）が recents に存在しなければ新規登録する。
    */
@@ -99,7 +99,7 @@ export function ImageSidebar({
         return;
       }
 
-      // 外部セット（FavoritesPanel 等）の場合：コンテンツハッシュで重複確認後に追加
+      // 外部セット（SimpleImageEditor 等）の場合：コンテンツハッシュで重複確認後に追加
       try {
         const hash = await imageContentHash(imageDataUrl);
         const { list: updated, item } = await addRecentImage({
