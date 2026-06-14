@@ -599,7 +599,7 @@ function Camera3DToggleSlot({
 function makeMultiChanger(
   d: DetailSettings,
   chg: (n: DetailSettings) => void,
-  scope: "hair" | "outfit" | "camera" | "myth" | "lighting" | "cyber",
+  scope: "hair" | "outfit" | "camera" | "myth" | "lighting" | "cyber" | "background" | "props" | "pose" | "bigObject" | "vehicle" | "foreground" | "cosplay",
 ) {
   return (fieldKey: string, field: string) => (single: string, multi: string[]) => {
     const mo = { ...(d.multiOverrides ?? {}) };
@@ -674,6 +674,7 @@ function BackgroundContent({ d, upd, chg }: {
     d.background.textLayout !== "skip" ||
     d.background.textTexture !== "skip";
   const [textOpen, setTextOpen] = useState(textActive);
+  const mc = makeMultiChanger(d, chg, "background");
   return (
     <div>
       {/* Scene preset grid */}
@@ -690,24 +691,24 @@ function BackgroundContent({ d, upd, chg }: {
         ))}
       </CellGrid>
       {/* Individual field grids */}
-      <FieldSection fieldKey="background.style" label="背景スタイル" value={d.background.style ?? "skip"} options={BG_STYLES}
-        onChange={(v) => upd("background", { style: v as DetailSettings["background"]["style"] })} />
+      <MultiFieldSection fieldKey="background.style" label="背景スタイル" singleValue={d.background.style ?? "skip"} multiValues={d.multiOverrides?.["background.style"] ?? []} options={BG_STYLES}
+        onChange={mc("background.style", "style")} />
       <MultiFieldSection fieldKey="background.place" label="場所" singleValue={d.background.place} multiValues={d.multiOverrides?.["background.place"] ?? []} options={BG_PLACES}
         onChange={(single, multi) => {
           const mo = { ...(d.multiOverrides ?? {}) };
           if (multi.length < 2) delete mo["background.place"]; else mo["background.place"] = multi;
           chg({ ...d, background: { ...d.background, place: single as DetailSettings["background"]["place"] }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
         }} />
-      <FieldSection fieldKey="background.color" label="色" value={d.background.color} options={BG_COLORS}
-        onChange={(v) => upd("background", { color: v as DetailSettings["background"]["color"] })} />
+      <MultiFieldSection fieldKey="background.color" label="色" singleValue={d.background.color} multiValues={d.multiOverrides?.["background.color"] ?? []} options={BG_COLORS}
+        onChange={mc("background.color", "color")} />
       <FieldSection fieldKey="background.time" label="時間帯" value={d.background.time} options={BG_TIMES}
         onChange={(v) => upd("background", { time: v as DetailSettings["background"]["time"] })} />
       <FieldSection fieldKey="background.weather" label="天候" value={d.background.weather} options={BG_WEATHERS}
         onChange={(v) => upd("background", { weather: v as DetailSettings["background"]["weather"] })} />
       <FieldSection fieldKey="background.density" label="密度" value={d.background.density} options={BG_DENSITIES}
         onChange={(v) => upd("background", { density: v as DetailSettings["background"]["density"] })} />
-      <FieldSection fieldKey="background.effect" label="空間効果" value={d.background.effect} options={BG_EFFECTS}
-        onChange={(v) => upd("background", { effect: v as DetailSettings["background"]["effect"] })} />
+      <MultiFieldSection fieldKey="background.effect" label="空間効果" singleValue={d.background.effect} multiValues={d.multiOverrides?.["background.effect"] ?? []} options={BG_EFFECTS}
+        onChange={mc("background.effect", "effect")} />
       <FieldSection fieldKey="background.depth" label="奥行き" value={d.background.depth} options={BG_DEPTHS}
         onChange={(v) => upd("background", { depth: v as DetailSettings["background"]["depth"] })} />
       <FieldSection fieldKey="background.info" label="情報量" value={d.background.info} options={BG_INFOS}

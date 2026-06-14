@@ -807,3 +807,11 @@ live.complete(message);
 - **検証**: front tsc / vite build exit0。**Playwright隔離(4330)で実証** — 単一(背景色): 選択→NG(取消線)＋非active→NG中クリック無視→再ダブルクリックで解除→再選択可（全6ステップ合格）。複数(場所/最大3): 3選択→1つNGで2に減・他は active 維持→NG中クリック無視→解除。`/api/generate` body: NG項目(inherit)は選択値に乗らず `background.color="blue"`・`ngOptions={"background.color":["inherit"]}` 送信。**server grep: ngOptions 参照0件＝単純に無視**。console 実エラー0(route.abort のみ)。後片付け済(4330停止・一時削除・5173/3001不可侵)
 - **適用範囲**: GridCell ベースの全 FieldSection/MultiFieldSection（背景/髪/衣装/ポーズ/カメラ/小物/大物/乗り物/神話/照明/前景/コスプレ）。bespoke UI のタブ(mood/artStyle/colorStrategy/ng/aspectRatio/camera3D)は GridCell 非使用のため対象外
 - **次**: ②複数選択のカテゴリ単位拡張（組合せ可能フィールドのみ・各フィールド client＋§4 結合・カテゴリごとに検証）
+
+### 2026-06-14: 複数選択(最大3)拡張② — 背景カテゴリ（スタイル/色/空間効果）
+
+- **対象**: 詳細設定②の複数選択を「組合せ可能フィールドのみ・カテゴリ単位」で拡張。第1カテゴリ＝背景
+- **変換した3フィールド**: 背景スタイル(style)/色(color)/空間効果(effect) を FieldSection→MultiFieldSection(maxSelect=3)。client は makeMultiChanger を "background" 他へ拡張して配線。server promptSystem(§4) に getMultiVals 結合分岐を **additive** 追加（2個以上選択時のみ融合表現／単一・auto・skip 時は既存 else-if を温存＝出力不変）
+- **除外（精査で判明）**: 文字背景4種(種類/雰囲気/配置/質感)＝**サーバが完全に未処理**(textType 等 grep 0)で multi 化しても生成無効果のため据え置き。時間帯/天候＝準排他(1画像1つ)。密度/奥行き/情報量＝スカラー
+- **検証**: front/server tsc・vite build exit0。runtime: multi「水彩画風×コラージュ（複数スタイルを自然に融合）／青系×ピンク系の配色／霧と光の粒子（複数効果を重ねる）」・single「水彩画風（固定）／青系（固定）／霧（固定）」＝**非multi出力不変**を実証。Playwright隔離: 背景スタイルで2選択→2/3・4つ目で FIFO→3/3・NG(機能①)併用で除外も動作。console0。後片付け済(4330停止・5173/3001不可侵)
+- **次カテゴリ候補**: 前景演出(エフェクト/回転渦/HUD/アート/位置/動き/色方向)→ポーズ(印象/手/足/動き)→小物/大物/乗り物/神話/コスプレ等

@@ -1348,8 +1348,11 @@ function describeDetails(
     const b = details.background;
     const fixed: string[] = [];
     const vary: string[] = [];
-    // 背景スタイル（絵画・アート・素材系）
-    if (b.style && b.style !== "auto" && b.style !== "skip")
+    // 背景スタイル（絵画・アート・素材系）。複数選択(multiOverrides)時は融合表現。
+    const bgStyleVals = getMultiVals(details.multiOverrides, "background.style");
+    if (bgStyleVals.length >= 2)
+      fixed.push(`【背景スタイル】：${bgStyleVals.map(v => (BG_LABELS.style as Record<string, string>)[v] ?? v).join("×")}（複数スタイルを自然に融合）`);
+    else if (b.style && b.style !== "auto" && b.style !== "skip")
       fixed.push(`【背景スタイル】：${BG_LABELS.style[b.style as keyof typeof BG_LABELS.style]}（固定）`);
     else if (b.style === "auto") vary.push("背景スタイル");
     const bgPlaceVals = getMultiVals(details.multiOverrides, "background.place");
@@ -1358,11 +1361,15 @@ function describeDetails(
     } else if (b.place !== "auto" && b.place !== "skip") {
       fixed.push(`場所：${BG_LABELS.place[b.place as keyof typeof BG_LABELS.place]}（固定）`);
     } else if (b.place === "auto") vary.push("場所");
-    if (b.color !== "auto" && b.color !== "skip") fixed.push(`色：${BG_LABELS.color[b.color as keyof typeof BG_LABELS.color]}（固定）`);
+    const bgColorVals = getMultiVals(details.multiOverrides, "background.color");
+    if (bgColorVals.length >= 2) fixed.push(`色：${bgColorVals.map(v => (BG_LABELS.color as Record<string, string>)[v] ?? v).join("×")}の配色（複数色を自然に配分）`);
+    else if (b.color !== "auto" && b.color !== "skip") fixed.push(`色：${BG_LABELS.color[b.color as keyof typeof BG_LABELS.color]}（固定）`);
     else if (b.color === "auto") vary.push("色");
     if (b.density !== "auto" && b.density !== "skip") fixed.push(`密度：${BG_LABELS.density[b.density]}（固定）`);
     else if (b.density === "auto") vary.push("密度");
-    if (b.effect !== "auto" && b.effect !== "skip") fixed.push(`空間効果：${BG_LABELS.effect[b.effect as keyof typeof BG_LABELS.effect]}（固定）`);
+    const bgEffectVals = getMultiVals(details.multiOverrides, "background.effect");
+    if (bgEffectVals.length >= 2) fixed.push(`空間効果：${bgEffectVals.map(v => (BG_LABELS.effect as Record<string, string>)[v] ?? v).join("と")}（複数効果を重ねる）`);
+    else if (b.effect !== "auto" && b.effect !== "skip") fixed.push(`空間効果：${BG_LABELS.effect[b.effect as keyof typeof BG_LABELS.effect]}（固定）`);
     else if (b.effect === "auto") vary.push("空間効果");
     if (b.time !== "auto" && b.time !== "skip") fixed.push(`時間帯：${BG_LABELS.time[b.time]}（固定）`);
     else if (b.time === "auto") vary.push("時間帯");
