@@ -3922,6 +3922,9 @@ export function buildSystemPrompt(
   // 安全モード（省略時 = "full" = 従来動作）
   const pt: PromptTarget = req.promptTarget ?? "full";
 
+  // 非空なら先頭に改行を付ける共通ヘルパ（各所の改行付与IIFEを集約・出力は不変）
+  const nl = (x: string) => (x ? "\n" + x : "");
+
   const scopeList = req.scopes.map((s) => SCOPE_JA[s]).join("・");
 
   // 固定ムード（ユーザーが具体的に選択）
@@ -4111,15 +4114,15 @@ export function buildSystemPrompt(
     autoMoodBlock || "",
     // 時代軸ブロック（eraBlock）は撤去（dead code整理・グローバル era は生成に不使用だった）。
     // 色戦略ブロック（肯定系のみ。否定系は NG ブロックに追加済み）
-    (() => { const b = colorStrategyPositiveBlock(req.colorStrategy); return b ? "\n" + b : ""; })(),
+    nl(colorStrategyPositiveBlock(req.colorStrategy)),
     // 絵柄スタイルブロック（設定なし = null/undefined の場合は挿入しない）
-    (() => { const b = artStyleBlock(req.artStyle); return b ? "\n" + b : ""; })(),
+    nl(artStyleBlock(req.artStyle)),
     // マンネリ回避エンジン（ジャンル抽選・意外性・頻出ペナルティ・背景依存低減・最終チェック）
-    (() => { const b = plan ? varietyBlock(plan, req) : ""; return b ? "\n" + b : ""; })(),
+    nl(plan ? varietyBlock(plan, req) : ""),
     "\n" + userStyleBlock(),
     // 異常な組み合わせ奨励：常時挿入（量産回避と対）
     "\n" + weirdCombinationBlock(),
-    (() => { const b = bgDiversityBlock(req); return b ? "\n" + b : ""; })(),
+    nl(bgDiversityBlock(req)),
     // 量産構図回避：UIトグルに従う（デフォルトON。省略時も true 扱い）。
     // ※「量産AI検知（Gemini採点）」は別物で gemini.ts 側で常時実行している。
     (req.avoidCliche !== false) ? "\n" + avoidClicheBlock() : "",
@@ -4131,31 +4134,31 @@ export function buildSystemPrompt(
     // 衣装サブジャンル展開：大カテゴリ名は出さず案ごとにサブジャンルへ展開
     subStylePlan ? "\n" + subStyleBlock(subStylePlan) : "",
     // ZOZOトレンド：衣装ON時のみ、現在のリアルなファッション傾向を反映
-    (() => { const b = zozoTrendBlock(req); return b ? "\n" + b : ""; })(),
+    nl(zozoTrendBlock(req)),
     // 色彩多様性ルール：常時挿入（mono/no_color 戦略選択時のみ除外）
     "\n" + colorDiversityBlock(req),
     // お気に入り学習：traits があれば反映（コピー禁止・変更範囲内・固定優先）
-    (() => { const b = favoriteProfileBlock(req.favoriteTraits, req.favoriteStrength); return b ? "\n" + b : ""; })(),
+    nl(favoriteProfileBlock(req.favoriteTraits, req.favoriteStrength)),
     // 神引き補助モディファイア（被り回避・別世界・バズ寄せ・顔映え）
-    (() => { const b = boostBlock(req); return b ? "\n" + b : ""; })(),
+    nl(boostBlock(req)),
     // 風の強さ（髪/衣装/前景演出/ポーズ/カメラ のいずれかON時のみ）
-    (() => { const b = windBlock(req); return b ? "\n" + b : ""; })(),
+    nl(windBlock(req)),
     // 重複制御（頻出モチーフの出現制御レベル）
-    (() => { const b = motifControlBlock(req, pt); return b ? "\n" + b : ""; })(),
+    nl(motifControlBlock(req, pt)),
     // 頻出構成（組み合わせ）制御
-    (() => { const b = comboControlBlock(req, pt); return b ? "\n" + b : ""; })(),
+    nl(comboControlBlock(req, pt)),
     // 色ポリシー（restrict / block）— 旧式の全軸色制御（互換）
-    (() => { const b = colorControlBlock(req, pt); return b ? "\n" + b : ""; })(),
+    nl(colorControlBlock(req, pt)),
     // 色×軸 重み制御（新式・軸別 0-5）— 髪/服/背景を独立に制御
-    (() => { const b = colorWeightBlock(req, pt); return b ? "\n" + b : ""; })(),
+    nl(colorWeightBlock(req, pt)),
     // 画像分析バイアス — 生成結果画像のクラスタリングから得た偏り情報
-    (() => { const b = imageBiasBlock(req, pt); return b ? "\n" + b : ""; })(),
+    nl(imageBiasBlock(req, pt)),
     // AI 好みプロファイル（実 Gemini 分析）— 最優先度の好み反映
-    (() => { const b = preferenceProfileBlock(req, pt); return b ? "\n" + b : ""; })(),
+    nl(preferenceProfileBlock(req, pt)),
     // ユーザー画像評価バイアス — 👍/👎 から導いた方向性ヒント
-    (() => { const b = ratingBiasBlock(req, pt); return b ? "\n" + b : ""; })(),
+    nl(ratingBiasBlock(req, pt)),
     // 質感・リアル度 — 人物と背景の質感統一（背景だけリアルすぎる問題の防止）
-    (() => { const b = realismBlock(req, pt); return b ? "\n" + b : ""; })(),
+    nl(realismBlock(req, pt)),
     detailLines ? `\n【詳細設定】\n${detailLines}` : "",
     extra ? `\n【ユーザー追加指示】${extra}` : "",
     "",

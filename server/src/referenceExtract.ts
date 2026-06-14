@@ -19,6 +19,12 @@ export const REFERENCE_KEYS = [
   "world", "texture", "mood",
 ] as const;
 
+/** REFERENCE_KEYS を全て空文字にした JSON 雛形文字列。
+ *  各ファイルにハードコードされていた雛形をここから生成し、キー追加時の片側更新漏れを防ぐ。 */
+export function emptyReferenceJson(): string {
+  return "{" + REFERENCE_KEYS.map((k) => `"${k}":""`).join(",") + "}";
+}
+
 /** 必ず具体的に埋める8カテゴリ（空欄・雑な一語は禁止） */
 const REQUIRED_KEYS = ["background", "outfit", "hair", "pose", "composition", "camera", "lighting", "color"];
 
@@ -68,7 +74,7 @@ const SYSTEM = [
   "- mood: 全体の空気感・感情トーン(静か/緊張感/儚さ/退廃 等)",
   "",
   "# 出力（このキー・順序で固定・JSONのみ。前置き/後置き/コードブロック不要）",
-  '{"background":"","outfit":"","hair":"","pose":"","composition":"","camera":"","lighting":"","color":"","props":"","foreground":"","world":"","texture":"","mood":""}',
+  emptyReferenceJson(),
 ].join("\n");
 
 const USER = [

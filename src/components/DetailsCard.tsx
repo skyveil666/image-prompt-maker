@@ -570,12 +570,28 @@ function Camera3DToggleSlot({
 
 // ─── Per-scope content ────────────────────────────────────────────────────────
 
-function HairContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
-  const mc = (fieldKey: string, field: keyof DetailSettings["hair"]) => (single: string, multi: string[]) => {
+/**
+ * multiOverrides を出し入れしつつ単一値も更新する共通クロージャ。
+ * 各 *Content にコピペされていた mc を集約（scope キーだけ差し替え）。
+ */
+function makeMultiChanger(
+  d: DetailSettings,
+  chg: (n: DetailSettings) => void,
+  scope: "hair" | "outfit" | "camera" | "myth" | "lighting" | "cyber",
+) {
+  return (fieldKey: string, field: string) => (single: string, multi: string[]) => {
     const mo = { ...(d.multiOverrides ?? {}) };
     if (multi.length < 2) delete mo[fieldKey]; else mo[fieldKey] = multi;
-    chg({ ...d, hair: { ...d.hair, [field]: single as any }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
+    chg({
+      ...d,
+      [scope]: { ...(d[scope] as any), [field]: single as any },
+      multiOverrides: Object.keys(mo).length > 0 ? mo : undefined,
+    } as DetailSettings);
   };
+}
+
+function HairContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
+  const mc = makeMultiChanger(d, chg, "hair");
   return (
     <div>
       <FieldSection label="スタイル系統" value={d.hair.hairStyle ?? "skip"} options={HAIR_STYLES} noTopMargin
@@ -603,11 +619,7 @@ function HairContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
 }
 
 function OutfitContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
-  const mc = (fieldKey: string, field: keyof DetailSettings["outfit"]) => (single: string, multi: string[]) => {
-    const mo = { ...(d.multiOverrides ?? {}) };
-    if (multi.length < 2) delete mo[fieldKey]; else mo[fieldKey] = multi;
-    chg({ ...d, outfit: { ...d.outfit, [field]: single as any }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
-  };
+  const mc = makeMultiChanger(d, chg, "outfit");
   return (
     <div>
       <MultiFieldSection label="系統" singleValue={d.outfit.style} multiValues={d.multiOverrides?.["outfit.style"] ?? []} options={OUTFIT_STYLES} noTopMargin
@@ -741,11 +753,7 @@ function PoseContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
 }
 
 function CameraContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
-  const mc = (fieldKey: string, field: keyof DetailSettings["camera"]) => (single: string, multi: string[]) => {
-    const mo = { ...(d.multiOverrides ?? {}) };
-    if (multi.length < 2) delete mo[fieldKey]; else mo[fieldKey] = multi;
-    chg({ ...d, camera: { ...d.camera, [field]: single as any }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
-  };
+  const mc = makeMultiChanger(d, chg, "camera");
   const activePresetId = activeCameraPresetId(d.camera, d.multiOverrides);
   return (
     <div>
@@ -946,11 +954,7 @@ function VehicleContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
 }
 
 function MythContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
-  const mc = (fieldKey: string, field: keyof DetailSettings["myth"]) => (single: string, multi: string[]) => {
-    const mo = { ...(d.multiOverrides ?? {}) };
-    if (multi.length < 2) delete mo[fieldKey]; else mo[fieldKey] = multi;
-    chg({ ...d, myth: { ...d.myth, [field]: single as any }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
-  };
+  const mc = makeMultiChanger(d, chg, "myth");
   return (
     <div>
       {/* 安全ルール注記 */}
@@ -972,11 +976,7 @@ function MythContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
 }
 
 function LightingContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
-  const mc = (fieldKey: string, field: keyof DetailSettings["lighting"]) => (single: string, multi: string[]) => {
-    const mo = { ...(d.multiOverrides ?? {}) };
-    if (multi.length < 2) delete mo[fieldKey]; else mo[fieldKey] = multi;
-    chg({ ...d, lighting: { ...d.lighting, [field]: single as any }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
-  };
+  const mc = makeMultiChanger(d, chg, "lighting");
   const activePresetId = activeLightPresetId(d.lighting, d.multiOverrides);
   return (
     <div>
@@ -1019,11 +1019,7 @@ function LightingContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg
 }
 
 function CyberContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
-  const mc = (fieldKey: string, field: keyof DetailSettings["cyber"]) => (single: string, multi: string[]) => {
-    const mo = { ...(d.multiOverrides ?? {}) };
-    if (multi.length < 2) delete mo[fieldKey]; else mo[fieldKey] = multi;
-    chg({ ...d, cyber: { ...d.cyber, [field]: single as any }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
-  };
+  const mc = makeMultiChanger(d, chg, "cyber");
   return (
     <div>
       {/* 安全ルール注記 */}

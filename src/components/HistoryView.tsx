@@ -229,7 +229,7 @@ export function HistoryView({
     });
   }, [items, filter, extraFilters, searchQuery]);
 
-  const onUpdate = useCallback(
+  const handleUpdate = useCallback(
     async (id: string, patch: Partial<PromptHistoryItem>) => {
       await updateItem(id, patch);
       // 楽観的更新のみ。setRefreshKey を呼ばない（不要な全件 reload を防ぐ）
@@ -238,7 +238,7 @@ export function HistoryView({
     []
   );
 
-  const onDelete = useCallback(async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     await deleteItem(id);
     // 楽観的更新のみ。setRefreshKey を呼ばない（不要な全件 reload を防ぐ）
     setItems((prev) => prev.filter((it) => it.id !== id));
@@ -641,8 +641,8 @@ export function HistoryView({
                 <HistoryItemRow
                   key={it.id}
                   item={it}
-                  onUpdate={onUpdate}
-                  onDelete={onDelete}
+                  onUpdate={handleUpdate}
+                  onDelete={handleDelete}
                   onArrange={onArrangeInline ? handleArrangeSelect : undefined}
                   onRestore={onRestore}
                   highlight={arrangeSource?.id === it.id}

@@ -9,7 +9,7 @@
  * ※ 顔・同一性・年齢・人物特定は採点も記述もしない（P1〜P7）。
  */
 import { GoogleGenAI } from "@google/genai";
-import { REFERENCE_KEYS } from "./referenceExtract.ts";
+import { REFERENCE_KEYS, emptyReferenceJson } from "./referenceExtract.ts";
 
 const apiKey = process.env.GEMINI_API_KEY;
 const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -65,7 +65,7 @@ const SYSTEM = [
   "",
   "# 出力（JSONのみ・前置き/コードブロック不要）",
   '{"scores":{"<渡された項目>":0-100},"reasons":{"<渡された項目>":"短評"},',
-  '"generated":{"background":"","outfit":"","hair":"","pose":"","composition":"","camera":"","lighting":"","color":"","props":"","foreground":"","world":"","texture":"","mood":""}}',
+  `"generated":${emptyReferenceJson()}}`,
 ].join("\n");
 
 /** スコアを 0-100 の整数に整える（不正は除外）。 */
