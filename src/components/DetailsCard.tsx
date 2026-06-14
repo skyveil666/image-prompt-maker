@@ -624,18 +624,18 @@ function HairContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
         onChange={mc("hair.shape", "shape")} />
       <MultiFieldSection fieldKey="hair.color" label="髪色" singleValue={d.hair.color} multiValues={d.multiOverrides?.["hair.color"] ?? []} options={HAIR_COLORS}
         onChange={mc("hair.color", "color")} />
-      <FieldSection fieldKey="hair.texture" label="質感" value={d.hair.texture} options={HAIR_TEXTURES}
-        onChange={(v) => upd("hair", { texture: v as DetailSettings["hair"]["texture"] })} />
+      <MultiFieldSection fieldKey="hair.texture" label="質感" singleValue={d.hair.texture} multiValues={d.multiOverrides?.["hair.texture"] ?? []} options={HAIR_TEXTURES}
+        onChange={mc("hair.texture", "texture")} />
       <FieldSection fieldKey="hair.colorMode" label="カラーモード" value={d.hair.colorMode} options={HAIR_COLOR_MODES}
         onChange={(v) => upd("hair", { colorMode: v as DetailSettings["hair"]["colorMode"] })} />
       <FieldSection fieldKey="hair.bangs" label="前髪" value={d.hair.bangs} options={HAIR_BANGS}
         onChange={(v) => upd("hair", { bangs: v as DetailSettings["hair"]["bangs"] })} />
-      <FieldSection fieldKey="hair.tips" label="毛先" value={d.hair.tips} options={HAIR_TIPS}
-        onChange={(v) => upd("hair", { tips: v as DetailSettings["hair"]["tips"] })} />
+      <MultiFieldSection fieldKey="hair.tips" label="毛先" singleValue={d.hair.tips} multiValues={d.multiOverrides?.["hair.tips"] ?? []} options={HAIR_TIPS}
+        onChange={mc("hair.tips", "tips")} />
       <FieldSection fieldKey="hair.volume" label="ボリューム" value={d.hair.volume} options={HAIR_VOLUMES}
         onChange={(v) => upd("hair", { volume: v as DetailSettings["hair"]["volume"] })} />
-      <FieldSection fieldKey="hair.accessory" label="アクセサリー" value={d.hair.accessory} options={HAIR_ACCESSORIES}
-        onChange={(v) => upd("hair", { accessory: v as DetailSettings["hair"]["accessory"] })} />
+      <MultiFieldSection fieldKey="hair.accessory" label="アクセサリー" singleValue={d.hair.accessory} multiValues={d.multiOverrides?.["hair.accessory"] ?? []} options={HAIR_ACCESSORIES}
+        onChange={mc("hair.accessory", "accessory")} />
     </div>
   );
 }

@@ -1150,7 +1150,9 @@ function describeDetails(
     } else if (h.shape !== "auto" && h.shape !== "skip") {
       fixed.push(`形：${HAIR_LABELS.shape[h.shape as keyof typeof HAIR_LABELS.shape]}（固定）`);
     } else if (h.shape === "auto") vary.push("形");
-    if (h.texture !== "auto" && h.texture !== "skip") fixed.push(`質感：${HAIR_LABELS.texture[h.texture as keyof typeof HAIR_LABELS.texture]}（固定）`);
+    const haTexVals = getMultiVals(details.multiOverrides, "hair.texture");
+    if (haTexVals.length >= 2) fixed.push(`質感：${haTexVals.map(v => (HAIR_LABELS.texture as Record<string, string>)[v] ?? v).join("・")}（複数の質感を融合）`);
+    else if (h.texture !== "auto" && h.texture !== "skip") fixed.push(`質感：${HAIR_LABELS.texture[h.texture as keyof typeof HAIR_LABELS.texture]}（固定）`);
     else if (h.texture === "auto") vary.push("質感");
     // colorMode: skip → 省略、auto → vary に追加、それ以外 → fixed（髪色変更ポリシー）
     if (h.colorMode !== "skip") {
@@ -1165,11 +1167,15 @@ function describeDetails(
     } else if (h.color === "auto" && h.colorMode !== "lock" && h.colorMode !== "skip") vary.push("髪色");
     if (h.bangs !== "auto" && h.bangs !== "skip") fixed.push(`前髪：${HAIR_LABELS.bangs[h.bangs as keyof typeof HAIR_LABELS.bangs]}（固定）`);
     else if (h.bangs === "auto") vary.push("前髪");
-    if (h.tips !== "auto" && h.tips !== "skip") fixed.push(`毛先：${HAIR_LABELS.tips[h.tips as keyof typeof HAIR_LABELS.tips]}（固定）`);
+    const haTipsVals = getMultiVals(details.multiOverrides, "hair.tips");
+    if (haTipsVals.length >= 2) fixed.push(`毛先：${haTipsVals.map(v => (HAIR_LABELS.tips as Record<string, string>)[v] ?? v).join("・")}（複数を併用）`);
+    else if (h.tips !== "auto" && h.tips !== "skip") fixed.push(`毛先：${HAIR_LABELS.tips[h.tips as keyof typeof HAIR_LABELS.tips]}（固定）`);
     else if (h.tips === "auto") vary.push("毛先");
     if (h.volume !== "auto" && h.volume !== "skip") fixed.push(`ボリューム：${HAIR_LABELS.volume[h.volume as keyof typeof HAIR_LABELS.volume]}（固定）`);
     else if (h.volume === "auto") vary.push("ボリューム");
-    if (h.accessory !== "auto" && h.accessory !== "skip") fixed.push(`アクセサリー：${HAIR_LABELS.accessory[h.accessory as keyof typeof HAIR_LABELS.accessory]}（固定）`);
+    const haAccVals = getMultiVals(details.multiOverrides, "hair.accessory");
+    if (haAccVals.length >= 2) fixed.push(`アクセサリー：${haAccVals.map(v => (HAIR_LABELS.accessory as Record<string, string>)[v] ?? v).join("・")}（複数を併用）`);
+    else if (h.accessory !== "auto" && h.accessory !== "skip") fixed.push(`アクセサリー：${HAIR_LABELS.accessory[h.accessory as keyof typeof HAIR_LABELS.accessory]}（固定）`);
     else if (h.accessory === "auto") vary.push("アクセサリー");
 
     if (fixed.length > 0 || vary.length > 0) {
