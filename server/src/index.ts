@@ -13,13 +13,16 @@ const VALID_EXPRESSIONS = new Set<string>([
   "neutral","smile","cold","assertive","sad","sleepy","elegant","cool","ephemeral","intimidating",
 ]);
 
-const GEMINI_TIMEOUT_MS = 30_000;
+// gemini-2.5-flash は thinking モデルで、巨大な system prompt＋画像＋複数案を1回で生成するため
+// 単発でも数十秒かかり得る。さらに generate() 内で空応答/区切り失敗時に最大1回リトライ（同一予算内）
+// するため、30秒では正常な生成まで打ち切られて 504 になる。真のハングは捕捉しつつ余裕を持たせる。
+const GEMINI_TIMEOUT_MS = 120_000;
 
 async function withTimeout<T>(fn: () => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      const e = new Error("Gemini request timed out (30s)") as Error & { isTimeout: boolean };
+      const e = new Error("Gemini request timed out (120s)") as Error & { isTimeout: boolean };
       e.isTimeout = true;
       reject(e);
     }, GEMINI_TIMEOUT_MS);
