@@ -821,3 +821,9 @@ live.complete(message);
 - **変換7フィールド**: エフェクト種類/回転・渦/HUD・デジタル/アート表現/位置/動き/色方向 を MultiFieldSection(最大3)化。ForegroundContent に chg を配線し makeMultiChanger("foreground") 使用。server promptSystem に getMultiVals 結合分岐を additive 追加
 - **据え置き**: preset(他フィールド一括上書きの特殊)・密度/奥行き(スカラー)・視認性(顔保護・準排他)
 - **検証**: front/server tsc・vite build exit0。runtime: multi「花びら・雪（複数を重ねる）／青白×ゴールド（複数色を併用）」・single「花びら（固定）／青白（固定）」＝非multi出力不変を実証
+
+### 2026-06-14: 複数選択(最大3)拡張② — ポーズカテゴリ（印象/手/足/動き）
+
+- **変換4フィールド**: 印象/手の位置/足の位置/動き を MultiFieldSection(最大3)化（PoseContent に chg 配線）。server に additive 結合分岐（手足は「左右で異なる配置」表現）
+- **据え置き**: 種類(基本姿勢1つ)・重心(1つ)・視線(1方向)・体の向き(1つ)＝排他
+- **検証**: tsc(both)/build exit0。runtime「印象：クール・謎めいた…（複数の印象を融合）／手：片手を腰・片手を顔の近く（左右の手で異なる配置）」・single「クール（固定）」＝非multi不変

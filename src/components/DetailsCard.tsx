@@ -752,23 +752,24 @@ function BackgroundContent({ d, upd, chg }: {
   );
 }
 
-function PoseContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
+function PoseContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
+  const mc = makeMultiChanger(d, chg, "pose");
   return (
     <div>
       <FieldSection fieldKey="pose.type" label="種類" value={d.pose.type} options={POSE_TYPES} noTopMargin
         onChange={(v) => upd("pose", { type: v as DetailSettings["pose"]["type"] })} />
-      <FieldSection fieldKey="pose.impression" label="印象" value={d.pose.impression} options={POSE_IMPRESSIONS}
-        onChange={(v) => upd("pose", { impression: v as DetailSettings["pose"]["impression"] })} />
+      <MultiFieldSection fieldKey="pose.impression" label="印象" singleValue={d.pose.impression} multiValues={d.multiOverrides?.["pose.impression"] ?? []} options={POSE_IMPRESSIONS}
+        onChange={mc("pose.impression", "impression")} />
       <FieldSection fieldKey="pose.gaze" label="視線" value={d.pose.gaze} options={POSE_GAZES}
         onChange={(v) => upd("pose", { gaze: v as DetailSettings["pose"]["gaze"] })} />
-      <FieldSection fieldKey="pose.hand" label="手の位置" value={d.pose.hand} options={POSE_HANDS}
-        onChange={(v) => upd("pose", { hand: v as DetailSettings["pose"]["hand"] })} />
-      <FieldSection fieldKey="pose.foot" label="足の位置" value={d.pose.foot} options={POSE_FEET}
-        onChange={(v) => upd("pose", { foot: v as DetailSettings["pose"]["foot"] })} />
+      <MultiFieldSection fieldKey="pose.hand" label="手の位置" singleValue={d.pose.hand} multiValues={d.multiOverrides?.["pose.hand"] ?? []} options={POSE_HANDS}
+        onChange={mc("pose.hand", "hand")} />
+      <MultiFieldSection fieldKey="pose.foot" label="足の位置" singleValue={d.pose.foot} multiValues={d.multiOverrides?.["pose.foot"] ?? []} options={POSE_FEET}
+        onChange={mc("pose.foot", "foot")} />
       <FieldSection fieldKey="pose.balance" label="重心" value={d.pose.balance} options={POSE_BALANCES}
         onChange={(v) => upd("pose", { balance: v as DetailSettings["pose"]["balance"] })} />
-      <FieldSection fieldKey="pose.motion" label="動き" value={d.pose.motion} options={POSE_MOTIONS}
-        onChange={(v) => upd("pose", { motion: v as DetailSettings["pose"]["motion"] })} />
+      <MultiFieldSection fieldKey="pose.motion" label="動き" singleValue={d.pose.motion} multiValues={d.multiOverrides?.["pose.motion"] ?? []} options={POSE_MOTIONS}
+        onChange={mc("pose.motion", "motion")} />
       <FieldSection fieldKey="pose.orientation" label="体の向き" value={d.pose.orientation} options={POSE_ORIENTATIONS}
         onChange={(v) => upd("pose", { orientation: v as DetailSettings["pose"]["orientation"] })} />
     </div>
@@ -1863,7 +1864,7 @@ export function DetailsCard({
       case "cyber":         return <CyberContent      d={value} upd={update} chg={onChange} />;
       case "background":    return <BackgroundContent d={value} upd={update} chg={onChange} />;
       case "foreground":    return <ForegroundContent d={value} upd={update} chg={onChange} />;
-      case "pose":          return <PoseContent       d={value} upd={update} />;
+      case "pose":          return <PoseContent       d={value} upd={update} chg={onChange} />;
       case "camera":        return <CameraContent     d={value} upd={update} chg={onChange} />;
       case "props":         return <PropsContent      d={value} upd={update} chg={onChange} />;
       case "big_object":    return <BigObjectContent  d={value} upd={update} chg={onChange} />;
