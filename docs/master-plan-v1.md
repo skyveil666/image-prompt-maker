@@ -798,3 +798,12 @@ live.complete(message);
 - **全出力反映**: bodyFixBlock() は buildSystemPrompt 内で**無条件挿入**（4186・コメント「常時挿入」）。runtime 検証で scopes=[]/background/pose/hair+outfit+camera の全ケースで「distortion 直後」に出力を実証
 - **P8整合**: 解剖学的な「補正・中立化」（脚の本数・長さ・破綻の抑制）であり主役導線を支配するスタイル注入ではない。既存 bodyFixBlock（手指・等身補正）と同性質
 - **検証**: server tsc exit0／runtime ALL_OK（temp script 実行・削除済）。front は無関係（サーバのみ）
+
+### 2026-06-14: 詳細設定にオプション単位 NG（ダブルクリック除外・A案）を実装
+
+- **背景**: ユーザー要望。詳細設定の全カテゴリのボタンに「ダブルクリックでNG（赤字＋取消線）→生成で完全スキップ・ネガティブ不使用（単純に無視）」を追加。あわせて複数選択(最大3)を調査した結果、既に `MultiFieldSection`(maxSelect=3・FIFO) で23フィールド実装済みと判明（②はカテゴリ単位で「組合せ可能フィールドのみ」拡張する別タスク）
+- **設計判断（ユーザー承認）**: NG は A案=クライアント側除外のみ。理由＝サーバの auto モードは候補プールを列挙しないため「auto抑制」には§4＋ソフトネガティブが必要で「ネガティブ不使用」要件と矛盾。A案では NG 項目を選択不可＋選択中なら解除＝選択値に乗らないため出力に出ない。**サーバ無改修(§4不要)**
+- **実装**: ①`DetailSettings.ngOptions?: Record<string,string[]>`（"scope.field"→NG id配列）追加 ②settingsPersist mergeDetails で ngOptions 永続保持（multiOverrides は従来通り非永続） ③GridCell に `ng`/`onDoubleClick`（赤字＋line-through＋select-none、active/✓抑制） ④FieldSection/MultiFieldSection が NgContext＋`fieldKey` で NG 描画・onClick ガード・onDoubleClick トグル。**全100 call site(77+23)に fieldKey を機械注入**（value=`d.scope.field` / multiOverrides キーから導出） ⑤DetailsCard 本体に `toggleNg`（NG化時は単一/複数選択から当該 id を解除）＋ NgContext.Provider ⑥フッターに「ダブルクリック＝NG（除外）」ヒント
+- **検証**: front tsc / vite build exit0。**Playwright隔離(4330)で実証** — 単一(背景色): 選択→NG(取消線)＋非active→NG中クリック無視→再ダブルクリックで解除→再選択可（全6ステップ合格）。複数(場所/最大3): 3選択→1つNGで2に減・他は active 維持→NG中クリック無視→解除。`/api/generate` body: NG項目(inherit)は選択値に乗らず `background.color="blue"`・`ngOptions={"background.color":["inherit"]}` 送信。**server grep: ngOptions 参照0件＝単純に無視**。console 実エラー0(route.abort のみ)。後片付け済(4330停止・一時削除・5173/3001不可侵)
+- **適用範囲**: GridCell ベースの全 FieldSection/MultiFieldSection（背景/髪/衣装/ポーズ/カメラ/小物/大物/乗り物/神話/照明/前景/コスプレ）。bespoke UI のタブ(mood/artStyle/colorStrategy/ng/aspectRatio/camera3D)は GridCell 非使用のため対象外
+- **次**: ②複数選択のカテゴリ単位拡張（組合せ可能フィールドのみ・各フィールド client＋§4 結合・カテゴリごとに検証）

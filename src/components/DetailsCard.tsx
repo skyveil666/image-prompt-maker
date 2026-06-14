@@ -1,4 +1,4 @@
-import { Suspense, lazy, useRef, useState } from "react";
+import { Suspense, lazy, useRef, useState, createContext, useContext } from "react";
 import type { ArtStyle, Camera3DState, ColorStrategy, DetailSettings, Mood, Scope } from "../types";
 import { DEFAULT_DETAILS, AUTO_DETAILS } from "../types";
 import { describeCameraAngle } from "../lib/cameraAngle";
@@ -379,19 +379,29 @@ function activeBgPresetId(bg: DetailSettings["background"]): string | null {
 
 // ─── FieldSection ─────────────────────────────────────────────────────────────
 
+/** 詳細設定の NG（ダブルクリック除外）共有。fieldKey="scope.field" 単位で NG id 配列を保持。 */
+const NgContext = createContext<{ ng: Record<string, string[]>; toggle: (fieldKey: string, id: string) => void }>({
+  ng: {},
+  toggle: () => {},
+});
+
 function FieldSection({
   label,
   value,
   options,
   onChange,
   noTopMargin = false,
+  fieldKey,
 }: {
   label: string;
   value: string;
   options: PresetItem[];
   onChange: (v: string) => void;
   noTopMargin?: boolean;
+  fieldKey?: string;
 }) {
+  const ngCtx = useContext(NgContext);
+  const ngSet = fieldKey ? ngCtx.ng[fieldKey] ?? [] : [];
   return (
     <div>
       <CellSectionLabel label={label} noTopMargin={noTopMargin} />
@@ -408,18 +418,21 @@ function FieldSection({
           cellKind="auto"
           onClick={() => onChange("auto")}
         />
-        {options.map((opt) => (
-          <GridCell
-            key={opt.id}
-            jaLabel={opt.label}
-            active={value === opt.id}
-            cellKind="value"
-            title={opt.ja}
-            onClick={() =>
-              onChange(value === opt.id ? "skip" : opt.id)
-            }
-          />
-        ))}
+        {options.map((opt) => {
+          const isNg = ngSet.includes(opt.id);
+          return (
+            <GridCell
+              key={opt.id}
+              jaLabel={opt.label}
+              active={!isNg && value === opt.id}
+              ng={isNg}
+              cellKind="value"
+              title={opt.ja}
+              onClick={() => { if (isNg) return; onChange(value === opt.id ? "skip" : opt.id); }}
+              onDoubleClick={fieldKey ? () => ngCtx.toggle(fieldKey, opt.id) : undefined}
+            />
+          );
+        })}
       </CellGrid>
     </div>
   );
@@ -441,6 +454,7 @@ function MultiFieldSection({
   onChange,
   noTopMargin = false,
   maxSelect = 3,
+  fieldKey,
 }: {
   label: string;
   singleValue: string;
@@ -449,7 +463,10 @@ function MultiFieldSection({
   onChange: (single: string, multi: string[]) => void;
   noTopMargin?: boolean;
   maxSelect?: number;
+  fieldKey?: string;
 }) {
+  const ngCtx = useContext(NgContext);
+  const ngSet = fieldKey ? ngCtx.ng[fieldKey] ?? [] : [];
   // 有効な選択セット: multiValues が 2+ ならそれ、
   // そうでなければ singleValue から1個分を導出
   const activeSet =
@@ -505,16 +522,21 @@ function MultiFieldSection({
           cellKind="auto"
           onClick={() => onChange("auto", [])}
         />
-        {options.map((opt) => (
-          <GridCell
-            key={opt.id}
-            jaLabel={opt.label}
-            active={activeSet.includes(opt.id)}
-            cellKind="value"
-            title={opt.ja}
-            onClick={() => handleToggle(opt.id)}
-          />
-        ))}
+        {options.map((opt) => {
+          const isNg = ngSet.includes(opt.id);
+          return (
+            <GridCell
+              key={opt.id}
+              jaLabel={opt.label}
+              active={!isNg && activeSet.includes(opt.id)}
+              ng={isNg}
+              cellKind="value"
+              title={opt.ja}
+              onClick={() => { if (isNg) return; handleToggle(opt.id); }}
+              onDoubleClick={fieldKey ? () => ngCtx.toggle(fieldKey, opt.id) : undefined}
+            />
+          );
+        })}
       </CellGrid>
     </div>
   );
@@ -594,25 +616,25 @@ function HairContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
   const mc = makeMultiChanger(d, chg, "hair");
   return (
     <div>
-      <FieldSection label="スタイル系統" value={d.hair.hairStyle ?? "skip"} options={HAIR_STYLES} noTopMargin
+      <FieldSection fieldKey="hair.hairStyle" label="スタイル系統" value={d.hair.hairStyle ?? "skip"} options={HAIR_STYLES} noTopMargin
         onChange={(v) => upd("hair", { hairStyle: v as DetailSettings["hair"]["hairStyle"] })} />
-      <FieldSection label="長さ" value={d.hair.length} options={HAIR_LENGTHS}
+      <FieldSection fieldKey="hair.length" label="長さ" value={d.hair.length} options={HAIR_LENGTHS}
         onChange={(v) => upd("hair", { length: v as DetailSettings["hair"]["length"] })} />
-      <MultiFieldSection label="形" singleValue={d.hair.shape} multiValues={d.multiOverrides?.["hair.shape"] ?? []} options={HAIR_SHAPES}
+      <MultiFieldSection fieldKey="hair.shape" label="形" singleValue={d.hair.shape} multiValues={d.multiOverrides?.["hair.shape"] ?? []} options={HAIR_SHAPES}
         onChange={mc("hair.shape", "shape")} />
-      <MultiFieldSection label="髪色" singleValue={d.hair.color} multiValues={d.multiOverrides?.["hair.color"] ?? []} options={HAIR_COLORS}
+      <MultiFieldSection fieldKey="hair.color" label="髪色" singleValue={d.hair.color} multiValues={d.multiOverrides?.["hair.color"] ?? []} options={HAIR_COLORS}
         onChange={mc("hair.color", "color")} />
-      <FieldSection label="質感" value={d.hair.texture} options={HAIR_TEXTURES}
+      <FieldSection fieldKey="hair.texture" label="質感" value={d.hair.texture} options={HAIR_TEXTURES}
         onChange={(v) => upd("hair", { texture: v as DetailSettings["hair"]["texture"] })} />
-      <FieldSection label="カラーモード" value={d.hair.colorMode} options={HAIR_COLOR_MODES}
+      <FieldSection fieldKey="hair.colorMode" label="カラーモード" value={d.hair.colorMode} options={HAIR_COLOR_MODES}
         onChange={(v) => upd("hair", { colorMode: v as DetailSettings["hair"]["colorMode"] })} />
-      <FieldSection label="前髪" value={d.hair.bangs} options={HAIR_BANGS}
+      <FieldSection fieldKey="hair.bangs" label="前髪" value={d.hair.bangs} options={HAIR_BANGS}
         onChange={(v) => upd("hair", { bangs: v as DetailSettings["hair"]["bangs"] })} />
-      <FieldSection label="毛先" value={d.hair.tips} options={HAIR_TIPS}
+      <FieldSection fieldKey="hair.tips" label="毛先" value={d.hair.tips} options={HAIR_TIPS}
         onChange={(v) => upd("hair", { tips: v as DetailSettings["hair"]["tips"] })} />
-      <FieldSection label="ボリューム" value={d.hair.volume} options={HAIR_VOLUMES}
+      <FieldSection fieldKey="hair.volume" label="ボリューム" value={d.hair.volume} options={HAIR_VOLUMES}
         onChange={(v) => upd("hair", { volume: v as DetailSettings["hair"]["volume"] })} />
-      <FieldSection label="アクセサリー" value={d.hair.accessory} options={HAIR_ACCESSORIES}
+      <FieldSection fieldKey="hair.accessory" label="アクセサリー" value={d.hair.accessory} options={HAIR_ACCESSORIES}
         onChange={(v) => upd("hair", { accessory: v as DetailSettings["hair"]["accessory"] })} />
     </div>
   );
@@ -622,21 +644,21 @@ function OutfitContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
   const mc = makeMultiChanger(d, chg, "outfit");
   return (
     <div>
-      <MultiFieldSection label="系統" singleValue={d.outfit.style} multiValues={d.multiOverrides?.["outfit.style"] ?? []} options={OUTFIT_STYLES} noTopMargin
+      <MultiFieldSection fieldKey="outfit.style" label="系統" singleValue={d.outfit.style} multiValues={d.multiOverrides?.["outfit.style"] ?? []} options={OUTFIT_STYLES} noTopMargin
         onChange={mc("outfit.style", "style")} />
-      <MultiFieldSection label="色方向" singleValue={d.outfit.color} multiValues={d.multiOverrides?.["outfit.color"] ?? []} options={OUTFIT_COLORS}
+      <MultiFieldSection fieldKey="outfit.color" label="色方向" singleValue={d.outfit.color} multiValues={d.multiOverrides?.["outfit.color"] ?? []} options={OUTFIT_COLORS}
         onChange={mc("outfit.color", "color")} />
-      <MultiFieldSection label="素材" singleValue={d.outfit.material} multiValues={d.multiOverrides?.["outfit.material"] ?? []} options={OUTFIT_MATERIALS}
+      <MultiFieldSection fieldKey="outfit.material" label="素材" singleValue={d.outfit.material} multiValues={d.multiOverrides?.["outfit.material"] ?? []} options={OUTFIT_MATERIALS}
         onChange={mc("outfit.material", "material")} />
-      <MultiFieldSection label="シルエット" singleValue={d.outfit.silhouette} multiValues={d.multiOverrides?.["outfit.silhouette"] ?? []} options={OUTFIT_SILHOUETTES}
+      <MultiFieldSection fieldKey="outfit.silhouette" label="シルエット" singleValue={d.outfit.silhouette} multiValues={d.multiOverrides?.["outfit.silhouette"] ?? []} options={OUTFIT_SILHOUETTES}
         onChange={mc("outfit.silhouette", "silhouette")} />
-      <FieldSection label="露出" value={d.outfit.exposure} options={OUTFIT_EXPOSURES}
+      <FieldSection fieldKey="outfit.exposure" label="露出" value={d.outfit.exposure} options={OUTFIT_EXPOSURES}
         onChange={(v) => upd("outfit", { exposure: v as DetailSettings["outfit"]["exposure"] })} />
-      <FieldSection label="装飾量" value={d.outfit.decoration} options={OUTFIT_DECORATIONS}
+      <FieldSection fieldKey="outfit.decoration" label="装飾量" value={d.outfit.decoration} options={OUTFIT_DECORATIONS}
         onChange={(v) => upd("outfit", { decoration: v as DetailSettings["outfit"]["decoration"] })} />
-      <FieldSection label="季節感" value={d.outfit.season} options={OUTFIT_SEASONS}
+      <FieldSection fieldKey="outfit.season" label="季節感" value={d.outfit.season} options={OUTFIT_SEASONS}
         onChange={(v) => upd("outfit", { season: v as DetailSettings["outfit"]["season"] })} />
-      <FieldSection label="高級感" value={d.outfit.luxury} options={OUTFIT_LUXURIES}
+      <FieldSection fieldKey="outfit.luxury" label="高級感" value={d.outfit.luxury} options={OUTFIT_LUXURIES}
         onChange={(v) => upd("outfit", { luxury: v as DetailSettings["outfit"]["luxury"] })} />
     </div>
   );
@@ -668,27 +690,27 @@ function BackgroundContent({ d, upd, chg }: {
         ))}
       </CellGrid>
       {/* Individual field grids */}
-      <FieldSection label="背景スタイル" value={d.background.style ?? "skip"} options={BG_STYLES}
+      <FieldSection fieldKey="background.style" label="背景スタイル" value={d.background.style ?? "skip"} options={BG_STYLES}
         onChange={(v) => upd("background", { style: v as DetailSettings["background"]["style"] })} />
-      <MultiFieldSection label="場所" singleValue={d.background.place} multiValues={d.multiOverrides?.["background.place"] ?? []} options={BG_PLACES}
+      <MultiFieldSection fieldKey="background.place" label="場所" singleValue={d.background.place} multiValues={d.multiOverrides?.["background.place"] ?? []} options={BG_PLACES}
         onChange={(single, multi) => {
           const mo = { ...(d.multiOverrides ?? {}) };
           if (multi.length < 2) delete mo["background.place"]; else mo["background.place"] = multi;
           chg({ ...d, background: { ...d.background, place: single as DetailSettings["background"]["place"] }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
         }} />
-      <FieldSection label="色" value={d.background.color} options={BG_COLORS}
+      <FieldSection fieldKey="background.color" label="色" value={d.background.color} options={BG_COLORS}
         onChange={(v) => upd("background", { color: v as DetailSettings["background"]["color"] })} />
-      <FieldSection label="時間帯" value={d.background.time} options={BG_TIMES}
+      <FieldSection fieldKey="background.time" label="時間帯" value={d.background.time} options={BG_TIMES}
         onChange={(v) => upd("background", { time: v as DetailSettings["background"]["time"] })} />
-      <FieldSection label="天候" value={d.background.weather} options={BG_WEATHERS}
+      <FieldSection fieldKey="background.weather" label="天候" value={d.background.weather} options={BG_WEATHERS}
         onChange={(v) => upd("background", { weather: v as DetailSettings["background"]["weather"] })} />
-      <FieldSection label="密度" value={d.background.density} options={BG_DENSITIES}
+      <FieldSection fieldKey="background.density" label="密度" value={d.background.density} options={BG_DENSITIES}
         onChange={(v) => upd("background", { density: v as DetailSettings["background"]["density"] })} />
-      <FieldSection label="空間効果" value={d.background.effect} options={BG_EFFECTS}
+      <FieldSection fieldKey="background.effect" label="空間効果" value={d.background.effect} options={BG_EFFECTS}
         onChange={(v) => upd("background", { effect: v as DetailSettings["background"]["effect"] })} />
-      <FieldSection label="奥行き" value={d.background.depth} options={BG_DEPTHS}
+      <FieldSection fieldKey="background.depth" label="奥行き" value={d.background.depth} options={BG_DEPTHS}
         onChange={(v) => upd("background", { depth: v as DetailSettings["background"]["depth"] })} />
-      <FieldSection label="情報量" value={d.background.info} options={BG_INFOS}
+      <FieldSection fieldKey="background.info" label="情報量" value={d.background.info} options={BG_INFOS}
         onChange={(v) => upd("background", { info: v as DetailSettings["background"]["info"] })} />
       {/* 文字背景 / 書（アコーディオン） */}
       <div className="mt-3 pt-2.5 border-t border-white/8">
@@ -715,13 +737,13 @@ function BackgroundContent({ d, upd, chg }: {
       </div>
       {textOpen && (
         <div className="mt-1 pl-1 border-l-2 border-emerald-500/20">
-          <FieldSection label="文字の種類" value={d.background.textType} options={BG_TEXT_TYPES} noTopMargin
+          <FieldSection fieldKey="background.textType" label="文字の種類" value={d.background.textType} options={BG_TEXT_TYPES} noTopMargin
             onChange={(v) => upd("background", { textType: v as DetailSettings["background"]["textType"] })} />
-          <FieldSection label="雰囲気" value={d.background.textMood} options={BG_TEXT_MOODS}
+          <FieldSection fieldKey="background.textMood" label="雰囲気" value={d.background.textMood} options={BG_TEXT_MOODS}
             onChange={(v) => upd("background", { textMood: v as DetailSettings["background"]["textMood"] })} />
-          <FieldSection label="配置" value={d.background.textLayout} options={BG_TEXT_LAYOUTS}
+          <FieldSection fieldKey="background.textLayout" label="配置" value={d.background.textLayout} options={BG_TEXT_LAYOUTS}
             onChange={(v) => upd("background", { textLayout: v as DetailSettings["background"]["textLayout"] })} />
-          <FieldSection label="質感" value={d.background.textTexture} options={BG_TEXT_TEXTURES}
+          <FieldSection fieldKey="background.textTexture" label="質感" value={d.background.textTexture} options={BG_TEXT_TEXTURES}
             onChange={(v) => upd("background", { textTexture: v as DetailSettings["background"]["textTexture"] })} />
         </div>
       )}
@@ -732,21 +754,21 @@ function BackgroundContent({ d, upd, chg }: {
 function PoseContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
   return (
     <div>
-      <FieldSection label="種類" value={d.pose.type} options={POSE_TYPES} noTopMargin
+      <FieldSection fieldKey="pose.type" label="種類" value={d.pose.type} options={POSE_TYPES} noTopMargin
         onChange={(v) => upd("pose", { type: v as DetailSettings["pose"]["type"] })} />
-      <FieldSection label="印象" value={d.pose.impression} options={POSE_IMPRESSIONS}
+      <FieldSection fieldKey="pose.impression" label="印象" value={d.pose.impression} options={POSE_IMPRESSIONS}
         onChange={(v) => upd("pose", { impression: v as DetailSettings["pose"]["impression"] })} />
-      <FieldSection label="視線" value={d.pose.gaze} options={POSE_GAZES}
+      <FieldSection fieldKey="pose.gaze" label="視線" value={d.pose.gaze} options={POSE_GAZES}
         onChange={(v) => upd("pose", { gaze: v as DetailSettings["pose"]["gaze"] })} />
-      <FieldSection label="手の位置" value={d.pose.hand} options={POSE_HANDS}
+      <FieldSection fieldKey="pose.hand" label="手の位置" value={d.pose.hand} options={POSE_HANDS}
         onChange={(v) => upd("pose", { hand: v as DetailSettings["pose"]["hand"] })} />
-      <FieldSection label="足の位置" value={d.pose.foot} options={POSE_FEET}
+      <FieldSection fieldKey="pose.foot" label="足の位置" value={d.pose.foot} options={POSE_FEET}
         onChange={(v) => upd("pose", { foot: v as DetailSettings["pose"]["foot"] })} />
-      <FieldSection label="重心" value={d.pose.balance} options={POSE_BALANCES}
+      <FieldSection fieldKey="pose.balance" label="重心" value={d.pose.balance} options={POSE_BALANCES}
         onChange={(v) => upd("pose", { balance: v as DetailSettings["pose"]["balance"] })} />
-      <FieldSection label="動き" value={d.pose.motion} options={POSE_MOTIONS}
+      <FieldSection fieldKey="pose.motion" label="動き" value={d.pose.motion} options={POSE_MOTIONS}
         onChange={(v) => upd("pose", { motion: v as DetailSettings["pose"]["motion"] })} />
-      <FieldSection label="体の向き" value={d.pose.orientation} options={POSE_ORIENTATIONS}
+      <FieldSection fieldKey="pose.orientation" label="体の向き" value={d.pose.orientation} options={POSE_ORIENTATIONS}
         onChange={(v) => upd("pose", { orientation: v as DetailSettings["pose"]["orientation"] })} />
     </div>
   );
@@ -783,17 +805,17 @@ function CameraContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
           />
         ))}
       </CellGrid>
-      <MultiFieldSection label="角度" singleValue={d.camera.angle} multiValues={d.multiOverrides?.["camera.angle"] ?? []} options={CAMERA_ANGLES}
+      <MultiFieldSection fieldKey="camera.angle" label="角度" singleValue={d.camera.angle} multiValues={d.multiOverrides?.["camera.angle"] ?? []} options={CAMERA_ANGLES}
         onChange={mc("camera.angle", "angle")} />
-      <MultiFieldSection label="距離" singleValue={d.camera.distance} multiValues={d.multiOverrides?.["camera.distance"] ?? []} options={CAMERA_DISTANCES}
+      <MultiFieldSection fieldKey="camera.distance" label="距離" singleValue={d.camera.distance} multiValues={d.multiOverrides?.["camera.distance"] ?? []} options={CAMERA_DISTANCES}
         onChange={mc("camera.distance", "distance")} />
-      <MultiFieldSection label="レンズ感" singleValue={d.camera.lens} multiValues={d.multiOverrides?.["camera.lens"] ?? []} options={CAMERA_LENSES}
+      <MultiFieldSection fieldKey="camera.lens" label="レンズ感" singleValue={d.camera.lens} multiValues={d.multiOverrides?.["camera.lens"] ?? []} options={CAMERA_LENSES}
         onChange={mc("camera.lens", "lens")} />
-      <MultiFieldSection label="構図" singleValue={d.camera.composition} multiValues={d.multiOverrides?.["camera.composition"] ?? []} options={CAMERA_COMPOSITIONS}
+      <MultiFieldSection fieldKey="camera.composition" label="構図" singleValue={d.camera.composition} multiValues={d.multiOverrides?.["camera.composition"] ?? []} options={CAMERA_COMPOSITIONS}
         onChange={mc("camera.composition", "composition")} />
-      <FieldSection label="画角" value={d.camera.fov} options={CAMERA_FOVS}
+      <FieldSection fieldKey="camera.fov" label="画角" value={d.camera.fov} options={CAMERA_FOVS}
         onChange={(v) => upd("camera", { fov: v as DetailSettings["camera"]["fov"] })} />
-      <FieldSection label="視点高さ" value={d.camera.eyeHeight} options={CAMERA_EYE_HEIGHTS}
+      <FieldSection fieldKey="camera.eyeHeight" label="視点高さ" value={d.camera.eyeHeight} options={CAMERA_EYE_HEIGHTS}
         onChange={(v) => upd("camera", { eyeHeight: v as DetailSettings["camera"]["eyeHeight"] })} />
       <div>
         <CellSectionLabel label="3D指定" />
@@ -809,23 +831,23 @@ function CameraContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
 function PropsContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n: DetailSettings) => void }) {
   return (
     <div>
-      <MultiFieldSection label="カテゴリ" singleValue={d.props.category} multiValues={d.multiOverrides?.["props.category"] ?? []} options={PROPS_CATEGORIES} noTopMargin
+      <MultiFieldSection fieldKey="props.category" label="カテゴリ" singleValue={d.props.category} multiValues={d.multiOverrides?.["props.category"] ?? []} options={PROPS_CATEGORIES} noTopMargin
         onChange={(single, multi) => {
           const mo = { ...(d.multiOverrides ?? {}) };
           if (multi.length < 2) delete mo["props.category"]; else mo["props.category"] = multi;
           chg({ ...d, props: { ...d.props, category: single as DetailSettings["props"]["category"] }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
         }} />
-      <FieldSection label="持たせ方" value={d.props.hold} options={PROPS_HOLDS}
+      <FieldSection fieldKey="props.hold" label="持たせ方" value={d.props.hold} options={PROPS_HOLDS}
         onChange={(v) => upd("props", { hold: v as DetailSettings["props"]["hold"] })} />
-      <FieldSection label="サイズ" value={d.props.size} options={PROPS_SIZES}
+      <FieldSection fieldKey="props.size" label="サイズ" value={d.props.size} options={PROPS_SIZES}
         onChange={(v) => upd("props", { size: v as DetailSettings["props"]["size"] })} />
-      <FieldSection label="光り方" value={d.props.glow} options={PROPS_GLOWS}
+      <FieldSection fieldKey="props.glow" label="光り方" value={d.props.glow} options={PROPS_GLOWS}
         onChange={(v) => upd("props", { glow: v as DetailSettings["props"]["glow"] })} />
-      <FieldSection label="雰囲気" value={d.props.vibe} options={PROPS_VIBES}
+      <FieldSection fieldKey="props.vibe" label="雰囲気" value={d.props.vibe} options={PROPS_VIBES}
         onChange={(v) => upd("props", { vibe: v as DetailSettings["props"]["vibe"] })} />
-      <FieldSection label="配置" value={d.props.placement} options={PROPS_PLACEMENTS}
+      <FieldSection fieldKey="props.placement" label="配置" value={d.props.placement} options={PROPS_PLACEMENTS}
         onChange={(v) => upd("props", { placement: v as DetailSettings["props"]["placement"] })} />
-      <FieldSection label="個数" value={d.props.count} options={PROPS_COUNTS}
+      <FieldSection fieldKey="props.count" label="個数" value={d.props.count} options={PROPS_COUNTS}
         onChange={(v) => upd("props", { count: v as DetailSettings["props"]["count"] })} />
     </div>
   );
@@ -916,15 +938,15 @@ function BigObjectContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; ch
           );
         })}
       </div>
-      <FieldSection label="種類" value={d.bigObject.type} options={BIG_OBJECT_TYPES}
+      <FieldSection fieldKey="bigObject.type" label="種類" value={d.bigObject.type} options={BIG_OBJECT_TYPES}
         onChange={(v) => upd("bigObject", { type: v as DetailSettings["bigObject"]["type"] })} />
-      <FieldSection label="状態" value={d.bigObject.condition} options={BIG_OBJECT_CONDITIONS}
+      <FieldSection fieldKey="bigObject.condition" label="状態" value={d.bigObject.condition} options={BIG_OBJECT_CONDITIONS}
         onChange={(v) => upd("bigObject", { condition: v as DetailSettings["bigObject"]["condition"] })} />
-      <FieldSection label="配置" value={d.bigObject.placement} options={BIG_OBJECT_PLACEMENTS}
+      <FieldSection fieldKey="bigObject.placement" label="配置" value={d.bigObject.placement} options={BIG_OBJECT_PLACEMENTS}
         onChange={(v) => upd("bigObject", { placement: v as DetailSettings["bigObject"]["placement"] })} />
-      <FieldSection label="サイズ" value={d.bigObject.size} options={BIG_OBJECT_SIZES}
+      <FieldSection fieldKey="bigObject.size" label="サイズ" value={d.bigObject.size} options={BIG_OBJECT_SIZES}
         onChange={(v) => upd("bigObject", { size: v as DetailSettings["bigObject"]["size"] })} />
-      <FieldSection label="雰囲気" value={d.bigObject.mood} options={BIG_OBJECT_MOODS}
+      <FieldSection fieldKey="bigObject.mood" label="雰囲気" value={d.bigObject.mood} options={BIG_OBJECT_MOODS}
         onChange={(v) => upd("bigObject", { mood: v as DetailSettings["bigObject"]["mood"] })} />
     </div>
   );
@@ -937,17 +959,17 @@ function VehicleContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
       <div className="mb-3 rounded-xl border border-orange-400/25 bg-orange-500/8 px-3 py-2 text-[11px] text-orange-200/70 leading-relaxed">
         🚗 <span className="text-orange-200/90 font-semibold">人物が主役</span>、乗り物は脇役。乗り物のジャンル・種類の順に選ぶと絞り込めます。ミリタリーは展示・停止状態のみ。
       </div>
-      <FieldSection label="ジャンル" value={d.vehicle.genre} options={VEHICLE_GENRES} noTopMargin
+      <FieldSection fieldKey="vehicle.genre" label="ジャンル" value={d.vehicle.genre} options={VEHICLE_GENRES} noTopMargin
         onChange={(v) => upd("vehicle", { genre: v as DetailSettings["vehicle"]["genre"] })} />
-      <FieldSection label="種類" value={d.vehicle.type} options={VEHICLE_TYPES}
+      <FieldSection fieldKey="vehicle.type" label="種類" value={d.vehicle.type} options={VEHICLE_TYPES}
         onChange={(v) => upd("vehicle", { type: v as DetailSettings["vehicle"]["type"] })} />
-      <FieldSection label="関わり方" value={d.vehicle.interaction} options={VEHICLE_INTERACTIONS}
+      <FieldSection fieldKey="vehicle.interaction" label="関わり方" value={d.vehicle.interaction} options={VEHICLE_INTERACTIONS}
         onChange={(v) => upd("vehicle", { interaction: v as DetailSettings["vehicle"]["interaction"] })} />
-      <FieldSection label="時代感" value={d.vehicle.era} options={VEHICLE_ERAS}
+      <FieldSection fieldKey="vehicle.era" label="時代感" value={d.vehicle.era} options={VEHICLE_ERAS}
         onChange={(v) => upd("vehicle", { era: v as DetailSettings["vehicle"]["era"] })} />
-      <FieldSection label="素材感" value={d.vehicle.material} options={VEHICLE_MATERIALS}
+      <FieldSection fieldKey="vehicle.material" label="素材感" value={d.vehicle.material} options={VEHICLE_MATERIALS}
         onChange={(v) => upd("vehicle", { material: v as DetailSettings["vehicle"]["material"] })} />
-      <FieldSection label="雰囲気" value={d.vehicle.atmosphere} options={VEHICLE_ATMOSPHERES}
+      <FieldSection fieldKey="vehicle.atmosphere" label="雰囲気" value={d.vehicle.atmosphere} options={VEHICLE_ATMOSPHERES}
         onChange={(v) => upd("vehicle", { atmosphere: v as DetailSettings["vehicle"]["atmosphere"] })} />
     </div>
   );
@@ -961,15 +983,15 @@ function MythContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
       <div className="mb-3 rounded-xl border border-amber-400/25 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-200/70 leading-relaxed">
         🐉 <span className="text-amber-200/90 font-semibold">人物が主役</span>、幻獣は演出要素。既存作品（ガンダム・ポケモン・DQ・FF等）の固有キャラクターは使わず、オリジナルデザインで描写します。
       </div>
-      <MultiFieldSection label="神話地域" singleValue={d.myth.region} multiValues={d.multiOverrides?.["myth.region"] ?? []} options={MYTH_REGIONS} noTopMargin
+      <MultiFieldSection fieldKey="myth.region" label="神話地域" singleValue={d.myth.region} multiValues={d.multiOverrides?.["myth.region"] ?? []} options={MYTH_REGIONS} noTopMargin
         onChange={mc("myth.region", "region")} />
-      <MultiFieldSection label="幻獣種別" singleValue={d.myth.creature} multiValues={d.multiOverrides?.["myth.creature"] ?? []} options={MYTH_CREATURES}
+      <MultiFieldSection fieldKey="myth.creature" label="幻獣種別" singleValue={d.myth.creature} multiValues={d.multiOverrides?.["myth.creature"] ?? []} options={MYTH_CREATURES}
         onChange={mc("myth.creature", "creature")} />
-      <FieldSection label="配置・関わり方" value={d.myth.interaction} options={MYTH_INTERACTIONS}
+      <FieldSection fieldKey="myth.interaction" label="配置・関わり方" value={d.myth.interaction} options={MYTH_INTERACTIONS}
         onChange={(v) => upd("myth", { interaction: v as DetailSettings["myth"]["interaction"] })} />
-      <FieldSection label="描写スタイル" value={d.myth.style} options={MYTH_STYLES}
+      <FieldSection fieldKey="myth.style" label="描写スタイル" value={d.myth.style} options={MYTH_STYLES}
         onChange={(v) => upd("myth", { style: v as DetailSettings["myth"]["style"] })} />
-      <FieldSection label="サイズ感" value={d.myth.size} options={MYTH_SIZES}
+      <FieldSection fieldKey="myth.size" label="サイズ感" value={d.myth.size} options={MYTH_SIZES}
         onChange={(v) => upd("myth", { size: v as DetailSettings["myth"]["size"] })} />
     </div>
   );
@@ -1002,17 +1024,17 @@ function LightingContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg
           />
         ))}
       </CellGrid>
-      <MultiFieldSection label="光源方向" singleValue={d.lighting.direction} multiValues={d.multiOverrides?.["lighting.direction"] ?? []} options={LIGHT_DIRECTIONS}
+      <MultiFieldSection fieldKey="lighting.direction" label="光源方向" singleValue={d.lighting.direction} multiValues={d.multiOverrides?.["lighting.direction"] ?? []} options={LIGHT_DIRECTIONS}
         onChange={mc("lighting.direction", "direction")} />
-      <MultiFieldSection label="強さ" singleValue={d.lighting.intensity} multiValues={d.multiOverrides?.["lighting.intensity"] ?? []} options={LIGHT_INTENSITIES}
+      <MultiFieldSection fieldKey="lighting.intensity" label="強さ" singleValue={d.lighting.intensity} multiValues={d.multiOverrides?.["lighting.intensity"] ?? []} options={LIGHT_INTENSITIES}
         onChange={mc("lighting.intensity", "intensity")} />
-      <MultiFieldSection label="色温度" singleValue={d.lighting.temperature} multiValues={d.multiOverrides?.["lighting.temperature"] ?? []} options={LIGHT_TEMPS}
+      <MultiFieldSection fieldKey="lighting.temperature" label="色温度" singleValue={d.lighting.temperature} multiValues={d.multiOverrides?.["lighting.temperature"] ?? []} options={LIGHT_TEMPS}
         onChange={mc("lighting.temperature", "temperature")} />
-      <MultiFieldSection label="影" singleValue={d.lighting.shadow} multiValues={d.multiOverrides?.["lighting.shadow"] ?? []} options={LIGHT_SHADOWS}
+      <MultiFieldSection fieldKey="lighting.shadow" label="影" singleValue={d.lighting.shadow} multiValues={d.multiOverrides?.["lighting.shadow"] ?? []} options={LIGHT_SHADOWS}
         onChange={mc("lighting.shadow", "shadow")} />
-      <MultiFieldSection label="反射" singleValue={d.lighting.reflection} multiValues={d.multiOverrides?.["lighting.reflection"] ?? []} options={LIGHT_REFLECTIONS}
+      <MultiFieldSection fieldKey="lighting.reflection" label="反射" singleValue={d.lighting.reflection} multiValues={d.multiOverrides?.["lighting.reflection"] ?? []} options={LIGHT_REFLECTIONS}
         onChange={mc("lighting.reflection", "reflection")} />
-      <FieldSection label="空気感" value={d.lighting.atmosphere} options={LIGHT_ATMOSPHERES}
+      <FieldSection fieldKey="lighting.atmosphere" label="空気感" value={d.lighting.atmosphere} options={LIGHT_ATMOSPHERES}
         onChange={(v) => upd("lighting", { atmosphere: v as DetailSettings["lighting"]["atmosphere"] })} />
     </div>
   );
@@ -1026,13 +1048,13 @@ function CyberContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (
       <div className="mb-3 rounded-xl border border-teal-400/25 bg-teal-500/8 px-3 py-2 text-[11px] text-teal-200/70 leading-relaxed">
         🤖 体の<span className="text-teal-200/90 font-semibold">一部だけ</span>をSF的に変化させます。顔・表情・体型・ポーズは維持。傷・欠損・血液表現は禁止。
       </div>
-      <MultiFieldSection label="変化する部位" singleValue={d.cyber.part} multiValues={d.multiOverrides?.["cyber.part"] ?? []} options={CYBER_PARTS} noTopMargin
+      <MultiFieldSection fieldKey="cyber.part" label="変化する部位" singleValue={d.cyber.part} multiValues={d.multiOverrides?.["cyber.part"] ?? []} options={CYBER_PARTS} noTopMargin
         onChange={mc("cyber.part", "part")} />
-      <MultiFieldSection label="機械化タイプ" singleValue={d.cyber.type} multiValues={d.multiOverrides?.["cyber.type"] ?? []} options={CYBER_TYPES}
+      <MultiFieldSection fieldKey="cyber.type" label="機械化タイプ" singleValue={d.cyber.type} multiValues={d.multiOverrides?.["cyber.type"] ?? []} options={CYBER_TYPES}
         onChange={mc("cyber.type", "type")} />
-      <MultiFieldSection label="質感" singleValue={d.cyber.texture} multiValues={d.multiOverrides?.["cyber.texture"] ?? []} options={CYBER_TEXTURES}
+      <MultiFieldSection fieldKey="cyber.texture" label="質感" singleValue={d.cyber.texture} multiValues={d.multiOverrides?.["cyber.texture"] ?? []} options={CYBER_TEXTURES}
         onChange={mc("cyber.texture", "texture")} />
-      <MultiFieldSection label="発光色" singleValue={d.cyber.glowColor} multiValues={d.multiOverrides?.["cyber.glowColor"] ?? []} options={CYBER_GLOW_COLORS}
+      <MultiFieldSection fieldKey="cyber.glowColor" label="発光色" singleValue={d.cyber.glowColor} multiValues={d.multiOverrides?.["cyber.glowColor"] ?? []} options={CYBER_GLOW_COLORS}
         onChange={mc("cyber.glowColor", "glowColor")} />
       {/* 変化量：おまかせボタンなし */}
       <div>
@@ -1067,25 +1089,25 @@ function CyberContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (
 function CosplayContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
   return (
     <div>
-      <FieldSection label="ジャンル系統" value={d.cosplay.genre} options={COSPLAY_GENRES} noTopMargin
+      <FieldSection fieldKey="cosplay.genre" label="ジャンル系統" value={d.cosplay.genre} options={COSPLAY_GENRES} noTopMargin
         onChange={(v) => upd("cosplay", { genre: v as DetailSettings["cosplay"]["genre"] })} />
-      <FieldSection label="かわいい系" value={d.cosplay.cuteStyle} options={COSPLAY_CUTE_STYLES}
+      <FieldSection fieldKey="cosplay.cuteStyle" label="かわいい系" value={d.cosplay.cuteStyle} options={COSPLAY_CUTE_STYLES}
         onChange={(v) => upd("cosplay", { cuteStyle: v as DetailSettings["cosplay"]["cuteStyle"] })} />
-      <FieldSection label="職種・役割系" value={d.cosplay.jobGenre} options={COSPLAY_JOB_GENRES}
+      <FieldSection fieldKey="cosplay.jobGenre" label="職種・役割系" value={d.cosplay.jobGenre} options={COSPLAY_JOB_GENRES}
         onChange={(v) => upd("cosplay", { jobGenre: v as DetailSettings["cosplay"]["jobGenre"] })} />
-      <FieldSection label="和風系" value={d.cosplay.japaneseStyle} options={COSPLAY_JAPANESE_STYLES}
+      <FieldSection fieldKey="cosplay.japaneseStyle" label="和風系" value={d.cosplay.japaneseStyle} options={COSPLAY_JAPANESE_STYLES}
         onChange={(v) => upd("cosplay", { japaneseStyle: v as DetailSettings["cosplay"]["japaneseStyle"] })} />
-      <FieldSection label="ファンタジー系" value={d.cosplay.fantasyStyle} options={COSPLAY_FANTASY_STYLES}
+      <FieldSection fieldKey="cosplay.fantasyStyle" label="ファンタジー系" value={d.cosplay.fantasyStyle} options={COSPLAY_FANTASY_STYLES}
         onChange={(v) => upd("cosplay", { fantasyStyle: v as DetailSettings["cosplay"]["fantasyStyle"] })} />
-      <FieldSection label="SF・近未来系" value={d.cosplay.scifiStyle} options={COSPLAY_SCIFI_STYLES}
+      <FieldSection fieldKey="cosplay.scifiStyle" label="SF・近未来系" value={d.cosplay.scifiStyle} options={COSPLAY_SCIFI_STYLES}
         onChange={(v) => upd("cosplay", { scifiStyle: v as DetailSettings["cosplay"]["scifiStyle"] })} />
-      <FieldSection label="ダーク系" value={d.cosplay.darkStyle} options={COSPLAY_DARK_STYLES}
+      <FieldSection fieldKey="cosplay.darkStyle" label="ダーク系" value={d.cosplay.darkStyle} options={COSPLAY_DARK_STYLES}
         onChange={(v) => upd("cosplay", { darkStyle: v as DetailSettings["cosplay"]["darkStyle"] })} />
-      <FieldSection label="職業コスプレ" value={d.cosplay.occupation} options={COSPLAY_OCCUPATIONS}
+      <FieldSection fieldKey="cosplay.occupation" label="職業コスプレ" value={d.cosplay.occupation} options={COSPLAY_OCCUPATIONS}
         onChange={(v) => upd("cosplay", { occupation: v as DetailSettings["cosplay"]["occupation"] })} />
-      <FieldSection label="装飾レベル" value={d.cosplay.decoration} options={COSPLAY_DECORATIONS}
+      <FieldSection fieldKey="cosplay.decoration" label="装飾レベル" value={d.cosplay.decoration} options={COSPLAY_DECORATIONS}
         onChange={(v) => upd("cosplay", { decoration: v as DetailSettings["cosplay"]["decoration"] })} />
-      <FieldSection label="持ち物・小物" value={d.cosplay.item} options={COSPLAY_ITEMS}
+      <FieldSection fieldKey="cosplay.item" label="持ち物・小物" value={d.cosplay.item} options={COSPLAY_ITEMS}
         onChange={(v) => upd("cosplay", { item: v as DetailSettings["cosplay"]["item"] })} />
       {/* 露出：おまかせボタンなし（安全のため） */}
       <div>
@@ -1113,7 +1135,7 @@ function CosplayContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
           ))}
         </CellGrid>
       </div>
-      <FieldSection label="カラー方向" value={d.cosplay.colorDir} options={COSPLAY_COLOR_DIRS}
+      <FieldSection fieldKey="cosplay.colorDir" label="カラー方向" value={d.cosplay.colorDir} options={COSPLAY_COLOR_DIRS}
         onChange={(v) => upd("cosplay", { colorDir: v as DetailSettings["cosplay"]["colorDir"] })} />
     </div>
   );
@@ -1187,27 +1209,27 @@ function ForegroundContent({ d, upd }: { d: DetailSettings; upd: Updater }) {
       <div className="mb-3 rounded-xl border border-lime-400/25 bg-lime-500/8 px-3 py-2 text-[11px] text-lime-200/70 leading-relaxed">
         🌿 人物の<span className="text-lime-200/90 font-semibold">手前</span>にエフェクトを重ねます。顔・目・表情は隠さず、ポーズ・衣装は変更しません。
       </div>
-      <FieldSection label="プリセット" value={d.foreground.preset} options={FG_PRESETS} noTopMargin
+      <FieldSection fieldKey="foreground.preset" label="プリセット" value={d.foreground.preset} options={FG_PRESETS} noTopMargin
         onChange={(v) => upd("foreground", { preset: v as DetailSettings["foreground"]["preset"] })} />
-      <FieldSection label="エフェクト種類" value={d.foreground.effectType} options={FG_EFFECT_TYPES}
+      <FieldSection fieldKey="foreground.effectType" label="エフェクト種類" value={d.foreground.effectType} options={FG_EFFECT_TYPES}
         onChange={(v) => upd("foreground", { effectType: v as DetailSettings["foreground"]["effectType"] })} />
-      <FieldSection label="回転・渦" value={d.foreground.swirlType} options={FG_SWIRL_TYPES}
+      <FieldSection fieldKey="foreground.swirlType" label="回転・渦" value={d.foreground.swirlType} options={FG_SWIRL_TYPES}
         onChange={(v) => upd("foreground", { swirlType: v as DetailSettings["foreground"]["swirlType"] })} />
-      <FieldSection label="HUD・デジタル" value={d.foreground.digitalType} options={FG_DIGITAL_TYPES}
+      <FieldSection fieldKey="foreground.digitalType" label="HUD・デジタル" value={d.foreground.digitalType} options={FG_DIGITAL_TYPES}
         onChange={(v) => upd("foreground", { digitalType: v as DetailSettings["foreground"]["digitalType"] })} />
-      <FieldSection label="アート表現" value={d.foreground.artType} options={FG_ART_TYPES}
+      <FieldSection fieldKey="foreground.artType" label="アート表現" value={d.foreground.artType} options={FG_ART_TYPES}
         onChange={(v) => upd("foreground", { artType: v as DetailSettings["foreground"]["artType"] })} />
-      <FieldSection label="位置" value={d.foreground.position} options={FG_POSITIONS}
+      <FieldSection fieldKey="foreground.position" label="位置" value={d.foreground.position} options={FG_POSITIONS}
         onChange={(v) => upd("foreground", { position: v as DetailSettings["foreground"]["position"] })} />
-      <FieldSection label="密度" value={d.foreground.density} options={FG_DENSITIES}
+      <FieldSection fieldKey="foreground.density" label="密度" value={d.foreground.density} options={FG_DENSITIES}
         onChange={(v) => upd("foreground", { density: v as DetailSettings["foreground"]["density"] })} />
-      <FieldSection label="動き" value={d.foreground.motion} options={FG_MOTIONS}
+      <FieldSection fieldKey="foreground.motion" label="動き" value={d.foreground.motion} options={FG_MOTIONS}
         onChange={(v) => upd("foreground", { motion: v as DetailSettings["foreground"]["motion"] })} />
-      <FieldSection label="色方向" value={d.foreground.color} options={FG_COLORS}
+      <FieldSection fieldKey="foreground.color" label="色方向" value={d.foreground.color} options={FG_COLORS}
         onChange={(v) => upd("foreground", { color: v as DetailSettings["foreground"]["color"] })} />
-      <FieldSection label="奥行き" value={d.foreground.depth} options={FG_DEPTHS}
+      <FieldSection fieldKey="foreground.depth" label="奥行き" value={d.foreground.depth} options={FG_DEPTHS}
         onChange={(v) => upd("foreground", { depth: v as DetailSettings["foreground"]["depth"] })} />
-      <FieldSection label="視認性" value={d.foreground.visibility} options={FG_VISIBILITIES}
+      <FieldSection fieldKey="foreground.visibility" label="視認性" value={d.foreground.visibility} options={FG_VISIBILITIES}
         onChange={(v) => upd("foreground", { visibility: v as DetailSettings["foreground"]["visibility"] })} />
     </div>
   );
@@ -1694,6 +1716,43 @@ export function DetailsCard({
     onChange({ ...value, [key]: { ...value[key], ...patch } });
   };
 
+  // オプション単位 NG（ダブルクリック）。NG 化時は選択中なら解除も行う（選択値に乗らない＝生成では単純に無視）。
+  const toggleNg = (fieldKey: string, id: string) => {
+    const cur = value.ngOptions?.[fieldKey] ?? [];
+    const ng = { ...(value.ngOptions ?? {}) };
+    if (cur.includes(id)) {
+      const arr = cur.filter((x) => x !== id);
+      if (arr.length > 0) ng[fieldKey] = arr; else delete ng[fieldKey];
+      onChange({ ...value, ngOptions: Object.keys(ng).length > 0 ? ng : undefined });
+      return;
+    }
+    ng[fieldKey] = [...cur, id];
+    const dot = fieldKey.indexOf(".");
+    const scope = fieldKey.slice(0, dot);
+    const field = fieldKey.slice(dot + 1);
+    const mo = { ...(value.multiOverrides ?? {}) };
+    const scopeObj = { ...((value as any)[scope]) };
+    const curMulti: string[] = mo[fieldKey] ?? [];
+    const curSingle = scopeObj[field];
+    const effective: string[] =
+      curMulti.length >= 2
+        ? curMulti
+        : curSingle !== "skip" && curSingle !== "auto"
+        ? [curSingle]
+        : [];
+    if (effective.includes(id)) {
+      const nextSet = effective.filter((x) => x !== id);
+      if (nextSet.length >= 2) { mo[fieldKey] = nextSet; scopeObj[field] = nextSet[0]; }
+      else { delete mo[fieldKey]; scopeObj[field] = nextSet[0] ?? "skip"; }
+    }
+    onChange({
+      ...value,
+      [scope]: scopeObj,
+      multiOverrides: Object.keys(mo).length > 0 ? mo : undefined,
+      ngOptions: ng,
+    } as DetailSettings);
+  };
+
   // ── 各カテゴリの選択件数（バッジ表示用）──
   function countTab(t: TabId): number {
     switch (t) {
@@ -1819,6 +1878,7 @@ export function DetailsCard({
   };
 
   return (
+    <NgContext.Provider value={{ ng: value.ngOptions ?? {}, toggle: toggleNg }}>
     <section className="card">
       {/* Header + utility buttons */}
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
@@ -1937,8 +1997,9 @@ export function DetailsCard({
       </div>
 
       <p className="text-[10px] text-text-muted/35 mt-4 leading-tight">
-        設定なし＝プロンプト省略　おまかせ＝案ごとに変化　選択＝固定
+        設定なし＝プロンプト省略　おまかせ＝案ごとに変化　選択＝固定　ダブルクリック＝NG（除外）
       </p>
     </section>
+    </NgContext.Provider>
   );
 }

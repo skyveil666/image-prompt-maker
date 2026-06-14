@@ -11,6 +11,10 @@ interface GridCellProps {
   active: boolean;
   cellKind?: "skip" | "auto" | "value";
   onClick: () => void;
+  /** ダブルクリック時のハンドラ（オプション単位 NG トグル用）。 */
+  onDoubleClick?: () => void;
+  /** NG（ダブルクリックで除外）状態。赤字＋取り消し線で表示し、選択不可にする。 */
+  ng?: boolean;
   title?: string;
   compact?: boolean;
 }
@@ -23,7 +27,7 @@ function getCellFontClass(label: string): string {
   return "text-[12px]";
 }
 
-export function GridCell({ jaLabel, active, cellKind = "value", onClick, title, compact = false }: GridCellProps) {
+export function GridCell({ jaLabel, active, cellKind = "value", onClick, onDoubleClick, ng = false, title, compact = false }: GridCellProps) {
   const activeStyle =
     cellKind === "skip"
       ? "bg-[#32363f] border-[#5a6070] shadow-[0_0_10px_rgba(150,160,180,0.3)] text-slate-100"
@@ -43,17 +47,22 @@ export function GridCell({ jaLabel, active, cellKind = "value", onClick, title, 
 
   const fontClass = getCellFontClass(jaLabel);
 
+  // NG（ダブルクリック除外）：赤字＋取り消し線。active/inactive より優先。
+  const ngStyle =
+    "bg-[#2a0e12] border-red-500/55 text-red-400/85 line-through decoration-red-400/70 shadow-none hover:bg-[#37121a]";
+
   return (
     <button
       type="button"
       onClick={onClick}
-      title={title ?? jaLabel}
+      onDoubleClick={onDoubleClick}
+      title={ng ? `${title ?? jaLabel}（NG・ダブルクリックで解除）` : (title ?? jaLabel)}
       className={[
-        `relative inline-flex items-center justify-center rounded-md border px-2 py-1 ${compact ? "min-h-[28px]" : "min-h-[34px]"} whitespace-nowrap text-center transition-all duration-150`,
-        active ? activeStyle : inactiveStyle,
+        `relative inline-flex items-center justify-center rounded-md border px-2 py-1 ${compact ? "min-h-[28px]" : "min-h-[34px]"} whitespace-nowrap text-center transition-all duration-150 select-none`,
+        ng ? ngStyle : active ? activeStyle : inactiveStyle,
       ].join(" ")}
     >
-      {active && (
+      {!ng && active && (
         <span className={`absolute top-0.5 right-0.5 text-[10px] leading-none ${checkColor}`}>✓</span>
       )}
       <span className={`${fontClass} font-semibold leading-snug`}>{jaLabel}</span>
