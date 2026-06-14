@@ -1610,13 +1610,17 @@ function describeDetails(
     } else if (bo.genre === "auto") vary.push("系統");
     if (bo.type !== "auto" && bo.type !== "skip") fixed.push(`種類：${bol("type", bo.type)}（固定）`);
     else if (bo.type === "auto") vary.push("種類");
-    if (bo.condition !== "auto" && bo.condition !== "skip") fixed.push(`状態：${bol("condition", bo.condition)}（固定）`);
+    const boCondVals = getMultiVals(details.multiOverrides, "bigObject.condition");
+    if (boCondVals.length >= 2) fixed.push(`状態：${boCondVals.map(v => bol("condition", v)).join("・")}（複数の状態が混在）`);
+    else if (bo.condition !== "auto" && bo.condition !== "skip") fixed.push(`状態：${bol("condition", bo.condition)}（固定）`);
     else if (bo.condition === "auto") vary.push("状態");
     if (bo.placement !== "auto" && bo.placement !== "skip") fixed.push(`配置：${bol("placement", bo.placement)}（固定）`);
     else if (bo.placement === "auto") vary.push("配置");
     if (bo.size !== "auto" && bo.size !== "skip") fixed.push(`サイズ：${bol("size", bo.size)}（固定）`);
     else if (bo.size === "auto") vary.push("サイズ");
-    if (bo.mood !== "auto" && bo.mood !== "skip") fixed.push(`雰囲気：${bol("mood", bo.mood)}（固定）`);
+    const boMoodVals = getMultiVals(details.multiOverrides, "bigObject.mood");
+    if (boMoodVals.length >= 2) fixed.push(`雰囲気：${boMoodVals.map(v => bol("mood", v)).join("・")}（複数の雰囲気を融合）`);
+    else if (bo.mood !== "auto" && bo.mood !== "skip") fixed.push(`雰囲気：${bol("mood", bo.mood)}（固定）`);
     else if (bo.mood === "auto") vary.push("雰囲気");
 
     if (fixed.length > 0 || vary.length > 0) {

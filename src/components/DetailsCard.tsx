@@ -888,6 +888,7 @@ function BigObjectContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; ch
     chg({ ...d, bigObject: { ...d.bigObject, genre: single as DetailSettings["bigObject"]["genre"] }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
   };
 
+  const mc = makeMultiChanger(d, chg, "bigObject");
   return (
     <div>
       {/* 系統（グループ分け表示） */}
@@ -943,14 +944,14 @@ function BigObjectContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; ch
       </div>
       <FieldSection fieldKey="bigObject.type" label="種類" value={d.bigObject.type} options={BIG_OBJECT_TYPES}
         onChange={(v) => upd("bigObject", { type: v as DetailSettings["bigObject"]["type"] })} />
-      <FieldSection fieldKey="bigObject.condition" label="状態" value={d.bigObject.condition} options={BIG_OBJECT_CONDITIONS}
-        onChange={(v) => upd("bigObject", { condition: v as DetailSettings["bigObject"]["condition"] })} />
+      <MultiFieldSection fieldKey="bigObject.condition" label="状態" singleValue={d.bigObject.condition} multiValues={d.multiOverrides?.["bigObject.condition"] ?? []} options={BIG_OBJECT_CONDITIONS}
+        onChange={mc("bigObject.condition", "condition")} />
       <FieldSection fieldKey="bigObject.placement" label="配置" value={d.bigObject.placement} options={BIG_OBJECT_PLACEMENTS}
         onChange={(v) => upd("bigObject", { placement: v as DetailSettings["bigObject"]["placement"] })} />
       <FieldSection fieldKey="bigObject.size" label="サイズ" value={d.bigObject.size} options={BIG_OBJECT_SIZES}
         onChange={(v) => upd("bigObject", { size: v as DetailSettings["bigObject"]["size"] })} />
-      <FieldSection fieldKey="bigObject.mood" label="雰囲気" value={d.bigObject.mood} options={BIG_OBJECT_MOODS}
-        onChange={(v) => upd("bigObject", { mood: v as DetailSettings["bigObject"]["mood"] })} />
+      <MultiFieldSection fieldKey="bigObject.mood" label="雰囲気" singleValue={d.bigObject.mood} multiValues={d.multiOverrides?.["bigObject.mood"] ?? []} options={BIG_OBJECT_MOODS}
+        onChange={mc("bigObject.mood", "mood")} />
     </div>
   );
 }
