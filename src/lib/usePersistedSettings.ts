@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type {
   Scope,
   Mood,
@@ -11,7 +11,7 @@ import type {
   AspectRatioPreset,
 } from "../types";
 import type { ZozoTrend } from "./zozoTrend";
-import { loadSettings, type PersistedSettings } from "./settingsPersist";
+import { loadSettings, saveSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY, type PersistedSettings } from "./settingsPersist";
 
 /**
  * 永続設定（PersistedSettings の30項目）の state 群を集約するフック。
@@ -59,6 +59,83 @@ export function usePersistedSettings() {
   const [zozoApplied, setZozoApplied] = useState<ZozoTrend | null>(s0.zozoApplied);
   const [activeBoosts, setActiveBoosts] = useState<string[]>(s0.activeBoosts);
   const [windLevel, setWindLevel] = useState<number>(s0.windLevel);
+
+  // ── 永続化 effect（App分割 Phase4b でここへ集約。挙動は App 時代と同一）──────────
+
+  // アスペクト比が非skip値に変更されたらデフォルトとして自動記憶
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const preset = details.aspectRatio?.preset;
+    if (preset && preset !== "skip") {
+      setDefaultAspectRatio(preset as AspectRatioPreset);
+    }
+  }, [details.aspectRatio?.preset]);
+
+  // 設定変更のたびに localStorage へ自動保存（ページを閉じても復元できるように）
+  useEffect(() => {
+    saveSettings({
+      scopes, moods, autoMoodCategories, count, details,
+      extraInstructions, ngList, viralMode, strength, glossLevel,
+      dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
+      promptTarget, avoidCliche,
+      bodyPoseLock, colorMoodLock, compositionLock,
+      colorStrategy,
+      faceLock, expression,
+      artStyle, defaultAspectRatio,
+      favoriteLearnEnabled, favoriteStrength,
+      zozoApplied, activeBoosts, windLevel,
+    });
+  }, [
+    scopes, moods, autoMoodCategories, count, details,
+    extraInstructions, ngList, viralMode, strength, glossLevel,
+    dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
+    promptTarget, avoidCliche,
+    bodyPoseLock, colorMoodLock, compositionLock,
+    colorStrategy,
+    faceLock, expression,
+    artStyle, defaultAspectRatio,
+    favoriteLearnEnabled, favoriteStrength,
+    zozoApplied, activeBoosts, windLevel,
+  ]);
+
+  // 他タブの設定変更を storage イベントで受け取り UI に反映（マルチタブ相互上書き対策）
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key !== SETTINGS_STORAGE_KEY) return;
+      const next = loadSettings();
+      setScopes(next.scopes);
+      setMoods(next.moods);
+      setAutoMoodCategories(next.autoMoodCategories);
+      setCount(next.count);
+      setDetails(next.details);
+      setExtraInstructions(next.extraInstructions);
+      setNgList(next.ngList);
+      setViralMode(next.viralMode);
+      setStrength(next.strength);
+      setGlossLevel(next.glossLevel);
+      setRealismLevel(next.realismLevel);
+      setRealismType(next.realismType);
+      setTextureOriginal(next.textureOriginal);
+      setTextureDisabled(next.textureDisabled);
+      setPromptTarget(next.promptTarget);
+      setAvoidCliche(next.avoidCliche);
+      setBodyPoseLock(next.bodyPoseLock);
+      setColorMoodLock(next.colorMoodLock);
+      setCompositionLock(next.compositionLock);
+      setColorStrategy(next.colorStrategy);
+      setFaceLock(next.faceLock);
+      setExpression(next.expression);
+      setArtStyle(next.artStyle);
+      setDefaultAspectRatio(next.defaultAspectRatio);
+      setFavoriteLearnEnabled(next.favoriteLearnEnabled);
+      setFavoriteStrength(next.favoriteStrength);
+      setZozoApplied(next.zozoApplied);
+      setActiveBoosts(next.activeBoosts);
+      setWindLevel(next.windLevel);
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
 
   return {
     scopes, setScopes,

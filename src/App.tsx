@@ -19,7 +19,6 @@ import { CompletionToast } from "./components/CompletionToast";
 import { PresetAppliedToast } from "./components/PresetAppliedToast";
 import { ReflectionStatusBar } from "./components/ReflectionStatusBar";
 import { generateViaBackend, analyzePreferencesViaBackend } from "./lib/backendClient";
-import { loadSettings, saveSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY } from "./lib/settingsPersist";
 import { usePersistedSettings } from "./lib/usePersistedSettings";
 import { getNotifSettings } from "./lib/notificationSettings";
 import { playCompletionSound } from "./lib/completionSound";
@@ -162,7 +161,6 @@ export default function App() {
     expression, setExpression,
     colorStrategy, setColorStrategy,
     artStyle, setArtStyle,
-    defaultAspectRatio, setDefaultAspectRatio,
     favoriteLearnEnabled, setFavoriteLearnEnabled,
     favoriteStrength, setFavoriteStrength,
     zozoApplied, setZozoApplied,
@@ -485,80 +483,8 @@ export default function App() {
     saveForbiddenTokens(forbiddenTokens);
   }, [forbiddenTokens]);
 
-  // アスペクト比が非skip値に変更されたらデフォルトとして自動記憶
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const preset = details.aspectRatio?.preset;
-    if (preset && preset !== "skip") {
-      setDefaultAspectRatio(preset as import("./types").AspectRatioPreset);
-    }
-  }, [details.aspectRatio?.preset]);
-
-  // 設定変更のたびに localStorage へ自動保存（ページを閉じても復元できるように）
-  useEffect(() => {
-    saveSettings({
-      scopes, moods, autoMoodCategories, count, details,
-      extraInstructions, ngList, viralMode, strength, glossLevel,
-      dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
-      promptTarget, avoidCliche,
-      bodyPoseLock, colorMoodLock, compositionLock,
-      colorStrategy,
-      faceLock, expression,
-      artStyle, defaultAspectRatio,
-      favoriteLearnEnabled, favoriteStrength,
-      zozoApplied, activeBoosts, windLevel,
-    });
-  }, [
-    scopes, moods, autoMoodCategories, count, details,
-    extraInstructions, ngList, viralMode, strength, glossLevel,
-    dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
-    promptTarget, avoidCliche,
-    bodyPoseLock, colorMoodLock, compositionLock,
-    colorStrategy,
-    faceLock, expression,
-    artStyle, defaultAspectRatio,
-    favoriteLearnEnabled, favoriteStrength,
-    zozoApplied, activeBoosts, windLevel,
-  ]);
-
-  // 他タブの設定変更を storage イベントで受け取り UI に反映（マルチタブ相互上書き対策）
-  useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key !== SETTINGS_STORAGE_KEY) return;
-      const next = loadSettings();
-      setScopes(next.scopes);
-      setMoods(next.moods);
-      setAutoMoodCategories(next.autoMoodCategories);
-      setCount(next.count);
-      setDetails(next.details);
-      setExtraInstructions(next.extraInstructions);
-      setNgList(next.ngList);
-      setViralMode(next.viralMode);
-      setStrength(next.strength);
-      setGlossLevel(next.glossLevel);
-      setRealismLevel(next.realismLevel);
-      setRealismType(next.realismType);
-      setTextureOriginal(next.textureOriginal);
-      setTextureDisabled(next.textureDisabled);
-      setPromptTarget(next.promptTarget);
-      setAvoidCliche(next.avoidCliche);
-      setBodyPoseLock(next.bodyPoseLock);
-      setColorMoodLock(next.colorMoodLock);
-      setCompositionLock(next.compositionLock);
-      setColorStrategy(next.colorStrategy);
-      setFaceLock(next.faceLock);
-      setExpression(next.expression);
-      setArtStyle(next.artStyle);
-      setDefaultAspectRatio(next.defaultAspectRatio);
-      setFavoriteLearnEnabled(next.favoriteLearnEnabled);
-      setFavoriteStrength(next.favoriteStrength);
-      setZozoApplied(next.zozoApplied);
-      setActiveBoosts(next.activeBoosts);
-      setWindLevel(next.windLevel);
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
-  }, []);
+  // 永続設定の保存 / 別タブ storage 同期 / アスペクト比自動記憶 effect は
+  // usePersistedSettings() へ集約（App分割 Phase4b）。
 
   // stale closure 回避（BUG-1）：preferenceProfile / ratingAnalysis / imageAnalysis は
   // buildInputs より後で宣言されるため依存配列に入れられない（TDZ）。
