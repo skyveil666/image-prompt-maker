@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Scope } from "../types";
 import { extractReferenceViaBackend } from "../lib/backendClient";
+import { readFileAsDataUrl } from "../lib/imageFile";
 import { useAutoResizeTextarea } from "../lib/useAutoResizeTextarea";
 
 /** 内容に合わせて高さが自動で伸びる textarea（抽出結果をスクロールせず読めるように） */
@@ -133,10 +134,9 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
 
   const loadFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) { flash("画像ファイルを入れてください"); return; }
-    const reader = new FileReader();
-    reader.onload = () => { setImage(reader.result as string); setOpen(true); };
-    reader.onerror = () => flash("画像の読み込みに失敗しました");
-    reader.readAsDataURL(file);
+    readFileAsDataUrl(file)
+      .then((url) => { setImage(url); setOpen(true); })
+      .catch(() => flash("画像の読み込みに失敗しました"));
   }, [flash]);
 
   // Ctrl+V / Cmd+V / スクショ貼付（クリップボードに画像がある時だけ作動・テキスト貼付は妨げない）

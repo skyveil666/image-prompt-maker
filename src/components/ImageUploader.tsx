@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { imageContentHash } from "../lib/imageThumb";
+import { readFileAsDataUrl } from "../lib/imageFile";
 
 export interface UploadedMeta {
   fileName?: string;
@@ -16,14 +17,6 @@ interface Props {
   onChange: (dataUrl: string | null, meta?: UploadedMeta) => void;
 }
 
-const readAsDataUrl = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-
 export function ImageUploader({ value, onChange }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,7 +27,7 @@ export function ImageUploader({ value, onChange }: Props) {
       if (!file.type.startsWith("image/")) return;
       // readAsDataUrl を先に待ち、content hash（ピクセル一致）を計算する
       // → PNG/JPEG 等フォーマットが異なっても同じ画像なら同じ ID になり重複を防ぐ
-      const url = await readAsDataUrl(file);
+      const url = await readFileAsDataUrl(file);
       const hash = await imageContentHash(url);
       onChange(url, { fileName: file.name, fileHash: hash });
     },

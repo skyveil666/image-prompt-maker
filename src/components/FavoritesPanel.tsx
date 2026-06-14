@@ -12,7 +12,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptHistoryItem, Mood } from "../types";
 import { getAll, updateItem, getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES } from "../lib/history";
-import { makeThumbnail } from "../lib/imageThumb";
+import { fileToThumbnail } from "../lib/imageFile";
 import { confirmUnfavorite } from "../lib/favoriteConfirm";
 import { ALL_SCOPE_LABELS as SCOPE_LABEL } from "../lib/scopeLabels";
 import { WithImagePreview } from "./ImagePreviewTooltip";
@@ -43,15 +43,6 @@ function formatDateTime(ts: number): string {
     `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")} ` +
     `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
   );
-}
-
-function readFileAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }
 
 // ── Props ────────────────────────────────────────────────────────────────────
@@ -286,9 +277,8 @@ function GeneratedImageSlot({ imageUrl, onImage }: GeneratedImageSlotProps) {
     if (!file.type.startsWith("image/")) return;
     setUploading(true);
     try {
-      const raw   = await readFileAsDataUrl(file);
-      const thumb = await makeThumbnail(raw, 600, 0.83);
-      await onImage(thumb);
+      const thumb = await fileToThumbnail(file);
+      if (thumb) await onImage(thumb);
     } catch { /* noop */ } finally {
       setUploading(false);
     }

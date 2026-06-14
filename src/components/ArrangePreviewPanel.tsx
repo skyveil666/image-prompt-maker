@@ -17,7 +17,7 @@ import {
   MAX_RESULT_IMAGES, RATING_LABELS,
   AXIS_RATING_META, type RatingAxisKey,
 } from "../lib/history";
-import { makeThumbnail } from "../lib/imageThumb";
+import { fileToThumbnail } from "../lib/imageFile";
 
 /** 1案ごとの画像・評価ローカル state の型 */
 export interface ProposalLocalState {
@@ -192,15 +192,8 @@ function ArrangeImageSlot({
   useEffect(() => { replaceRef.current = onReplaceAt; }, [onReplaceAt]);
 
   const process = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    const raw = await new Promise<string>((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(r.result as string);
-      r.onerror = rej;
-      r.readAsDataURL(file);
-    });
-    let final = raw;
-    try { final = await makeThumbnail(raw, 600, 0.83); } catch { /* noop */ }
+    const final = await fileToThumbnail(file);
+    if (!final) return;
     if (replaceIdx !== null) { replaceRef.current(replaceIdx, final); setReplaceIdx(null); }
     else appendRef.current(final);
   }, [replaceIdx]);

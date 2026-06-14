@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listRecentImages, addRecentImage, type RecentImageItem } from "../lib/recentImages";
-import { makeThumbnail } from "../lib/imageThumb";
+import { fileToThumbnail } from "../lib/imageFile";
 
 interface Props {
   /** 選択中の画像 dataURL（親へ lift-up） */
@@ -56,18 +56,14 @@ export function HistoryMiniExplorer({ selectedImage, onSelectImage, onUseForArra
     if (!file.type.startsWith("image/")) return;
     setLoading(true);
     try {
-      const raw = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(r.result as string);
-        r.onerror = rej;
-        r.readAsDataURL(file);
-      });
-      const thumb = await makeThumbnail(raw, 400, 0.85).catch(() => raw);
-      onSelectImage(thumb);
-      // 最近の画像に追加
-      await addRecentImage({ imageHash: `hist-${Date.now()}`, originalDataUrl: thumb });
-      const fresh = await listRecentImages();
-      setRecentImages(fresh);
+      const thumb = await fileToThumbnail(file, 400, 0.85);
+      if (thumb) {
+        onSelectImage(thumb);
+        // 最近の画像に追加
+        await addRecentImage({ imageHash: `hist-${Date.now()}`, originalDataUrl: thumb });
+        const fresh = await listRecentImages();
+        setRecentImages(fresh);
+      }
     } finally {
       setLoading(false);
     }

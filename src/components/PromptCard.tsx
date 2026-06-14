@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptHistoryItem, FailureMemo, ResultAnalysis } from "../types";
-import { makeThumbnail } from "../lib/imageThumb";
+import { fileToThumbnail } from "../lib/imageFile";
 import { analyzeResultViaBackend } from "../lib/backendClient";
 import { FavoriteButton } from "./FavoriteButton";
 import {
@@ -203,19 +203,10 @@ function GeneratedResultSlot({
   useEffect(() => { appendRef.current = onAppend; }, [onAppend]);
   useEffect(() => { replaceRef.current = onReplaceAt; }, [onReplaceAt]);
 
-  /** ファイル → サムネ → 追加 or 差し替え */
+  /** ファイル → サムネ → 追加 or 差し替え（共通 fileToThumbnail を使用） */
   const processFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload  = (e) => resolve(e.target!.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-    let final = dataUrl;
-    try {
-      final = await makeThumbnail(dataUrl, 600, 0.83);
-    } catch { /* 元 dataUrl で続行 */ }
+    const final = await fileToThumbnail(file);
+    if (!final) return;
     if (replaceTarget !== null) {
       replaceRef.current(replaceTarget, final);
       setReplaceTarget(null);
