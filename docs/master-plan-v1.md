@@ -778,3 +778,13 @@ live.complete(message);
 - **Phase 1b（referenceNoteText）**: 「【参照画像から強制適用】」ブロックの整形 useMemo（App 内インライン）を `src/lib/referenceNote.ts` の `buildReferenceNoteText(note, categories)` 純関数へ抽出。lib をコンポーネント層へ依存させないため categories は引数で受ける。**出力文字列は従来と完全一致**（verbatim 抽出）
 - **影響範囲**: App.tsx −約20行＋import2行。挙動不変（フックは元の useRef+useEffect と同型・更新タイミング厳守／純関数は同一出力）。front tsc / vite build exit 0
 - **保留（Phase 4・5）**: 生成設定 state 群の useGenerationSettings 化（buildInputs 隣接で中〜高リスク）、JSX 800行のセクション別分割（§3 該当）。別途設計・承認を前提に保留
+
+### 2026-06-14: App.tsx 分割 Phase 2/3（useColorWeights / usePolicyControls）は見送り
+
+- **背景**: 監査②の Phase 2（色×軸 重み）・Phase 3（モチーフlv／コンボ／反映フラグ）を「自己完結クラスタ → カスタムフック化」する計画だったが、実装前調査で**クリーン分離不可**と判明
+- **根本原因（宣言順序の分断）**: 状態（`colorWeights`/`levels`/`comboPolicies`/`policyApplied`）は `buildInputs`(586行・P7中核ゲート) が読むため **586行より前**に宣言必須。一方 auto-adjust／undo／toastラッパ群（1452–1585）は `showPresetToast`(985) と `colorAnalysis`(1000) に依存するため **遅い**位置に必須。1つのフックはこの 586 ↔ 985/1000 の分断を跨げない（早く呼べば auto-adjust が TDZ、遅く呼べば buildInputs が TDZ）。**Phase 1a で5本（preferenceProfileRef 等）を変換できなかったのと同一の構造的制約**
+- **選択肢**: A=見送り＋記録 ／ B=「状態フック＋遅延 auto-adjust 用に setter を返す escape-hatch」版で実装
+- **採用**: A（見送り）
+- **理由**: 案B は挙動同一で App.tsx を約100行減らせるが、(1) フックが setter 数本を漏らす薄い「状態バッグ」で真の抽象化にならない、(2) buildInputs の変数源・JSX props・auto-adjust 尾部を広く配線変更、(3) §5 生成ペイロードに効くため Playwright 検証必須。クリーン版に必要な「buildInputs を 1000行以降へ移すリオーダー」は P7・§3 抵触。リスク／churn に見合う利得がない
+- **影響範囲**: コード変更なし（本ログのみ）。Phase 1a/1b（commit `2360ecd`）までで②は一旦完了とする
+- **再挑戦の前提**: もし将来やるなら、まず `buildInputs` の入力組み立てを別 lib（純関数）へ切り出して「状態を読む位置」と「組み立てロジック」を分離する設計（＝Phase 4 系）を先に承認・実施し、ゲートの前後関係を解いてから
