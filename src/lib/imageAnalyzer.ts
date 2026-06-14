@@ -29,10 +29,6 @@ export interface ImageFeature {
   id: string;
   /** dHash 64bit を 16進文字列で（16文字） */
   hash: string;
-  /** 上位3色の代表色（pixel sample から） */
-  dominantColors: { r: number; g: number; b: number; ratio: number }[];
-  /** 平均輝度 0-1 */
-  brightness: number;
   /** バッチID（クラスタ判定で同バッチをまとめないため） */
   batchId: string;
   analyzedAt: number;
@@ -140,77 +136,9 @@ async function computeHash(dataUrl: string): Promise<string> {
   return bits.toString(16).padStart(16, "0");
 }
 
-/** ドミナント色の簡易抽出（小サイズに圧縮→量子化バケットで多数決） */
-function loadDominantColors(dataUrl: string): Promise<{ r: number; g: number; b: number; ratio: number }[]> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const W = 32, H = 32;
-        const canvas = document.createElement("canvas");
-        canvas.width = W; canvas.height = H;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("canvas 2d unavailable"));
-        ctx.drawImage(img, 0, 0, W, H);
-        const data = ctx.getImageData(0, 0, W, H).data;
-        // 32 段階に量子化 → "rrggbb" 文字列キー → カウント
-        const buckets = new Map<string, { r: number; g: number; b: number; count: number }>();
-        const N = W * H;
-        for (let i = 0; i < N; i++) {
-          const r = data[i * 4 + 0];
-          const g = data[i * 4 + 1];
-          const b = data[i * 4 + 2];
-          // 量子化: 32 buckets per channel
-          const qr = (r >> 3) << 3;
-          const qg = (g >> 3) << 3;
-          const qb = (b >> 3) << 3;
-          const key = `${qr}-${qg}-${qb}`;
-          const cur = buckets.get(key);
-          if (cur) cur.count++;
-          else buckets.set(key, { r: qr, g: qg, b: qb, count: 1 });
-        }
-        const sorted = Array.from(buckets.values())
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 3)
-          .map((c) => ({ r: c.r, g: c.g, b: c.b, ratio: c.count / N }));
-        resolve(sorted);
-      } catch (e) { reject(e); }
-    };
-    img.onerror = () => reject(new Error("image load failed"));
-    img.src = dataUrl;
-  });
-}
-
-/** 平均輝度（dataUrl から 32x32 サンプル） */
-function loadBrightness(dataUrl: string): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => {
-      try {
-        const W = 32, H = 32;
-        const canvas = document.createElement("canvas");
-        canvas.width = W; canvas.height = H;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("canvas 2d unavailable"));
-        ctx.drawImage(img, 0, 0, W, H);
-        const data = ctx.getImageData(0, 0, W, H).data;
-        let sum = 0;
-        const N = W * H;
-        for (let i = 0; i < N; i++) {
-          const r = data[i * 4 + 0];
-          const g = data[i * 4 + 1];
-          const b = data[i * 4 + 2];
-          sum += r * 0.299 + g * 0.587 + b * 0.114;
-        }
-        resolve(sum / (N * 255));
-      } catch (e) { reject(e); }
-    };
-    img.onerror = () => reject(new Error("image load failed"));
-    img.src = dataUrl;
-  });
-}
+// loadDominantColors / loadBrightness は削除（ImageFeature.dominantColors/brightness は
+// どこからも読まれていなかったため。クラスタリングは hash のみ使用＝毎画像の canvas描画2回＋
+// ピクセル走査2回を削減）。
 
 /** 16進ハッシュ → BigInt */
 function hashToBig(hex: string): bigint {
@@ -244,16 +172,10 @@ export async function analyzeOne(
   if (existing) return existing;
 
   try {
-    const [hash, colors, brightness] = await Promise.all([
-      computeHash(primary),
-      loadDominantColors(primary),
-      loadBrightness(primary),
-    ]);
+    const hash = await computeHash(primary);
     const f: ImageFeature = {
       id: item.id,
       hash,
-      dominantColors: colors,
-      brightness,
       batchId: item.batchId,
       analyzedAt: Date.now(),
     };
