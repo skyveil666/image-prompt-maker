@@ -105,6 +105,8 @@ import { GlobalProtectionBar } from "./components/GlobalProtectionBar";
 import { AnalysisStatusStrip, type AnalysisCategoryView } from "./components/AnalysisStatusStrip";
 import { RecoveryPanel } from "./components/RecoveryPanel";
 import { useAnalysisLive } from "./lib/useAnalysisLive";
+import { useLatestRef } from "./lib/useLatestRef";
+import { buildReferenceNoteText } from "./lib/referenceNote";
 import { AnalysisLiveView } from "./components/AnalysisLiveView";
 import {
   extractSuccessPromptPatterns, type SuccessPromptPattern,
@@ -172,18 +174,10 @@ export default function App() {
   const [referenceNote, setReferenceNote] = useState<Record<string, string>>({});
   /** referenceNote を「【参照画像から強制適用】」独立ブロックに整形（生成時に extraInstructions へ統合）。
    *  生成ロジック本体は不変。参照要素を最優先で反映させるため、強い宣言付きブロックにする。 */
-  const referenceNoteText = useMemo(() => {
-    const lines = REFERENCE_CATEGORIES
-      .filter((c) => (referenceNote[c.key] ?? "").trim())
-      .map((c) => `${c.label}：${referenceNote[c.key].trim()}`);
-    if (lines.length === 0) return "";
-    return [
-      "【参照画像から強制適用】",
-      ...lines,
-      "上記の参照要素は優先度最高で必ず反映する。自動生成のジャンル・世界観・他の変更指示よりも優先する。",
-      "参照画像の雰囲気・構図・色味・空気感を保つこと。参照画像に無い要素を勝手に足さないこと。",
-    ].join("\n");
-  }, [referenceNote]);
+  const referenceNoteText = useMemo(
+    () => buildReferenceNoteText(referenceNote, REFERENCE_CATEGORIES),
+    [referenceNote],
+  );
   /** Compare Mode 用：参照画像＋抽出13カテゴリを生成時に参照レコードへ残すための ref（再描画不要）。
    *  パネルから image / extracted が変わるたびに最新を受け取る。生成・抽出ロジックには影響しない。 */
   const referenceContextRef = useRef<{ image: string; extracted: Record<string, string> } | null>(null);
@@ -194,10 +188,7 @@ export default function App() {
     [],
   );
   /** referenceNote を runGenerate（deps非依存）から最新参照するための ref。 */
-  const referenceNoteRef = useRef<Record<string, string>>({});
-  useEffect(() => {
-    referenceNoteRef.current = referenceNote;
-  }, [referenceNote]);
+  const referenceNoteRef = useLatestRef(referenceNote);
   /** Compare Mode（参照↔生成 比較ビュー）の開閉。Reference Picker の「🆚 比較」から開く。 */
   const [compareOpen, setCompareOpen] = useState(false);
   // 分析ラボ（孤立入口）は撤去（#4）。詳細探索は分析センターの重複分析/🔭発見タブに集約。
@@ -395,15 +386,10 @@ export default function App() {
   /** 🤖 AI分析ライブビュー */
   const analysisLive = useAnalysisLive();
   /** runGenerate 内で items の最新値を読むためのリファレンス */
-  const itemsRef = useRef<PromptHistoryItem[]>(items);
+  const itemsRef = useLatestRef(items);
   /** pendingRun の保証発火のためのカウンター（scopes/moods が変わらない場合の保険） */
   const [pendingRunKey, setPendingRunKey] = useState(0);
   const canGenerate = scopes.length > 0;
-
-  // Keep itemsRef in sync so runGenerate can read the current value without a stale closure
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
 
   // 起動時に自動クリーンアップを実行（設定が ON の場合のみ）
   useEffect(() => {

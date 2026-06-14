@@ -769,3 +769,12 @@ live.complete(message);
 - **影響範囲**: front −174行 / server −121行 / shared +229行。挙動は完全不変（型レベルのみ・ランタイムコード0）。front tsc / server tsc / vite build すべて exit 0
 - **副次発見（本件対象外・別途）**: server `BackgroundSettings` は textType/textMood/textLayout/textTexture を持たず promptSystem も未読（文字背景はサーバ未実装の機能ギャップ）。`Camera3DState.pose` 欠落・`DetailSettings.bigObject?` optional は promptSystem 側ガード済で良性
 - **保留**: 設定 interface の共通化（案C・非推奨）。型ミラーの残りはサーバの permissive 設計として意図的に維持
+
+### 2026-06-14: App.tsx 分割 Phase 1a/1b 実装完了（useLatestRef フック化＋referenceNoteText 抽出）
+
+- **背景**: App.tsx は約2890行の god component。§3「無計画な大規模分割禁止」に従い、副作用の薄い純 move から段階分割する方針（①型ミラーに続く②の Phase 1）
+- **Phase 1a（useLatestRef）**: `const xRef = useRef(x); useEffect(() => { xRef.current = x; }, [x]);` の定番を `src/lib/useLatestRef.ts` に集約
+  - **正直な調査結果**: 当初「7本」と見積もったが、安全変換できたのは **2本のみ**（`referenceNoteRef` / `itemsRef`＝state が ref より前に宣言）。残り5本（`preferenceProfileRef` / `ratingAnalysisRef` / `imageAnalysisRef` / `skyveilProfileRef` / `skyveilStrengthRef`）は `buildInputs`(600) / `handleGenerate`(914) が TDZ を避けて最新値を読むための**意図的な前方宣言**（state は1084行以降）。`useLatestRef(state)` は宣言地点で state を渡すため適用不可 → 現状維持。フック JSDoc に除外理由を明記
+- **Phase 1b（referenceNoteText）**: 「【参照画像から強制適用】」ブロックの整形 useMemo（App 内インライン）を `src/lib/referenceNote.ts` の `buildReferenceNoteText(note, categories)` 純関数へ抽出。lib をコンポーネント層へ依存させないため categories は引数で受ける。**出力文字列は従来と完全一致**（verbatim 抽出）
+- **影響範囲**: App.tsx −約20行＋import2行。挙動不変（フックは元の useRef+useEffect と同型・更新タイミング厳守／純関数は同一出力）。front tsc / vite build exit 0
+- **保留（Phase 4・5）**: 生成設定 state 群の useGenerationSettings 化（buildInputs 隣接で中〜高リスク）、JSX 800行のセクション別分割（§3 該当）。別途設計・承認を前提に保留
