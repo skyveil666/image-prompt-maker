@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ArrangeResult, Count, GeneratedProposal, PromptHistoryItem, Scope } from "../types";
 import { detectSourceScopes } from "../lib/arrange";
 import { deleteItem, getAll, getByDate, updateItem } from "../lib/history";
@@ -31,6 +31,8 @@ interface Props {
   favoriteProfile?: FavoriteProfile | null;
   /** お気に入り学習が現在ONか（「反映中」表示用）。 */
   favoriteLearnEnabled?: boolean;
+  /** 🛟 履歴・お気に入り復旧（左メニューから移設・左レール最下部に表示）。App 側で構築した RecoveryPanel を渡す。 */
+  recoverySlot?: ReactNode;
 
   // ── 「見えない支配」可視化（App のライブ state を ArrangePreviewPanel へ透過）──
   // アレンジは handleArrangeInline 内で buildInputs() を {...current} 取り込みするため、
@@ -88,7 +90,7 @@ const EXTRA_FILTER_LABELS: { id: ExtraFilter; label: string }[] = [
 export function HistoryView({
   onBack, initialFavoritesOnly = false,
   onArrangeInline, onSaveArranged, onSendToGenerator, onRestore,
-  favoriteProfile = null, favoriteLearnEnabled = false,
+  favoriteProfile = null, favoriteLearnEnabled = false, recoverySlot,
   avoidRealBackground, worldCombinedNote, referenceNoteText,
   onClearAvoidRealBg, onClearWorld, onClearReference,
   onToast,
@@ -626,6 +628,8 @@ export function HistoryView({
               </div>
             )}
           </div>
+          {/* 🛟 履歴・お気に入り復旧（左メニューから移設・左レール最下部＝左下） */}
+          {recoverySlot}
         </aside>
 
         {/* Middle: history list */}

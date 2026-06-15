@@ -25,10 +25,6 @@ interface Props {
   /** 🖼 Reference Picker履歴（保存した参照画像＋抽出プロンプトの再利用／生成と比較）を開く */
   onShowReferenceHistory: () => void;
   onShowAnalysis: () => void;
-  /** 🛟 履歴・お気に入り復旧パネルの開閉トグル（お気に入り一覧の近くに配置） */
-  onToggleRecovery?: () => void;
-  /** 復旧パネルが開いているか（ボタンの ▲/▼ 表示用） */
-  recoveryOpen?: boolean;
   onToggleExplorer: () => void;
   explorerOpen: boolean;
   /** 画像がセットされているときに表示する「選択範囲プロンプト」ボタンのコールバック */
@@ -52,8 +48,6 @@ export function ImageSidebar({
   onShowFavorites,
   onShowReferenceHistory,
   onShowAnalysis,
-  onToggleRecovery,
-  recoveryOpen,
   onToggleExplorer,
   explorerOpen,
   onOpenSelectionPrompt,
@@ -236,19 +230,6 @@ export function ImageSidebar({
           <span>🖼</span>
           <span>Reference Picker履歴</span>
         </button>
-        {/* 🛟 履歴・お気に入り復旧（お気に入り一覧の近くに集約・パネルはメイン列に展開） */}
-        {onToggleRecovery && (
-          <button
-            type="button"
-            onClick={onToggleRecovery}
-            className="w-full rounded-xl px-3 py-2 text-[13px] font-semibold border border-amber-400/35 bg-amber-400/5 text-amber-200/90 hover:bg-amber-400/15 hover:border-amber-400/70 transition flex items-center justify-center gap-2"
-            title="IndexedDB に残っている履歴・お気に入りを確認・再読み込み・書き出し/読み込み"
-          >
-            <span>🛟</span>
-            <span>履歴・お気に入り復旧</span>
-            <span className="opacity-70">{recoveryOpen ? "▲" : "▼"}</span>
-          </button>
-        )}
         {/* 分析センター（独立画面・全画面） */}
         <button
           type="button"

@@ -2093,6 +2093,24 @@ export default function App() {
               void refreshFavoriteProfile();
             }}
             initialFavoritesOnly={historyFavoritesOnly}
+            recoverySlot={
+              <div className="space-y-2">
+                {/* 🛟 履歴・お気に入り復旧：左メニューから移設（誤操作防止）。機能は RecoveryPanel のまま不変。 */}
+                <button
+                  type="button"
+                  onClick={() => setRecoveryOpen((v) => !v)}
+                  title="IndexedDB に残っている履歴・お気に入りを確認・再読み込み・書き出し/読み込み"
+                  className="w-full rounded-xl px-3 py-2 text-[12px] font-semibold border border-amber-400/30 bg-amber-400/5 text-amber-200/90 hover:bg-amber-400/12 hover:border-amber-400/60 transition flex items-center gap-2"
+                >
+                  <span>🛟</span>
+                  <span>履歴・お気に入り復旧</span>
+                  <span className="ml-auto opacity-60">{recoveryOpen ? "▲" : "▼"}</span>
+                </button>
+                {recoveryOpen && (
+                  <RecoveryPanel onReloadAll={reloadAllData} onClose={() => setRecoveryOpen(false)} />
+                )}
+              </div>
+            }
             onArrangeInline={handleArrangeInline}
             onSaveArranged={handleSaveArranged}
             onSendToGenerator={handleArrange}
@@ -2199,8 +2217,6 @@ export default function App() {
               }}
               onShowReferenceHistory={() => setCompareOpen(true)}
               onShowAnalysis={() => setAnalysisCenterOpen(true)}
-              onToggleRecovery={() => setRecoveryOpen((v) => !v)}
-              recoveryOpen={recoveryOpen}
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
               onOpenSelectionPrompt={() => setSelectionModalOpen(true)}
@@ -2221,10 +2237,6 @@ export default function App() {
                   📅 1ヶ月生成カレンダー
                 </button>
               </div>
-              {/* 🛟 復旧パネル本体：トグルは左メニューの「履歴・お気に入り復旧」ボタン。展開はこのメイン列に表示 */}
-              {recoveryOpen && (
-                <RecoveryPanel onReloadAll={reloadAllData} onClose={() => setRecoveryOpen(false)} />
-              )}
 
               {/* 🔁 復元確認バナー：「同じ構成で再生成」後に表示 */}
               {restoredItem && (
