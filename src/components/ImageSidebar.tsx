@@ -22,6 +22,8 @@ interface Props {
   viralMode: boolean;
   onShowCalendar: () => void;
   onShowFavorites: () => void;
+  /** 🖼 Reference Picker履歴（保存した参照画像＋抽出プロンプトの再利用／生成と比較）を開く */
+  onShowReferenceHistory: () => void;
   onShowAnalysis: () => void;
   /** 🛟 履歴・お気に入り復旧パネルの開閉トグル（お気に入り一覧の近くに配置） */
   onToggleRecovery?: () => void;
@@ -48,6 +50,7 @@ export function ImageSidebar({
   viralMode,
   onShowCalendar,
   onShowFavorites,
+  onShowReferenceHistory,
   onShowAnalysis,
   onToggleRecovery,
   recoveryOpen,
@@ -222,6 +225,16 @@ export function ImageSidebar({
         >
           <span>⭐</span>
           <span>お気に入り一覧</span>
+        </button>
+        {/* 🖼 Reference Picker履歴（保存した参照画像＋抽出プロンプトの再利用／生成と比較・全画面） */}
+        <button
+          type="button"
+          onClick={onShowReferenceHistory}
+          className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold border border-violet-400/40 bg-violet-400/8 text-violet-100 hover:bg-violet-400/18 hover:border-violet-400/70 transition flex items-center justify-center gap-2"
+          title="保存した参照画像・抽出プロンプトの履歴を全画面で開く（再利用・生成と比較）"
+        >
+          <span>🖼</span>
+          <span>Reference Picker履歴</span>
         </button>
         {/* 🛟 履歴・お気に入り復旧（お気に入り一覧の近くに集約・パネルはメイン列に展開） */}
         {onToggleRecovery && (

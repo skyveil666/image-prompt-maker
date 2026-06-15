@@ -2197,6 +2197,7 @@ export default function App() {
                 setHistoryFavoritesOnly(true);
                 setView("history");
               }}
+              onShowReferenceHistory={() => setCompareOpen(true)}
               onShowAnalysis={() => setAnalysisCenterOpen(true)}
               onToggleRecovery={() => setRecoveryOpen((v) => !v)}
               recoveryOpen={recoveryOpen}
