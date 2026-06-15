@@ -945,3 +945,21 @@ live.complete(message);
 - **S4 Gemini 接続バッジ復活（commit `a8a3a52`）**: 調査で特定＝`8b7bfa2`(UI/UX改善6件)が ImageSidebar の `<BackendStatus compact/>` を撤去し prominent 版＋`GlobalProtectionBar.connection` スロットを用意したが、**ヘッダーへの最終配線が未コミットで落ち**、以降どこにも描画されていなかった（health 経路 `checkBackendHealth`→`/api/health` は無傷）。→ App に `import BackendStatus` ＋ analysisSummary スロット内(🔎分析センターで見る の隣)に `<BackendStatus prominent />` を1行配線して復旧。既存部材のみ(BackendStatus.prominent/checkBackendHealth/`/api/health`/10秒ポーリング)・新規実装/サーバ変更なし。
 - **不変条件**: 各ボタン遷移先・生成/進捗計算・/api/generate payload・サーバ・§4(idb/backup/promptSystem/gemini/scopeFilter)・抽出/適用経路・カメラピッカー・Reference Picker履歴(A〜E)・第1便第2便 は無変更。
 - **検証**: 全段 front tsc 0・vite build 0。Playwright隔離4330＝S1:左メニューにカレンダー1件・右上消滅・押下で分析センター全画面plan tab／S2:両ボタン消滅・モーダル無し・dangling import 0(tsc/build)／S3:進捗バーが上部バー(.sticky.top-0)配下・h-3.5拡大・**11%→37%上昇**「プロンプトを生成しています…4案37%」／S4:バッジが分析センターで見る隣・**/api/health ポーリング2回発火・接続中=緑/未接続=rose**(実応答を page.route で制御)。console は通常接続時0(down検証時の503はブラウザ標準のネットワークログ＝既存ポーリング挙動・実装由来でない)。後片付け済(4330停止・5173/3001不可侵・health はGETのみ実Gemini不使用)。
+
+### 2026-06-15: NG指定 再設計（効かないグリッドNG撤去／効く欄へ一本化／否定→肯定変換／バズる継承・S1〜S4）
+
+- **背景/方針（調査確定）**: グリッドの ダブルクリックNG(`ngOptions`)は**サーバ参照0件・ngList非合流＝プロンプトに乗らない**（client UI除外のみ）。一方 NG指定欄(`ngList`)＋禁止モチーフ(`forbiddenTokens`)は出力【NG】に乗る。→ 効かないグリッドNGを**撤去**し、NG入力を「効く欄」に**一本化**、否定NGは**肯定形へ変換**(GPT Image は否定指定を守りにくい)、バズるでもNG/参照を**継承**。全てクライアント完結＝**§4(promptSystem)無改修**。
+- **S1（B・`a272d05`）**: `DetailsCard` の NG指定タブ(`NgTabContent`)先頭に明示文「NGはこの欄に入力（詳細グリッドでは指定不可・候補選択のみ）」。表示のみ。
+- **S2（D・`671dd31`）**: `buildImageViralInputs`(quickActions) の `extraInstructions` を `note` 上書き→`[note, current.extraInstructions]` **追記**化（バズるでもユーザー追加指示/NG/参照適用を継承）。※蓄積回帰は後述ホットfix `e43f498` で是正。
+- **S3（C・`7d8ce25`）**: 新規 `src/lib/ngPositive.ts`（`NG_POSITIVE_MAP`＋`splitNg`）。App `buildInputs` で `ngList: splitNg().ngForBlock`（未マップのみ【NG】）／`extraInstructions` へ `splitNg().positiveGuidance`（室内→「屋外・広い空・自然光」等）相乗り。`mergeForbiddenIntoNgList` import 撤去。**§4回避**（既存 ngList/extraInstructions 利用）。
+- **S4（A・`5100590`）**: グリッドNG(`ngOptions`)撤去。`GridCell` の `ng`/`onDoubleClick`＋赤表示、`DetailsCard` の NgContext/toggleNg/FieldSection・MultiFieldSection の NGロジック・**`fieldKey` prop 100件**(regex一括・multi配線 makeMultiChanger は不変)・createContext/useContext import、`types.ts DetailSettings.ngOptions`、`settingsPersist` の ngOptions 正規化 を削除（後方互換＝旧 ngOptions は読み手消滅で無視・migration不要）。グリッドは候補選択専用。**−83行**。
+- **不変条件**: 禁止モチーフ/NG欄の効く経路・Reference Picker(適用)系統(別フィールド・混線なし)・/api/generate payload構造・サーバ(§4)・カメラピッカー・Reference Picker履歴・UI整理(S1〜S4)・multi選択(makeMultiChanger) は無変更。
+- **検証**: 全段 front tsc0/build0・Playwright隔離4330。S1=明示文表示／S2=バズる payload に 追加指示＋note／S3=NG欄「室内、ピンク」→payload で室内=肯定誘導「屋外・広い空・自然光」へ・ピンク=【NG】残存／S4=描画無クラッシュ・payload `details` に ngOptions無し・旧 ngOptions 注入→reload で後方互換。console0。push 済(`f303fa0..5100590`)。
+- **残（任意）**: `forbiddenTokens.ts` の `mergeForbiddenIntoNgList` は S3 で未使用化（exported helper・tsc非警告・除去は任意の微掃除）。
+
+### 2026-06-15: 「この画像でバズる」指示文が追加指示欄に蓄積するバグ修正（S2/D回帰・単独ホットfix・`e43f498`）
+
+- **症状/原因**: バズるを押すたびバズる指示文(note)が「追加指示」欄(`extraInstructions`)に重複蓄積(3〜4回)し settingsPersist で永続化（リロード後も残存）。原因＝`handleImageViral`(App.tsx) が **note込みの結合済み extraInstructions を生の state へ書き戻し**(`setExtraInstructions(next.extraInstructions)`)、S2(D)で note を上書き→追記化した結果と噛み合い、押すたびに note が積み増えた（dedupなし）。生成effectは `pendingRunRef.current` を使い `buildInputs` を再呼びしないため、書き戻しを外せば note は payload に1回だけ残る。
+- **修正（4ファイル・§4非接触）**: ①App `handleImageViral` の `setExtraInstructions(next.extraInstructions)` **書き戻し除去**（note は生成 payload=`pendingRunRef` にのみ・生の追加指示 state は汚さない）②新規 `src/lib/viralNote.ts`＝`VIRAL_IMAGE_NOTE`(note 単一ソース)＋`stripViralImageNote`(蓄積note除去・生入力保持・冪等)③`quickActions` インラインnote→`VIRAL_IMAGE_NOTE` 参照(payload経路は不変)④`settingsPersist loadSettings` で蓄積noteを**起動時除去**(既存データ後始末・冪等)。
+- **不変**: バズるモード/viralModeバッジ・NG肯定誘導(S3)・参照適用・/api/generate payload構造・サーバ・§4・NG再設計(S1〜S4)。
+- **検証**: front tsc0/build0・Playwright隔離4330＝バズる**3連打**で payload note **各1回**・eiLen **585〜586で安定(蓄積0)**／ユーザー追加指示は payload に保持(note1回)／seed した note×3 が reload で除去・ユーザー入力「MYINPUT_KEEP」保持／console0(残はroute.abort=実装外)。
