@@ -10,6 +10,7 @@ import { RestoredItemBanner } from "./components/main/RestoredItemBanner";
 import { PatternPreviewBanner } from "./components/main/PatternPreviewBanner";
 import { ArrangeSourceBanner } from "./components/main/ArrangeSourceBanner";
 import { GenerationSummary } from "./components/main/GenerationSummary";
+import { GenerationProgress } from "./components/GenerationProgress";
 import { NanoBananaWarning } from "./components/main/NanoBananaWarning";
 import { GenerationActionBar } from "./components/main/GenerationActionBar";
 import { GenerationErrorPanel } from "./components/main/GenerationErrorPanel";
@@ -2204,6 +2205,15 @@ export default function App() {
                 />
               </>
             }
+            progressSlot={
+              <GenerationProgress
+                generating={generating}
+                count={count}
+                onComplete={handleGenerationComplete}
+                size="lg"
+                info={`${outputTargetLabel}向け / 統一プロンプト`}
+              />
+            }
           />
           {/* 🤖 AI分析ライブビュー：GPB 展開内の[ライブビュー]で開く（M-2 統合） */}
           {analysisDetailOpen && (
@@ -2509,8 +2519,6 @@ export default function App() {
                 count={count}
                 outputTargetLabel={outputTargetLabel}
                 viralMode={viralMode}
-                generating={generating}
-                onComplete={handleGenerationComplete}
               />
 
               {error && (

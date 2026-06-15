@@ -9,6 +9,8 @@ interface Props {
   animationEnabled?: boolean;
   /** P4: 進捗行に表示する補足（例 "ChatGPT向け / 統一プロンプト"）。表示のみ・ロジック非関与 */
   info?: string;
+  /** 表示サイズ。"lg"=上部バー用に拡大（バー高/文字/スピナーを大きく・上罫線+余白でストリップ化）。ロジック非関与。 */
+  size?: "sm" | "lg";
 }
 
 /**
@@ -45,6 +47,7 @@ export function GenerationProgress({
   onComplete,
   animationEnabled = true,
   info,
+  size = "sm",
 }: Props) {
   const [progress,        setProgress]        = useState(0);
   const [state,           setState]           = useState<RunState>("idle");
@@ -98,15 +101,20 @@ export function GenerationProgress({
 
   const isDone = state === "done";
   const doAnim = isDone && isDoneAnimating && animationEnabled;
+  const lg = size === "lg";
 
   return (
-    <div className="space-y-1.5" aria-live="polite" aria-atomic="true">
-      <div className="flex items-center gap-2 text-sm">
+    <div
+      className={lg ? "space-y-2 px-3 py-2.5 border-t border-bg-border/40" : "space-y-1.5"}
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <div className={["flex items-center gap-2", lg ? "text-base" : "text-sm"].join(" ")}>
         {isDone ? (
           <>
             {/* バッジ点滅：scale + glow（2回） */}
             <span
-              className="text-emerald-300 text-base leading-none"
+              className={[lg ? "text-lg" : "text-base", "text-emerald-300 leading-none"].join(" ")}
               style={
                 doAnim
                   ? { animation: "completionPulse 0.58s ease-out 2" }
@@ -128,20 +136,20 @@ export function GenerationProgress({
           </>
         ) : (
           <>
-            <Spinner />
+            <Spinner size={size} />
             <span className="text-text-base">{stageOf(progress)}</span>
           </>
         )}
-        <span className="ml-auto inline-flex items-center gap-2 text-[13px] text-text-muted/85">
-          {info && <span className="hidden sm:inline text-[11px] text-text-muted/65">{info}</span>}
+        <span className={["ml-auto inline-flex items-center gap-2 text-text-muted/85", lg ? "text-sm" : "text-[13px]"].join(" ")}>
+          {info && <span className={["hidden sm:inline text-text-muted/65", lg ? "text-[12px]" : "text-[11px]"].join(" ")}>{info}</span>}
           <span>{count}案</span>
-          <span className="tabular-nums font-mono text-text-base/80">
+          <span className={["tabular-nums font-mono text-text-base/80", lg ? "text-base" : ""].join(" ")}>
             {Math.round(progress)}%
           </span>
         </span>
       </div>
 
-      <div className="relative h-2 rounded-full bg-bg-base overflow-hidden border border-bg-border">
+      <div className={["relative rounded-full bg-bg-base overflow-hidden border border-bg-border", lg ? "h-3.5" : "h-2"].join(" ")}>
         <div
           className={[
             "h-full rounded-full transition-[width] duration-200 ease-out",
@@ -163,10 +171,10 @@ export function GenerationProgress({
   );
 }
 
-function Spinner() {
+function Spinner({ size = "sm" }: { size?: "sm" | "lg" }) {
   return (
     <svg
-      className="animate-spin w-4 h-4 text-accent"
+      className={`animate-spin ${size === "lg" ? "w-5 h-5" : "w-4 h-4"} text-accent`}
       viewBox="0 0 24 24"
       fill="none"
       aria-hidden

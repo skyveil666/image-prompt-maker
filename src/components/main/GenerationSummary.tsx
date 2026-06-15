@@ -1,4 +1,3 @@
-import { GenerationProgress } from "../GenerationProgress";
 import type { Count } from "../../types";
 
 interface GenerationSummaryProps {
@@ -6,18 +5,14 @@ interface GenerationSummaryProps {
   count: Count;
   outputTargetLabel: string;
   viralMode: boolean;
-  generating: boolean;
-  onComplete: () => void;
 }
 
-/** 設定サマリー（P4：出力先ラベル）＋生成プログレス（App.tsx から純移設・表示専用）。 */
+/** 設定サマリー（P4：出力先ラベル・表示専用）。生成プログレスは上部バー(GlobalProtectionBar)へ移設。 */
 export function GenerationSummary({
   scopeLabel,
   count,
   outputTargetLabel,
   viralMode,
-  generating,
-  onComplete,
 }: GenerationSummaryProps) {
   return (
     <div className="px-1 space-y-1.5">
@@ -32,13 +27,6 @@ export function GenerationSummary({
           </span>
         )}
       </div>
-      <GenerationProgress
-        generating={generating}
-        count={count}
-        onComplete={onComplete}
-        animationEnabled={true}
-        info={`${outputTargetLabel}向け / 統一プロンプト`}
-      />
     </div>
   );
 }

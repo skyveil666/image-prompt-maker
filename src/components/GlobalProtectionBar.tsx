@@ -57,9 +57,11 @@ interface Props {
   analysisDetail?: ReactNode;
   /** ヘッダー右側に固定表示する操作群（出力先/案数/✨生成）。UI配置のみ・生成ロジックには無関係。 */
   actions?: ReactNode;
+  /** 本体行の直下に全幅表示する生成プログレス（生成中のみ・表示専用）。UI配置のみ・進捗ロジック非関与。 */
+  progressSlot?: ReactNode;
 }
 
-export function GlobalProtectionBar({ faceLock, risk, brand, connection, analysisSummary, analysisDetail, actions }: Props) {
+export function GlobalProtectionBar({ faceLock, risk, brand, connection, analysisSummary, analysisDetail, actions, progressSlot }: Props) {
   const [open, setOpen] = useState(false);
   const lvl = LEVEL_STYLE[risk.level];
 
@@ -110,6 +112,9 @@ export function GlobalProtectionBar({ faceLock, risk, brand, connection, analysi
             <span className="text-[9px] leading-none">{open ? "▲" : "▼"}</span>
           </button>
         </div>
+
+        {/* 生成プログレス（本体行直下・全幅・生成中のみ／表示専用・進捗ロジック非関与） */}
+        {progressSlot}
 
         {/* ── 展開時のみ：AI分析詳細 + 顔・同一性 + Identity Shield の詳細 ─────────── */}
         {open && (
