@@ -95,9 +95,11 @@ interface Props {
   onContextChange?: (ctx: { image: string; extracted: Record<string, string> } | null) => void;
   /** Compare Mode（参照↔生成 比較ビュー）を開く（任意）。 */
   onOpenCompare?: () => void;
+  /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（任意）。保存できたら true。 */
+  onSaveToHistory?: () => Promise<boolean>;
 }
 
-export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare }: Props) {
+export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, onSaveToHistory }: Props) {
   const [open, setOpen] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -110,6 +112,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   const [showJson, setShowJson] = useState(false);
   const [othersOpen, setOthersOpen] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const currentJson = REFERENCE_CATEGORIES.reduce<Record<string, string>>((acc, c) => {
@@ -236,6 +239,21 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
       window.prompt("抽出JSON（コピーしてください）", json);
     }
   }, [fields, flash]);
+
+  /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（生成しなくても残せる）。
+   *  保存自体は App 側（onSaveToHistory）が referenceContextRef から行う＝抽出/適用ロジックには触れない。 */
+  const doSaveToHistory = useCallback(async () => {
+    if (!image || !onSaveToHistory || saving) return;
+    setSaving(true);
+    try {
+      const ok = await onSaveToHistory();
+      flash(ok ? "✅ 履歴に保存しました（🕘 履歴で確認・再利用できます）" : "保存に失敗しました");
+    } catch {
+      flash("保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  }, [image, onSaveToHistory, saving, flash]);
 
   /** Gemini Vision で参照画像を解析し、13カテゴリ欄を実抽出結果で埋める。 */
   const runExtract = useCallback(async () => {
@@ -450,6 +468,14 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
             className="mt-1.5 w-full text-[11px] px-2 py-1 rounded border border-bg-border bg-bg-panel text-text-muted hover:text-text-base transition">
             📋 抽出JSONをコピー
           </button>
+          {onSaveToHistory && (
+            <button type="button" disabled={!image || saving}
+              onClick={() => { void doSaveToHistory(); }}
+              title={image ? "現在の参照画像＋抽出を「Reference Picker履歴」に保存（生成しなくても残せる・あとで🕘 履歴から再利用/比較できます）" : "先に参照画像を貼ってください"}
+              className="mt-1.5 w-full text-[11px] font-semibold px-2 py-1 rounded border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed">
+              {saving ? "保存中…" : "📌 この参照を履歴に保存"}
+            </button>
+          )}
           <p className="text-[10px] text-text-muted/65 leading-snug pt-1.5">
             ※ 参照画像に実際に見える要素だけを抽出します（無い要素を足しません）。
             顔・同一性・表情・体型は抽出せず、人物そのものは複製しません。手入力で上書きも可。

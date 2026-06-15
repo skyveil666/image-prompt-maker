@@ -49,6 +49,11 @@ export interface ReferenceRecord {
   evaluatedAt?: number;
   /** 任意：お気に入り（学習連携用） */
   favorite?: boolean;
+  /** 保存種別（任意・後方互換）。"picker"=Reference Picker から手動保存（生成バッチ無し）。
+   *  未設定 or "generation"＝生成時に自動保存（既存挙動）。読み取り側は「未設定＝generation」とみなす。 */
+  kind?: "generation" | "picker";
+  /** 任意：ユーザーが付けるラベル（将来のアルバム表示・整理用。現状は未入力）。 */
+  note?: string;
 }
 
 /** 参照レコード保持上限（古いものから間引く。サムネ込みなので控えめ） */

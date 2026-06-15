@@ -210,6 +210,27 @@ export default function App() {
   );
   /** referenceNote を runGenerate（deps非依存）から最新参照するための ref。 */
   const referenceNoteRef = useLatestRef(referenceNote);
+  /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（生成しなくても残す）。
+   *  生成時の自動保存（下記 runGenerate 内）と同じデータ源（referenceContextRef＝画像+抽出 /
+   *  referenceNote＝適用）を使う追加経路。kind:"picker" / batchId:"" で記録（生成バッチ無し）。
+   *  抽出・適用・生成ロジックには一切影響しない。保存できたら true。 */
+  const handleSaveReferenceToHistory = useCallback(async (): Promise<boolean> => {
+    try {
+      const refCtx = referenceContextRef.current;
+      if (!refCtx?.image) return false;
+      const refThumb = await makeThumbnail(refCtx.image);
+      const id = await saveReferenceRecord({
+        refThumb,
+        extracted: refCtx.extracted,
+        applied: referenceNoteRef.current ?? {},
+        batchId: "",
+        kind: "picker",
+      });
+      return id != null;
+    } catch {
+      return false;
+    }
+  }, [referenceNoteRef]);
   /** Compare Mode（参照↔生成 比較ビュー）の開閉。Reference Picker の「🆚 比較」から開く。 */
   const [compareOpen, setCompareOpen] = useState(false);
   // 分析ラボ（孤立入口）は撤去（#4）。詳細探索は分析センターの重複分析/🔭発見タブに集約。
@@ -2530,6 +2551,7 @@ export default function App() {
           onClearAll={handleClearReference}
           onContextChange={handleReferenceContextChange}
           onOpenCompare={() => setCompareOpen(true)}
+          onSaveToHistory={handleSaveReferenceToHistory}
         />
       )}
 

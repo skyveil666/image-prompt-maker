@@ -216,7 +216,7 @@ export function CompareModeView({ open, onClose }: Props) {
             <div className="space-y-1.5 max-w-md">
               <p className="text-[13px] font-semibold text-text-base">まだ比較できる参照レコードがありません</p>
               <p className="text-[11.5px] text-text-muted leading-relaxed">
-                Reference Picker で参照画像を取り込み →「適用」してから「プロンプトを生成」すると、ここに参照レコードが追加されます。
+                Reference Picker で参照画像を取り込み、「📌 この参照を履歴に保存」で保存するか、「適用」してから「プロンプトを生成」すると、ここに参照レコードが追加されます。
                 生成結果を履歴で貼り戻すと、右側に並べて比較できます。
               </p>
             </div>
@@ -239,7 +239,13 @@ export function CompareModeView({ open, onClose }: Props) {
                   >
                     <img src={r.refThumb} alt="" className="w-10 h-10 rounded object-cover border border-bg-border shrink-0" />
                     <span className="flex flex-col leading-tight min-w-0">
-                      <span className="text-[10px] text-text-muted">{fmtDate(r.createdAt)}</span>
+                      <span className="text-[10px] text-text-muted flex items-center gap-1">
+                        {r.kind === "picker" && (
+                          <span className="text-[8px] px-1 rounded bg-violet-500/25 text-violet-200 leading-none shrink-0"
+                            title="Reference Picker から手動保存（生成バッチ無し）">📌保存</span>
+                        )}
+                        {fmtDate(r.createdAt)}
+                      </span>
                       <span className="text-[10px] text-text-base/90 truncate">{labels.length ? labels.join("・") : "（適用なし）"}</span>
                     </span>
                   </button>
