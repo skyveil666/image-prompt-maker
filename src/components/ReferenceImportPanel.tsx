@@ -97,9 +97,13 @@ interface Props {
   onOpenCompare?: () => void;
   /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（任意）。保存できたら true。 */
   onSaveToHistory?: () => Promise<boolean>;
+  /** ♻ 🕘履歴からの再利用 seed（任意）。token が変わるたびに 参照画像（サムネ）＋抽出を流し込み、開く。 */
+  reuseSeed?: { image: string; extracted: Record<string, string>; token: number } | null;
+  /** ♻ seed を流し込み終えたら呼ぶ（任意）。親が seed を null に戻し、再マウント時の二重注入を防ぐ。 */
+  onReuseConsumed?: () => void;
 }
 
-export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, onSaveToHistory }: Props) {
+export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, onSaveToHistory, reuseSeed, onReuseConsumed }: Props) {
   const [open, setOpen] = useState(false);
   const [image, setImage] = useState<string | null>(null);
   const [fields, setFields] = useState<Record<string, string>>({});
@@ -135,6 +139,22 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     setNote(m);
     window.setTimeout(() => setNote((cur) => (cur === m ? null : cur)), 2600);
   }, []);
+
+  // ♻ 🕘履歴からの「再利用」：参照画像（サムネ）＋抽出13カテゴリをピッカーへ流し込み、開く。
+  // token が変わるたびに再実行（同一レコードの再利用も拾う）。適用はユーザーが従来どおり押す＝適用ロジック不変。
+  useEffect(() => {
+    if (!reuseSeed) return;
+    setImage(reuseSeed.image);
+    setFields(() => {
+      const next: Record<string, string> = {};
+      for (const c of REFERENCE_CATEGORIES) next[c.key] = (reuseSeed.extracted[c.key] ?? "").trim();
+      return next;
+    });
+    setSelected(new Set());
+    setOpen(true);
+    flash("♻ 履歴から再利用しました。内容を確認し「適用」で反映してください。");
+    onReuseConsumed?.(); // 親が seed を null に戻す＝再マウント時の二重注入防止
+  }, [reuseSeed, flash, onReuseConsumed]);
 
   const loadFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) { flash("画像ファイルを入れてください"); return; }

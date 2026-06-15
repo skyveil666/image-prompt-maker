@@ -39,9 +39,11 @@ const COMPARE_ITEMS: { key: string; label: string }[] = [
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** ♻ 選択中の参照レコードをピッカーへ流し込んで再利用（任意）。適用はユーザーが押す＝適用ロジック不変。 */
+  onReuse?: (rec: ReferenceRecord) => void;
 }
 
-export function CompareModeView({ open, onClose }: Props) {
+export function CompareModeView({ open, onClose, onReuse }: Props) {
   const [records, setRecords] = useState<ReferenceRecord[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [results, setResults] = useState<ResultImage[]>([]);
@@ -268,6 +270,13 @@ export function CompareModeView({ open, onClose }: Props) {
                     <div className="text-[10.5px] text-text-muted leading-snug">
                       適用：{appliedLabels(selected).join("・") || "（なし）"}
                     </div>
+                    {onReuse && (
+                      <button type="button" onClick={() => onReuse(selected)}
+                        title="この参照画像＋抽出をピッカーへ流し込んで再利用（履歴は閉じます・適用は内容確認後にご自身で押せます）"
+                        className="w-full text-[11px] font-semibold px-2 py-1.5 rounded-lg border border-violet-400/50 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25 transition">
+                        ♻ この参照をピッカーで再利用
+                      </button>
+                    )}
                   </div>
 
                   {/* 中央：参照 ⇔ 生成 比較表（6項目＋一致率） */}

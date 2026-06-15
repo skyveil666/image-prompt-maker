@@ -67,7 +67,7 @@ import { getRecentGenres, pushRecentGenres, clearRecentGenres } from "./lib/genr
 import { getRecentSubStyles, pushRecentSubStyles, clearRecentSubStyles } from "./lib/subStyleHistory";
 import { runAutoCleanup, getAutoCleanupEnabled } from "./lib/cleanup";
 import { makeThumbnail } from "./lib/imageThumb";
-import { saveReferenceRecord } from "./lib/referenceRecords";
+import { saveReferenceRecord, type ReferenceRecord } from "./lib/referenceRecords";
 import { StorageQuotaError } from "./lib/idb";
 import { loadReferenceLearning, type ReferenceLearning } from "./lib/referenceLearning";
 import {
@@ -233,6 +233,20 @@ export default function App() {
   }, [referenceNoteRef]);
   /** Compare Mode（参照↔生成 比較ビュー）の開閉。Reference Picker の「🆚 比較」から開く。 */
   const [compareOpen, setCompareOpen] = useState(false);
+  /** ♻ 🕘履歴からの「再利用」：選んだ参照レコードの 参照画像（サムネ）＋抽出13カテゴリを
+   *  ピッカーへ流し込むための seed。token を変えるたびにピッカー側 effect が再発火（同一レコードの
+   *  再利用も拾う）。適用はユーザーが従来どおり押す＝適用ロジックには一切触れない。 */
+  const referenceReuseTokenRef = useRef(0);
+  const [referenceReuseSeed, setReferenceReuseSeed] =
+    useState<{ image: string; extracted: Record<string, string>; token: number } | null>(null);
+  const handleReuseReference = useCallback((rec: ReferenceRecord) => {
+    referenceReuseTokenRef.current += 1;
+    setReferenceReuseSeed({ image: rec.refThumb, extracted: { ...rec.extracted }, token: referenceReuseTokenRef.current });
+    setCompareOpen(false); // 履歴を閉じてメインのピッカーへ戻す
+    setView("main");       // ピッカーは main view でのみ描画されるため確実に main へ
+  }, []);
+  /** ♻ ピッカーが seed を流し込み終えたら null に戻す（再マウント時の二重注入防止）。 */
+  const handleReuseConsumed = useCallback(() => setReferenceReuseSeed(null), []);
   // 分析ラボ（孤立入口）は撤去（#4）。詳細探索は分析センターの重複分析/🔭発見タブに集約。
   /** 📊 分析センター（全画面モーダル・docs/32）。左メニューから開く。 */
   const [analysisCenterOpen, setAnalysisCenterOpen] = useState(false);
@@ -2552,11 +2566,13 @@ export default function App() {
           onContextChange={handleReferenceContextChange}
           onOpenCompare={() => setCompareOpen(true)}
           onSaveToHistory={handleSaveReferenceToHistory}
+          reuseSeed={referenceReuseSeed}
+          onReuseConsumed={handleReuseConsumed}
         />
       )}
 
       {/* 🆚 Compare Mode（参照↔生成 比較・全幅ビュー） */}
-      <CompareModeView open={compareOpen} onClose={() => setCompareOpen(false)} />
+      <CompareModeView open={compareOpen} onClose={() => setCompareOpen(false)} onReuse={handleReuseReference} />
 
       {/* 🔬 分析ラボは撤去（#4・孤立入口）。詳細探索は分析センターの重複分析/🔭発見タブへ集約。 */}
 
