@@ -7,9 +7,9 @@ import { useEffect, useRef } from "react";
  * - onEscape は ref 経由で常に最新を呼ぶため、インライン関数を渡しても
  *   enabled が変わらない限りリスナーは張り替えない。
  *
- * 注意: Escape 以外のキーも同一リスナーで扱うコンポーネント
- * （SelectionPromptModal / SimpleImageEditor の undo/redo 等）や、入力欄の
- * keydown（ForbiddenTokens）は、Escape だけ切り出すとリスナーが分裂するため対象外。
+ * 注意: Escape 以外のキーも同一リスナーで扱うコンポーネント（undo/redo 等の
+ * 複合キー）や、入力欄の keydown（ForbiddenTokens）は、Escape だけ切り出すと
+ * リスナーが分裂するため対象外。
  */
 export function useEscapeKey(onEscape: () => void, enabled = true): void {
   const ref = useRef(onEscape);

@@ -29,10 +29,6 @@ interface Props {
   onShowPostingCalendar: () => void;
   onToggleExplorer: () => void;
   explorerOpen: boolean;
-  /** 画像がセットされているときに表示する「選択範囲プロンプト」ボタンのコールバック */
-  onOpenSelectionPrompt?: () => void;
-  /** 画像がセットされているときに表示する「簡易画像編集」ボタンのコールバック */
-  onOpenSimpleEditor?: () => void;
   /** 「この画像でバズる」一発生成ボタンのコールバック（画像あり時のみ表示） */
   onImageViral?: () => void;
 }
@@ -53,8 +49,6 @@ export function ImageSidebar({
   onShowPostingCalendar,
   onToggleExplorer,
   explorerOpen,
-  onOpenSelectionPrompt,
-  onOpenSimpleEditor,
   onImageViral,
 }: Props) {
   const [recents, setRecents] = useState<RecentImageItem[]>([]);
@@ -73,7 +67,7 @@ export function ImageSidebar({
   /**
    * imageDataUrl が変化するたびに recents を IDB から再同期する。
    * - 通常のアップロード（handleUpload）では setRecents 済みだが冪等で問題なし。
-   * - SimpleImageEditor 等の外部セット時は handleUpload を
+   * - Explorer 選択等の外部セット時は handleUpload を
    *   経由しないため、ここで同期しないと一覧が古いままになる。
    * - 外部由来の URL（data:image/...）が recents に存在しなければ新規登録する。
    */
@@ -99,7 +93,7 @@ export function ImageSidebar({
         return;
       }
 
-      // 外部セット（SimpleImageEditor 等）の場合：コンテンツハッシュで重複確認後に追加
+      // 外部セット（Explorer 選択等）の場合：コンテンツハッシュで重複確認後に追加
       try {
         const hash = await imageContentHash(imageDataUrl);
         const { list: updated, item } = await addRecentImage({
@@ -267,30 +261,6 @@ export function ImageSidebar({
             <span className="text-base">⚡</span>
             <span>この画像でバズる</span>
           </button>
-        )}
-        {imageDataUrl && (onOpenSelectionPrompt || onOpenSimpleEditor) && (
-          <div className="mt-2 flex flex-col gap-1.5">
-            {onOpenSimpleEditor && (
-              <button
-                type="button"
-                onClick={onOpenSimpleEditor}
-                className="w-full rounded-xl px-3 py-2.5 text-[12px] font-semibold border border-emerald-400/45 bg-emerald-400/8 text-emerald-200 hover:bg-emerald-400/15 hover:border-emerald-400/70 transition flex items-center justify-center gap-1.5"
-              >
-                <span>🎨</span>
-                <span>簡易画像編集</span>
-              </button>
-            )}
-            {onOpenSelectionPrompt && (
-              <button
-                type="button"
-                onClick={onOpenSelectionPrompt}
-                className="w-full rounded-xl px-3 py-2.5 text-[12px] font-semibold border border-violet-400/45 bg-violet-400/8 text-violet-200 hover:bg-violet-400/15 hover:border-violet-400/70 transition flex items-center justify-center gap-1.5"
-              >
-                <span>🖌</span>
-                <span>選択範囲プロンプト</span>
-              </button>
-            )}
-          </div>
         )}
       </section>
 

@@ -15,8 +15,6 @@ import { GenerationActionBar } from "./components/main/GenerationActionBar";
 import { GenerationErrorPanel } from "./components/main/GenerationErrorPanel";
 import { BoostArea } from "./components/main/BoostArea";
 import { PromptTargetSelector } from "./components/PromptTargetSelector";
-import { SelectionPromptModal } from "./components/SelectionPromptModal";
-import { SimpleImageEditor } from "./components/SimpleImageEditor";
 import { CompletionToast } from "./components/CompletionToast";
 import { PresetAppliedToast } from "./components/PresetAppliedToast";
 import { ReflectionStatusBar } from "./components/ReflectionStatusBar";
@@ -389,8 +387,6 @@ export default function App() {
       return false;
     }
   });
-  const [selectionModalOpen, setSelectionModalOpen] = useState(false);
-  const [simpleEditorOpen,   setSimpleEditorOpen]   = useState(false);
   /** ⑤ 生成完了後1.5秒だけ true → ボタンを「✅ 完了！」表示 */
   const [justCompleted, setJustCompleted] = useState(false);
   /** ③ インクリメントするたびトーストを1回表示 */
@@ -2255,8 +2251,6 @@ export default function App() {
               onShowPostingCalendar={() => { setAnalysisInitialTab("plan"); setAnalysisCenterOpen(true); }}
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
-              onOpenSelectionPrompt={() => setSelectionModalOpen(true)}
-              onOpenSimpleEditor={() => setSimpleEditorOpen(true)}
               onImageViral={imageDataUrl ? handleImageViral : undefined}
             />
 
@@ -2566,26 +2560,6 @@ export default function App() {
       <CompareModeView open={compareOpen} onClose={() => setCompareOpen(false)} onReuse={handleReuseReference} />
 
       {/* 🔬 分析ラボは撤去（#4・孤立入口）。詳細探索は分析センターの重複分析/🔭発見タブへ集約。 */}
-
-      {/* 🖌 選択範囲プロンプトモーダル */}
-      {selectionModalOpen && imageDataUrl && (
-        <SelectionPromptModal
-          imageDataUrl={imageDataUrl}
-          onClose={() => setSelectionModalOpen(false)}
-        />
-      )}
-
-      {/* 🎨 簡易画像編集モーダル */}
-      {simpleEditorOpen && imageDataUrl && (
-        <SimpleImageEditor
-          imageDataUrl={imageDataUrl}
-          onClose={() => setSimpleEditorOpen(false)}
-          onSave={(newUrl) => {
-            setImageDataUrl(newUrl);
-            setSimpleEditorOpen(false);
-          }}
-        />
-      )}
 
       {/* ③ 生成完了トースト（右上・3秒） */}
       <CompletionToast trigger={toastTrigger} count={count} />
