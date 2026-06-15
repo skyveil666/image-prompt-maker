@@ -418,8 +418,6 @@ export interface Camera3DState {
   distance: number;
   composition: "face" | "bust" | "waist" | "full" | "wide";
   preset: string | null;
-  /** ポーズ状態（null = デフォルト自然立ち）*/
-  pose?: import("./lib/poseLib").PoseState | null;
 }
 
 export interface CameraSettings {
