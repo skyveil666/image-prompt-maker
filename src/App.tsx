@@ -11,6 +11,7 @@ import { PatternPreviewBanner } from "./components/main/PatternPreviewBanner";
 import { ArrangeSourceBanner } from "./components/main/ArrangeSourceBanner";
 import { GenerationSummary } from "./components/main/GenerationSummary";
 import { GenerationProgress } from "./components/GenerationProgress";
+import { BackendStatus } from "./components/BackendStatus";
 import { NanoBananaWarning } from "./components/main/NanoBananaWarning";
 import { GenerationActionBar } from "./components/main/GenerationActionBar";
 import { GenerationErrorPanel } from "./components/main/GenerationErrorPanel";
@@ -2180,6 +2181,8 @@ export default function App() {
                 >
                   🔎 分析センターで見る
                 </button>
+                {/* 🟢 Gemini 接続状態（health ポーリング・8b7bfa2 で落ちた最終配線を復旧） */}
+                <BackendStatus prominent />
               </div>
             }
             analysisDetail={
