@@ -181,6 +181,17 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     flash(n > 0 ? `${n}件を適用しました` : "適用できる項目がありませんでした");
   }, [selected, applyOne, flash]);
 
+  /** text 有り・非ロックの全カテゴリへ一括適用（適用は既存 applyOne を再利用＝適用ロジック不変）。 */
+  const applyAll = useCallback(() => {
+    const keys = REFERENCE_CATEGORIES
+      .filter((c) => (fields[c.key] ?? "").trim() && !referenceLockReason(c, protections))
+      .map((c) => c.key);
+    if (keys.length === 0) { flash("適用できる項目がありません"); return; }
+    let n = 0;
+    for (const k of keys) if (applyOne(k)) n++;
+    flash(n > 0 ? `${n}件をすべて適用しました` : "適用できる項目がありませんでした");
+  }, [fields, protections, applyOne, flash]);
+
   const clearAll = useCallback(() => {
     setFields({});
     setSelected(new Set());
@@ -235,6 +246,11 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   const priorityCats = REFERENCE_CATEGORIES.filter((c) => PRIORITY_KEYS.includes(c.key));
   const otherCats = REFERENCE_CATEGORIES.filter((c) => !PRIORITY_KEYS.includes(c.key));
 
+  /** 抽出済みだが未適用（text有り・未適用・非ロック）＝「適用押し忘れ」候補。 */
+  const unappliedCats = REFERENCE_CATEGORIES.filter(
+    (c) => (fields[c.key] ?? "").trim() && appliedNote[c.key] == null && !referenceLockReason(c, protections),
+  );
+
   /** カテゴリ別カード（状態バッジ：未適用/適用済み/保護で適用不可） */
   const renderCard = (cat: ReferenceCategory) => {
     const lockReason = referenceLockReason(cat, protections);
@@ -242,16 +258,20 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     const applied = appliedNote[cat.key] != null;
     const scopeOn = cat.scope != null && activeScopes.includes(cat.scope);
     const status = lockReason
-      ? { text: "🔒 保護で適用不可", cls: "border-amber-400/40 bg-amber-400/10 text-amber-200" }
+      ? { text: "🔒 保護で適用不可", cls: "border-bg-border bg-bg-base/40 text-text-muted/60" }
       : applied
       ? { text: "✅ 適用済み（反映中）", cls: "border-violet-400/45 bg-violet-400/12 text-violet-200" }
       : hasText
-      ? { text: "○ 未適用", cls: "border-sky-400/35 bg-sky-400/8 text-sky-200/85" }
+      ? { text: "⚠ 未適用", cls: "border-amber-400/55 bg-amber-400/15 text-amber-100 font-bold" }
       : { text: "— 空", cls: "border-bg-border bg-bg-base/40 text-text-muted/55" };
     return (
       <div key={cat.key} className={[
         "rounded-lg border px-2.5 py-2 space-y-1.5",
-        lockReason ? "border-bg-border bg-bg-base/20 opacity-70" : "border-bg-border bg-bg-base/40",
+        lockReason
+          ? "border-bg-border bg-bg-base/20 opacity-70"
+          : hasText && !applied
+          ? "border-amber-400/50 bg-amber-400/[0.06] ring-1 ring-amber-400/25"
+          : "border-bg-border bg-bg-base/40",
       ].join(" ")}>
         <div className="flex items-center gap-1.5 flex-wrap">
           <input type="checkbox" checked={selected.has(cat.key)} onChange={() => toggleSel(cat.key)}
@@ -342,6 +362,17 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
             <span className="text-violet-200/70"> ／「プロンプトを生成」で効きます</span>
           </div>
         )}
+        {/* 抽出済みだが「適用」未押下の軸を目立たせる＋ワンクリック全適用（適用押し忘れ対策） */}
+        {unappliedCats.length > 0 && (
+          <div className="rounded-lg border border-amber-400/50 bg-amber-400/10 px-2.5 py-2 text-[11px] text-amber-100 leading-snug flex items-center gap-2 flex-wrap">
+            <span className="flex-1 min-w-0">⚠ 抽出済み・未適用：{unappliedCats.map((c) => c.label).join("・")}（{unappliedCats.length}件）— <b>「適用」を押すまで反映されません</b></span>
+            <button type="button" onClick={applyAll}
+              title="抽出済みで未適用の軸をまとめて反映する"
+              className="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg border border-amber-400/60 bg-amber-500/20 text-amber-50 hover:bg-amber-500/30 transition">
+              ✨ 全適用
+            </button>
+          </div>
+        )}
         {/* 取り込みエリア */}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -409,7 +440,8 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
           <BulkBtn label="構図だけ適用"  onClick={() => { applyOne("composition"); }} />
           <BulkBtn label="光だけ適用"    onClick={() => { applyOne("lighting"); }} />
           <BulkBtn label="色味だけ適用"  onClick={() => { applyOne("color"); }} />
-          <BulkBtn label="選択項目だけ適用" onClick={applySelected} accent />
+          <BulkBtn label="✨ 全適用" onClick={applyAll} accent />
+          <BulkBtn label="選択項目だけ適用" onClick={applySelected} />
           <BulkBtn label="全解除" onClick={clearAll} danger />
         </div>
         </div>{/* /左カラム */}
