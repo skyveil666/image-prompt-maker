@@ -46,6 +46,7 @@ const SYSTEM = [
   "",
   "# 最重要・厳守",
   "- 画像に実際に写っている要素だけを書く。**画像に無いものを推測で足さない**。色・衣装・ポーズ・背景を別物に変えない。",
+  "- ただし**実際に見えている要素は省略せず、色・素材・形・質感・光・空気感まで具体的に厚く描写する**（捏造はしない／見えているものを一語で済ませない）。各カテゴリは複数の語句を「、」で具体的に列挙する。",
   "  禁止例（参照画像に無ければ絶対に書かない）：黒ゴシック / 黒レイヤード / 青ネオン / サイバー都市 /",
   "  クリスタル / 羽・翼 / HUD・ホログラム。これらは画像に明確に見える場合のみ書く。",
   "- 人物の顔・目鼻立ち・肌・表情・年齢・性別・人種・個人や特定キャラクターの同一性は一切書かない。",
@@ -54,7 +55,7 @@ const SYSTEM = [
   "- 各値は『生成に使える具体的なプロンプト素材』。説明文（「〜です」「人物が〜」）は禁止。",
   "  日本語の語句を「、」で区切って具体的に列挙する。",
   "- background / outfit / hair / pose / composition / camera / lighting / color は",
-  "  必ず具体的に埋める（空欄・「不明」・雑な一語は禁止）。",
+  "  必ず具体的に・厚く埋める（空欄・「不明」・雑な一語は禁止。最低でも複数語句を列挙）。",
   "  props / foreground / world / texture / mood は、画像に該当が見えれば埋め、無ければ \"\"。",
   "- 元画像の『印象』が残るよう、空気感・世界観・色温度・感情トーンも具体的に拾う。",
   "",
@@ -83,13 +84,22 @@ const USER = [
   "画像に無い要素を足さないこと。JSON のみ返す：",
 ].join("\n");
 
-/** Gemini 応答を13キー固定・string に整える（不足キーは ""、長すぎは切り詰め） */
+/** 値を上限内に収める。途中で切れないよう、最後の区切り（、。）でクランプする（ぶつ切り防止）。 */
+function clampValue(v: string, max = 300): string {
+  const t = v.replace(/\s+/g, " ").trim();
+  if (t.length <= max) return t;
+  const head = t.slice(0, max);
+  const cut = Math.max(head.lastIndexOf("、"), head.lastIndexOf("。"));
+  return (cut >= max * 0.5 ? head.slice(0, cut) : head).replace(/[、。・/\s]+$/, "");
+}
+
+/** Gemini 応答を13キー固定・string に整える（不足キーは ""、長すぎは区切りでクランプ） */
 function sanitize(obj: unknown): ReferenceElements {
   const o = (obj && typeof obj === "object" ? obj : {}) as Record<string, unknown>;
   const out: ReferenceElements = {};
   for (const k of REFERENCE_KEYS) {
     const v = o[k];
-    out[k] = typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, 160) : "";
+    out[k] = typeof v === "string" ? clampValue(v) : "";
   }
   return out;
 }
@@ -123,7 +133,7 @@ export async function extractReference(imageDataUrl: string): Promise<ExtractRef
     ],
     config: {
       systemInstruction: SYSTEM,
-      temperature: 0.2,
+      temperature: 0.3,
       responseMimeType: "application/json",
     },
   });
