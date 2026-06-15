@@ -109,6 +109,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   const [lightbox, setLightbox] = useState(false);
   const [showJson, setShowJson] = useState(false);
   const [othersOpen, setOthersOpen] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const currentJson = REFERENCE_CATEGORIES.reduce<Record<string, string>>((acc, c) => {
@@ -159,6 +160,28 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     window.addEventListener("paste", onPaste, true);
     return () => window.removeEventListener("paste", onPaste, true);
   }, [open, loadFile]);
+
+  // 右クリック→独自メニュー「貼り付け」。navigator.clipboard.read() で画像を取得（ユーザー操作起点）。
+  // 権限拒否・未対応・画像なし等で失敗したら Ctrl+V を案内（Ctrl+V は常に有効＝二重化）。
+  // 第1便の paste 分離（open限定＋capture＋stopImmediatePropagation）には触れない別経路。
+  const pasteFromClipboard = useCallback(async () => {
+    setCtxMenu(null);
+    try {
+      if (!navigator.clipboard?.read) { flash("この環境は右クリック貼り付け非対応です。Ctrl+V で貼り付けてください"); return; }
+      const items = await navigator.clipboard.read();
+      for (const it of items) {
+        const type = it.types.find((t) => t.startsWith("image/"));
+        if (type) {
+          const blob = await it.getType(type);
+          loadFile(new File([blob], "pasted-image", { type }));
+          return;
+        }
+      }
+      flash("クリップボードに画像がありません。Ctrl+V でも貼り付けられます");
+    } catch {
+      flash("クリップボードを読めませんでした。Ctrl+V で貼り付けてください");
+    }
+  }, [loadFile, flash]);
 
   const setField = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
   const toggleSel = (k: string) => setSelected((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
@@ -375,6 +398,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
         )}
         {/* 取り込みエリア */}
         <div
+          onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) loadFile(f); }}
@@ -475,6 +499,21 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
           <button type="button" onClick={() => setLightbox(false)}
             className="fixed top-3 right-4 text-white/80 hover:text-white text-[20px] leading-none">✕</button>
         </div>
+      )}
+
+      {/* 右クリック・コンテキストメニュー（画像エリア用・「貼り付け」のみ）。失敗時は Ctrl+V 案内へ。 */}
+      {ctxMenu && (
+        <>
+          <div className="fixed inset-0 z-[410]" onClick={() => setCtxMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setCtxMenu(null); }} />
+          <div className="fixed z-[411] rounded-lg border border-bg-border bg-bg-panel shadow-xl py-1"
+            style={{ left: Math.min(ctxMenu.x, window.innerWidth - 170), top: ctxMenu.y }}>
+            <button type="button" onClick={() => { void pasteFromClipboard(); }}
+              className="flex items-center gap-2 px-3 py-1.5 text-[12px] text-text-base hover:bg-violet-500/20 transition w-full text-left whitespace-nowrap">
+              📋 クリップボードから貼り付け
+            </button>
+          </div>
+        </>
       )}
     </aside>
   );
