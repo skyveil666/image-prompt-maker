@@ -134,11 +134,6 @@ function mergeDetails(saved: unknown): DetailSettings {
     myth:        merge(DEFAULT_DETAILS.myth,        s.myth),
     lighting:    merge(DEFAULT_DETAILS.lighting,    s.lighting),
     aspectRatio: merge(DEFAULT_DETAILS.aspectRatio, s.aspectRatio),
-    // オプション単位 NG はキュレーション性質のため永続保持する（multiOverrides は従来通り非永続）。
-    ngOptions:
-      s.ngOptions && typeof s.ngOptions === "object"
-        ? (s.ngOptions as Record<string, string[]>)
-        : undefined,
   };
 }
 

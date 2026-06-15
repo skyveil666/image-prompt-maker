@@ -901,12 +901,6 @@ export interface DetailSettings {
    * 最大3項目。
    */
   multiOverrides?: Record<string, string[]>;
-  /**
-   * オプション単位の NG（ダブルクリックで設定）。キーは "scope.field" 形式（multiOverrides と同形）。
-   * 値はそのフィールドで NG 指定されたオプション id の配列。NG 項目は UI で選択不可になり、
-   * 選択値（単一/複数）に乗らないため生成プロンプトに出ない（ネガティブにも入れない＝単純に無視）。
-   */
-  ngOptions?: Record<string, string[]>;
 }
 
 // ── Texture / Dimension slider types ────────────────────────────────────────
