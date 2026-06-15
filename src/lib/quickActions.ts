@@ -3172,6 +3172,25 @@ export function buildCombinedAssistInputs(
 // ─── ⚡ 画像バズり一発生成 ─────────────────────────────────────────────────────
 
 /**
+ * バズる用：ユーザーの詳細設定を保持しつつ、未設定(skip)のフィールドだけ「おまかせ(auto)」へ補う。
+ * 設定済みの値・特殊フィールド(multiOverrides/aspectRatio/custom3D 等の非文字列)は尊重する。
+ * ＝「この画像でバズる」で 場所/季節/背景スタイル等が毎回リセットされる問題への対処。
+ */
+function keepSetElseAuto(details: PromptInputs["details"]): PromptInputs["details"] {
+  const SPECIAL = new Set(["multiOverrides", "aspectRatio"]);
+  const out = { ...details } as Record<string, unknown>;
+  for (const [key, cat] of Object.entries(out)) {
+    if (SPECIAL.has(key)) continue;
+    if (cat && typeof cat === "object" && !Array.isArray(cat)) {
+      out[key] = Object.fromEntries(
+        Object.entries(cat as Record<string, unknown>).map(([f, v]) => [f, v === "skip" ? "auto" : v]),
+      );
+    }
+  }
+  return out as unknown as PromptInputs["details"];
+}
+
+/**
  * ⚡ この画像でバズる：画像を元にSNSバズり最強プロンプトを即生成するための設定を作る。
  * 設定のみ適用（生成トリガーは呼び出し側が行う）。
  */
@@ -3196,7 +3215,8 @@ export function buildImageViralInputs(current: PromptInputs): PromptInputs {
     // バズるnoteを先頭に、既存の追加指示（世界観/参照画像から適用/NG肯定誘導/ユーザー追加指示）を
     // 後段へ追記（上書きしない）＝ユーザーのNG・参照適用がバズる生成でも継承される。
     extraInstructions: [note, current.extraInstructions].filter(Boolean).join("\n\n"),
-    details: AUTO_DETAILS,
+    // 詳細設定はユーザーの設定を保持（未設定 skip のみ auto に補う）。AUTO_DETAILS で毎回リセットしない。
+    details: keepSetElseAuto(current.details),
   };
 }
 
