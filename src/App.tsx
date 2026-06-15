@@ -50,8 +50,8 @@ import {
 import {
   loadForbiddenTokens,
   saveForbiddenTokens,
-  mergeForbiddenIntoNgList,
 } from "./lib/forbiddenTokens";
+import { splitNg } from "./lib/ngPositive";
 // MassProductionBanner は DuplicateAnalysisPanel に統合されました。
 import type { WorldPreset } from "./components/QuickActions";
 import { type VariationMemory, createEmptyMemory, updateMemory } from "./lib/variationEngine";
@@ -563,16 +563,15 @@ export default function App() {
       },
       safety:   "fictional_ai",
       details,
-      // worldCombinedNote（世界観プリセット由来）・referenceNote（参照画像から適用）・追加指示を結合
-      // （出現制御は motifControls で別途反映）
-      extraInstructions: [worldCombinedNote, referenceNoteText, extraInstructions].filter(Boolean).join("\n\n"),
+      // worldCombinedNote（世界観プリセット由来）・referenceNote（参照画像から適用）・追加指示
+      // ＋ NG肯定誘導（splitNg：否定NG語を肯定方向の誘導文へ変換・GPT Image対策）を結合。出現制御は motifControls で別途。
+      extraInstructions: [worldCombinedNote, referenceNoteText, extraInstructions, splitNg(ngList, forbiddenTokens).positiveGuidance].filter(Boolean).join("\n\n"),
       faceLock,
       expression: faceLock ? undefined : (expression ?? undefined),
-      // 出力の【NG】にはユーザー明示のNG（NG欄＋禁止ワードチップ）のみを載せる。
-      // モチーフlv0・禁止色(weight=0)・頻出構成block は motifControls / colorWeights /
-      // comboControls として別経路でサーバへ届き生成側で除外されるため、
-      // ここで ngList へ合流させない（自動NGが出力プロンプト末尾の【NG】に乗るのを防ぐ）。
-      ngList: mergeForbiddenIntoNgList(ngList, forbiddenTokens),
+      // 出力の【NG】にはユーザー明示NG（NG欄＋禁止モチーフ）のうち「肯定変換できなかった語」のみを載せる。
+      // splitNg：対応表該当語は肯定誘導(extraInstructions)へ回し、残りを【NG】否定形へ／禁止モチーフは英語類語展開。
+      // モチーフlv0・禁止色(weight=0)・頻出構成block は motifControls / colorWeights / comboControls の別経路（ngList非合流）。
+      ngList: splitNg(ngList, forbiddenTokens).ngForBlock,
       // 重複制御：反映ON時のみ、非4レベルのモチーフをサーバへ渡す
       motifControls: policyApplied ? getMotifControls(levels) : undefined,
       // 構成制御：反映ON時のみ、block/alt のコンボをサーバへ渡す
