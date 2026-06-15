@@ -169,6 +169,17 @@ export default function App() {
     windLevel, setWindLevel,
   } = usePersistedSettings();
 
+  // ── B: カメラが変更対象から外れたら 3D カメラ指定(custom3D)を自動解除 ─────────────
+  // 3Dピッカーは camera タブ内にしか無く、custom3D は camera ∈ scopes のときだけ本文へ反映される。
+  // camera を変更対象から外すと custom3D は画面から消えたまま残留し、再選択時にボタン指定を
+  // 上書きする「見えない支配」になり得る。invariant「custom3D は camera が変更対象のときだけ存在」を
+  // 全経路（手動解除 / 全リセット / 履歴復元 / アレンジ）で強制する。
+  useEffect(() => {
+    if (!scopes.includes("camera") && details.camera.custom3D) {
+      setDetails((d) => ({ ...d, camera: { ...d.camera, custom3D: null } }));
+    }
+  }, [scopes, details.camera.custom3D]);
+
   const [view, setView] = useState<AppView>("main");
   const [historyFavoritesOnly, setHistoryFavoritesOnly] = useState(false);
 
