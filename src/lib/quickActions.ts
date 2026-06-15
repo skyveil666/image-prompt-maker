@@ -3215,7 +3215,9 @@ export function buildImageViralInputs(current: PromptInputs): PromptInputs {
     viralMode: true,
     faceLock: true,
     autoMoodCategories: [],
-    extraInstructions: note,
+    // バズるnoteを先頭に、既存の追加指示（世界観/参照画像から適用/NG肯定誘導/ユーザー追加指示）を
+    // 後段へ追記（上書きしない）＝ユーザーのNG・参照適用がバズる生成でも継承される。
+    extraInstructions: [note, current.extraInstructions].filter(Boolean).join("\n\n"),
     details: AUTO_DETAILS,
   };
 }
