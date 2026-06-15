@@ -31,7 +31,7 @@ interface Props {
 
 // ─── カメラ計算 ────────────────────────────────────────────────────────────────
 
-const TARGET = new THREE.Vector3(0, 3.6, 0);
+const TARGET = new THREE.Vector3(0, 4.1, 0);
 function d2r(d: number) { return (d * Math.PI) / 180; }
 function r2d(r: number) { return (r * 180) / Math.PI; }
 
@@ -56,21 +56,64 @@ function camToState(pos: THREE.Vector3) {
 // ─── 静的シルエット（被写体の大きさ・向きの視覚基準。関節なし） ──────────────────
 
 function StaticSilhouette() {
+  // 静的な簡易人型（関節なし・固定形状＝ポーズ機能ではない）。向きを視覚で判別するため:
+  //  - 顔の前面(+Z)にシアンのマーカー → 正面/背面の判別
+  //  - 肩・胴を「横広 × 前後薄」 → 正面(広い)と真横(薄い)の判別
+  const body = "#bda7ff";
+  const mat = <meshStandardMaterial color={body} emissive="#5a3fff" emissiveIntensity={0.08} />;
   return (
     <group>
       {/* 頭 */}
-      <mesh position={[0, 6.4, 0]}>
-        <sphereGeometry args={[0.55, 24, 16]} />
+      <mesh position={[0, 5.05, 0]}>
+        <sphereGeometry args={[0.45, 24, 16]} />
         <meshStandardMaterial color="#e8d9ff" emissive="#5a3fff" emissiveIntensity={0.15} />
       </mesh>
-      {/* 胴（カプセル） */}
-      <mesh position={[0, 3.4, 0]}>
-        <capsuleGeometry args={[0.6, 4.4, 6, 12]} />
-        <meshStandardMaterial color="#bda7ff" emissive="#5a3fff" emissiveIntensity={0.08} />
+      {/* 顔向きマーカー（前面=カメラ正面方向 +Z） */}
+      <mesh position={[0, 5.05, 0.42]}>
+        <sphereGeometry args={[0.13, 16, 12]} />
+        <meshStandardMaterial color="#67e8f9" emissive="#22d3ee" emissiveIntensity={0.45} />
+      </mesh>
+      {/* 首 */}
+      <mesh position={[0, 4.65, 0]}>
+        <cylinderGeometry args={[0.14, 0.14, 0.3, 12]} />
+        {mat}
+      </mesh>
+      {/* 肩（横広・前後薄） */}
+      <mesh position={[0, 4.4, 0]}>
+        <boxGeometry args={[2.0, 0.4, 0.6]} />
+        {mat}
+      </mesh>
+      {/* 胴（横広・前後薄＝向き判別） */}
+      <mesh position={[0, 3.55, 0]}>
+        <boxGeometry args={[1.45, 1.7, 0.6]} />
+        {mat}
+      </mesh>
+      {/* 腕（固定・下げ） */}
+      <mesh position={[-0.92, 3.55, 0]}>
+        <cylinderGeometry args={[0.15, 0.15, 1.7, 12]} />
+        {mat}
+      </mesh>
+      <mesh position={[0.92, 3.55, 0]}>
+        <cylinderGeometry args={[0.15, 0.15, 1.7, 12]} />
+        {mat}
+      </mesh>
+      {/* 腰 */}
+      <mesh position={[0, 2.55, 0]}>
+        <boxGeometry args={[1.2, 0.5, 0.58]} />
+        {mat}
+      </mesh>
+      {/* 脚（左右割れ・固定） */}
+      <mesh position={[-0.38, 1.4, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 2.0, 12]} />
+        {mat}
+      </mesh>
+      <mesh position={[0.38, 1.4, 0]}>
+        <cylinderGeometry args={[0.2, 0.2, 2.0, 12]} />
+        {mat}
       </mesh>
       {/* 接地リング（足元の基準） */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <ringGeometry args={[1.1, 1.2, 48]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.35, 0]}>
+        <ringGeometry args={[0.95, 1.05, 48]} />
         <meshBasicMaterial color="#3a3550" side={THREE.DoubleSide} />
       </mesh>
     </group>
