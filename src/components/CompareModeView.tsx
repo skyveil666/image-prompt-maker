@@ -1,5 +1,6 @@
 /**
- * CompareModeView — Compare Mode（参照 ↔ 生成 比較）の全幅ビュー。docs/24 Phase B。
+ * CompareModeView — Reference Picker履歴（旧 Compare Mode）の全画面ビュー。docs/24 Phase B。
+ * 参照画像・抽出プロンプトの履歴一覧＋参照↔生成の比較・評価。
  *
  * 参照レコード（referenceRecords）一覧から1件選び、3ペインで並べて比較する：
  *   左   = 参照画像（refThumb・クリック拡大）
@@ -66,6 +67,14 @@ export function CompareModeView({ open, onClose }: Props) {
       }
     })();
     return () => { alive = false; };
+  }, [open]);
+
+  // 全画面表示中は背面（メイン画面）のスクロールを止める＝スクロールバーのガター解消＋背面スクロール防止。
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
   }, [open]);
 
   const selected = useMemo(
@@ -184,17 +193,14 @@ export function CompareModeView({ open, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-2 sm:p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-[1400px] h-[92vh] flex flex-col rounded-xl border border-bg-border bg-bg-panel shadow-2xl overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-40 flex flex-col bg-bg-base">
+      <div className="flex-1 min-h-0 flex flex-col bg-bg-panel overflow-hidden">
         {/* ヘッダ */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-bg-border shrink-0">
-          <span className="text-[15px]">🆚</span>
+          <span className="text-[15px]">🖼</span>
           <div className="flex flex-col leading-tight">
-            <span className="text-[14px] font-bold text-text-base">Compare Mode</span>
-            <span className="text-[10px] text-text-muted/70">参照 ↔ 生成 を並べて比較（背景 / 衣装 / ポーズ / 髪型 / 色味 / 空気感）</span>
+            <span className="text-[14px] font-bold text-text-base">Reference Picker履歴</span>
+            <span className="text-[10px] text-text-muted/70">保存した参照画像・抽出プロンプトの履歴 ／ 参照 ↔ 生成 の比較（背景 / 衣装 / ポーズ / 髪型 / 色味 / 空気感）</span>
           </div>
           <button
             type="button" onClick={onClose}

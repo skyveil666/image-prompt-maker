@@ -348,9 +348,9 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
         </span>
         {onOpenCompare && (
           <button type="button" onClick={onOpenCompare}
-            title="参照と生成結果を並べて比較（Compare Mode）"
+            title="Reference Picker履歴（保存した参照・抽出を再利用／生成と比較）を開く"
             className="ml-auto text-[11px] px-2 py-0.5 rounded border border-violet-400/40 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition leading-none">
-            🆚 比較
+            🕘 履歴
           </button>
         )}
         <button type="button" onClick={() => setShowJson((v) => !v)}

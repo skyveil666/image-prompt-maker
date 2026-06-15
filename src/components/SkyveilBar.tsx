@@ -98,7 +98,7 @@ export function SkyveilBar({
             </>
           )}
           <div className="text-[11px] text-text-desc leading-snug pt-1 border-t border-violet-400/10">
-            分析ソース：⭐お気に入り ・ 🆚Compare評価 ・ 📊画像評価 ・ 🕒履歴
+            分析ソース：⭐お気に入り ・ 🆚参照比較の評価 ・ 📊画像評価 ・ 🕒履歴
           </div>
           <p className="text-[11px] text-violet-200/85 leading-snug">
             ↩ 反映・更新などの操作は、生成画面の「あなたの好み（skyveil）」で行えます（ここは確認専用）。
@@ -235,7 +235,7 @@ export function SkyveilBar({
 
           {/* 分析ソース（読み取り専用の説明）＋ 今回だけ反映の説明 */}
           <div className="text-[11px] text-text-desc leading-snug space-y-0.5">
-            <div>分析ソース：⭐お気に入り ・ 🆚Compare評価 ・ 📊画像評価 ・ 🕒履歴（自動では反映しません）</div>
+            <div>分析ソース：⭐お気に入り ・ 🆚参照比較の評価 ・ 📊画像評価 ・ 🕒履歴（自動では反映しません）</div>
             <div>✨ 今回だけ反映＝保存せず、この1回だけ適用。反映は<span className="text-amber-200/90 font-semibold">あなたが押した時だけ</span>。</div>
           </div>
 
