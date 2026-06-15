@@ -917,3 +917,9 @@ live.complete(message);
 - **不変条件**: ImageUploader・`referenceNote`→extraInstructions 適用経路・抽出ロジック(`referenceExtract`/モデル/字数)・/api/generate ペイロード・サーバ(§4)・他scope・enum 詳細欄は無変更（自由文ブロックのまま）。
 - **検証**: front tsc 0・vite build 0・Playwright隔離4330で合成 paste イベントを dispatch＝**閉→mainのみ(`mainImg:true`)／open→pickerのみ(`pickerImg:true,mainImg:false`＝左欄混入なし)**・console エラー0/警告0。
 - **未対応(別件・今回スコープ外)**: 抽出品質改善(gemini-2.5-flash→pro・160字上限)／アルバム機能(参照画像の永続ギャラリー・idb §4該当)／右クリック貼付。`HistoryMiniExplorer` の `document` paste 購読は直近画像エクスプローラの画像検索＝main生成スロットとは別物で④に非該当。
+
+### 2026-06-15: Reference Picker 第2便 A(抽出品質)＋C(適用押し忘れUX)（commit `45113f0`/`ba7e826`）
+
+- **A 抽出品質（`server/src/referenceExtract.ts` のみ・flash維持/低コスト・commit `45113f0`）**: 切り詰め `slice(0,160)`→**`clampValue`(上限300＋「、」「。」境界でクランプ＝語中で切れない)**。prompt は捏造禁止を維持しつつ「**見えている要素は省略せず 色/素材/形/質感/光/空気感まで厚く描写・複数語句を列挙**」を追加（必須8カテゴリも「厚く埋める」）。温度 0.2→**0.3**。13カテゴリ固定/responseMimeType:json/sanitize構造/モデル gemini-2.5-flash は維持。index.ts・/api/generate系サーバ・§4 は無変更。検証=server/front tsc 0・build 0・`clampValue` を node 実測(460字→298字・境界で停止・語中で切れない・短文不変)。質的な厚みは実Gemini確認推奨。
+- **C 適用押し忘れUX（`ReferenceImportPanel.tsx` のみ・表示＋一括トリガーのみ・commit `ba7e826`）**: 抽出済み未適用軸を amber 強調（バッジ「○ 未適用(sky)」→「⚠ 未適用(amber太字)」＋カードに amber リング／ロックは amber→ニュートラル灰＝amber を要適用専用に）。左カラム上部に未適用サマリ「⚠ 抽出済み・未適用：…（N件）—『適用』を押すまで反映されません」＋「✨ 全適用」。一括行にも「✨ 全適用」。`applyAll` は text有り・非ロック全軸に既存 `applyOne` を回すのみ＝**適用ロジック(referenceNote→extraInstructions)は無変更**。enum詳細欄/payload/サーバ/§4/ImageUploader/第1便のpaste分離 は無変更。検証=front tsc 0・build 0・Playwright隔離4330で 背景/衣装入力→⚠未適用2件＋サマリ→全適用→✅適用済み2件・未適用0・サマリ消滅(appliedNote反映)・console0・スクショで amber 確認。
+- **B 右クリック貼付＝実装前に実現可否を提案（着手保留）**: `navigator.clipboard.read()` の権限/ブラウザ差/ユーザー操作起点制約があるため。第1便の paste 分離(open限定＋伝播停止)は維持・Ctrl+V は保険として残す方針で別途提案。
