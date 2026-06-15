@@ -150,6 +150,7 @@ export default function App() {
     compositionLock, setCompositionLock,
     viralMode, setViralMode,
     avoidCliche, setAvoidCliche,
+    avoidRealBackground, setAvoidRealBackground,
     strength, setStrength,
     glossLevel, setGlossLevel,
     dimensionLevel,
@@ -184,8 +185,7 @@ export default function App() {
   const [historyFavoritesOnly, setHistoryFavoritesOnly] = useState(false);
 
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
-  /** 🌆 背景を2D/非写実に（既定ON・非永続）。背景が変更対象の時だけ、背景の風景・空間を2D/イラスト調へ寄せる（avoidRealBackgroundBlock）。人物・顔・肌は元画像の実写質感を厳守（ブロック内で明記）。 */
-  const [avoidRealBackground, setAvoidRealBackground] = useState(true);
+  // 🌆 背景を2D/非写実に（既定ON・avoidRealBackgroundBlock）は usePersistedSettings へ移管し永続化（上の分割代入で受領）。
   /** アクティブな世界観プリセット（マルチセレクト、最大3） */
   const [activeWorldPresets, setActiveWorldPresets] = useState<WorldPreset[]>([]);
   /** 世界観プリセット由来の指示文（extraInstructions と分離して管理） */

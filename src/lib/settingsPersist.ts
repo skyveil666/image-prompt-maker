@@ -48,6 +48,8 @@ export interface PersistedSettings {
   promptTarget:       PromptTarget | null;
   /** 量産構図を避ける（初期ON）*/
   avoidCliche:        boolean;
+  /** 背景を2D/非写実へ寄せる（初期ON・永続化＝写実背景を減らす設定をセッション跨ぎで保持）*/
+  avoidRealBackground: boolean;
   /** 体型とポーズを守る（初期ON）*/
   bodyPoseLock:       boolean;
   /** 色味と雰囲気を守る（初期ON）*/
@@ -94,6 +96,7 @@ export const SETTINGS_DEFAULTS: PersistedSettings = {
   textureDisabled:    false,
   promptTarget:       "chatgpt_safe",
   avoidCliche:        true,
+  avoidRealBackground: true,
   bodyPoseLock:       true,
   colorMoodLock:      true,
   compositionLock:    true,

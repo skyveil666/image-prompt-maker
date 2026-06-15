@@ -23,7 +23,8 @@ import { loadSettings, saveSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY, type P
  * - `dimensionLevel` は互換のため値のみ返す（setter なし。UI からは外している）。
  * - 永続化 effect（保存 / storage 同期 / アスペクト比記憶）は Phase4a では App.tsx に残す。
  *   分割代入した値・setter を読むだけで従来どおり動く。effect の移設は Phase4b で行う。
- * - `avoidRealBackground` は非永続（既定ON）のため本フックには含めない（App 側に残置）。
+ * - `avoidRealBackground` は永続化（既定ON）。App 側の standalone useState から本フックへ移管
+ *   （写実背景を減らす設定をセッション跨ぎで保持するため）。表示・解除は既存の DominatorBadge で可視化済み。
  */
 export function usePersistedSettings() {
   const [s0] = useState<PersistedSettings>(() => loadSettings());
@@ -40,6 +41,7 @@ export function usePersistedSettings() {
   const [compositionLock, setCompositionLock] = useState(s0.compositionLock);
   const [viralMode, setViralMode] = useState(s0.viralMode);
   const [avoidCliche, setAvoidCliche] = useState(s0.avoidCliche);
+  const [avoidRealBackground, setAvoidRealBackground] = useState<boolean>(s0.avoidRealBackground ?? true);
   const [strength, setStrength] = useState(s0.strength);
   const [glossLevel, setGlossLevel] = useState(s0.glossLevel);
   // dimensionLevel は互換のため state に持つ（旧履歴・旧設定の保存のため）。UI からは外した。
@@ -77,7 +79,7 @@ export function usePersistedSettings() {
       scopes, moods, autoMoodCategories, count, details,
       extraInstructions, ngList, viralMode, strength, glossLevel,
       dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
-      promptTarget, avoidCliche,
+      promptTarget, avoidCliche, avoidRealBackground,
       bodyPoseLock, colorMoodLock, compositionLock,
       colorStrategy,
       faceLock, expression,
@@ -89,7 +91,7 @@ export function usePersistedSettings() {
     scopes, moods, autoMoodCategories, count, details,
     extraInstructions, ngList, viralMode, strength, glossLevel,
     dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
-    promptTarget, avoidCliche,
+    promptTarget, avoidCliche, avoidRealBackground,
     bodyPoseLock, colorMoodLock, compositionLock,
     colorStrategy,
     faceLock, expression,
@@ -119,6 +121,7 @@ export function usePersistedSettings() {
       setTextureDisabled(next.textureDisabled);
       setPromptTarget(next.promptTarget);
       setAvoidCliche(next.avoidCliche);
+      setAvoidRealBackground(next.avoidRealBackground);
       setBodyPoseLock(next.bodyPoseLock);
       setColorMoodLock(next.colorMoodLock);
       setCompositionLock(next.compositionLock);
@@ -150,6 +153,7 @@ export function usePersistedSettings() {
     compositionLock, setCompositionLock,
     viralMode, setViralMode,
     avoidCliche, setAvoidCliche,
+    avoidRealBackground, setAvoidRealBackground,
     strength, setStrength,
     glossLevel, setGlossLevel,
     dimensionLevel,
