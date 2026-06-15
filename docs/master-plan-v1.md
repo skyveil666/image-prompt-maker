@@ -882,4 +882,17 @@ live.complete(message);
 - **① 実装**: HistoryItemRow に「📋 コピー」ボタン追加（アレンジ/再生成の並び）。`item.promptText` 全文を `navigator.clipboard.writeText` へ。承認済み方針＝(a) 通知は App 汎用トースト `showPresetToast` を HistoryView 経由で再利用（HistoryView に `onToast` prop・App から配線・「✓ コピーしました」）(b) コピー成功時に `item.copied=true` を `onUpdate` で永続し既存「📋 コピー済み」フィルタと整合（PromptCard と同挙動）。
 - **不変条件**: ControlPanel系/生成/サーバ無関係。既存の削除確認・各ボタン・レイアウト不変。IDB は既存 updateItem 経由（copied のみ・非破壊）。PC専用。
 - **検証**: front tsc / vite build exit0。Playwright隔離(4330・合成履歴 seed): コピー→`writeText` 引数が当該カードの promptText 全文と完全一致・「コピーしました」トースト・copied=true 永続・既存削除確認(キャンセルで残存)無傷・console error0。seed に dateKey 欠落で CalendarView が `startsWith` で落ちる事象を発見したが、実データは buildHistoryItems が必ず dateKey 付与のため再現せず＝実装非該当（seed を dateKey/最近日時付きに修正して解消）。
-- **付随メモ**: `FavoritesPanel.tsx`（FavCard 含む）は未使用 dead code。別途削除は任意（今回は非対象）。
+- **付随メモ**: `FavoritesPanel.tsx`（FavCard 含む）は未使用 dead code → 後続 commit `5930e94` で削除済（847行・stale コメント5箇所も整合）。
+
+### 2026-06-15: 詳細設定UI再構成（全体スタイル最上部固定／詳細オプション常時表示／退廃的除去・commit `2666a10`）
+
+- **背景**: ユーザー要望で DetailsCard（「雰囲気・スタイル」＝アコーディオン）のUI構成を見直し。調査で各定義場所を特定（絵柄=`ART_STYLE_OPTIONS`/`ArtStyleTabContent`・色戦略=`COLOR_STRATEGY_OPTIONS`@EraColorSelector/`ColorStrategyTabContent`・詳細オプション=`MOOD_GROUPS_DETAIL`@MoodSelector・その他=`MOOD_GROUPS_BASIC[2]`@MoodSelector）。
+- **設計の核心（要判断→承認済）**: 絵柄・色戦略は**グローバル設定**（scope非依存・全案適用）、背景スタイル/背景の色は**背景scope専用**。→ 背景内にネストすると背景未選択時に操作不能になるため、**ネストせず「上部固定の専用セクション」へ集約**する方針をユーザーが選択。
+- **実装（DetailsCard.tsx / MoodSelector.tsx・UIのみ）**:
+  - 新 EXTRA `globalStyle`「🎨 全体スタイル」を新設し `GlobalStyleTabContent`（絵柄＋色戦略を縦積み）に集約。`EXTRA_TAB_IDS=["globalStyle","mood","ng"]`、accordion sort を rank制（globalStyle=2 最上部／選択済=1／未選択=0）にして**常時最上部にピン留め**。旧 EXTRA `artStyle`/`colorStrategy` を globalStyle へ統合（countTab/renderTabContent/EXTRA_TAB_META 整合）。
+  - `MoodTabContent`：「詳細オプション（反射・空気感・色調・空間）」の折りたたみ（detailOpen/hasDetailSelection）を廃止し `MOOD_GROUPS_DETAIL` を基本群に続けて**常時表示**。
+  - `MOOD_GROUPS_BASIC`「その他」から `decadent`（退廃的）をピッカー除去（ChatGPT画像ブロック誘発語・P8/#69）。**mood ID は types/server・保存データに温存（非破壊）**。
+  - **文字背景/書・背景の色(background.color)・NG指定・各scope content・サーバ・生成ロジックは無変更**（色戦略は全体スタイルへ・背景の色とはレイヤーが異なるため背景の色は不変＝色語彙の重複は役割分離で併存）。
+- **不変条件**: 絵柄/色戦略の選択肢・解除・生成反映は不変。§4=新規セクション追加のみ。§5=新規グローバル設定の追加なし（既存移設）。
+- **検証**: front tsc / vite build exit0。Playwright隔離(4330): 全体スタイルが最上部＋絵柄/色戦略内包・**絵柄フォトリアル選択→/api/generate body.artStyle="photo" 反映**・雰囲気に反射/空気感/色調/空間が折りたたみなしで常時表示・その他に退廃的なし・console error0。
+- **未実施（任意）**: 背景の色(BG_COLORS)からの色戦略重複ラベル除去は保存データ表示の副作用があるため見送り。
