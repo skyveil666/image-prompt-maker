@@ -806,6 +806,12 @@ function CameraContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
           />
         ))}
       </CellGrid>
+      <div className={d.camera.custom3D ? "opacity-40 pointer-events-none select-none" : ""}>
+      {d.camera.custom3D && (
+        <p className="text-[11px] text-cyan-200/80 px-1 pt-2 pb-0.5 leading-snug">
+          🎥 3D指定中：角度・距離・レンズ・構図・画角・視点高さは3Dピッカーが優先します（解除はプリセット「設定なし／おまかせ」で）。
+        </p>
+      )}
       <MultiFieldSection fieldKey="camera.angle" label="角度" singleValue={d.camera.angle} multiValues={d.multiOverrides?.["camera.angle"] ?? []} options={CAMERA_ANGLES}
         onChange={mc("camera.angle", "angle")} />
       <MultiFieldSection fieldKey="camera.distance" label="距離" singleValue={d.camera.distance} multiValues={d.multiOverrides?.["camera.distance"] ?? []} options={CAMERA_DISTANCES}
@@ -818,11 +824,16 @@ function CameraContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
         onChange={(v) => upd("camera", { fov: v as DetailSettings["camera"]["fov"] })} />
       <FieldSection fieldKey="camera.eyeHeight" label="視点高さ" value={d.camera.eyeHeight} options={CAMERA_EYE_HEIGHTS}
         onChange={(v) => upd("camera", { eyeHeight: v as DetailSettings["camera"]["eyeHeight"] })} />
+      </div>
       <div>
         <CellSectionLabel label="3D指定" />
         <Camera3DToggleSlot
           value={d.camera.custom3D}
-          onChange={(next) => upd("camera", { custom3D: next })}
+          onChange={(next) =>
+            upd("camera", next
+              ? { custom3D: next, lens: "skip", fov: "skip", composition: "skip" }
+              : { custom3D: next })
+          }
         />
       </div>
     </div>
