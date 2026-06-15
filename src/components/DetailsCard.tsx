@@ -118,7 +118,6 @@ import {
   MOOD_GROUPS_DETAIL,
   type MoodGroup,
   MoodGroupRow,
-  hasDetailSelection,
 } from "./MoodSelector";
 import { COLOR_STRATEGY_OPTIONS } from "./EraColorSelector";
 
@@ -128,10 +127,11 @@ const Camera3DPicker = lazy(() => import("./Camera3DPicker"));
 
 // "era"（時代）は完全撤去（dead code整理）。"sns"/"culture" タブも撤去（重複整理：
 // SNS系はバズボタン・世界観はQuickActionsプリセットに一本化。mood ID・保存データは非破壊）。
-type ExtraTabId = "mood" | "colorStrategy" | "artStyle" | "ng";
+type ExtraTabId = "mood" | "globalStyle" | "ng";
 type TabId = Scope | ExtraTabId;
 
-const EXTRA_TAB_IDS: ExtraTabId[] = ["mood", "colorStrategy", "artStyle", "ng"];
+// globalStyle（絵柄＋色戦略）は最上部にピン留めする（renderのsortで rank 最上位）。
+const EXTRA_TAB_IDS: ExtraTabId[] = ["globalStyle", "mood", "ng"];
 
 interface ExtraTabMeta {
   label: string;
@@ -143,8 +143,7 @@ interface ExtraTabMeta {
 
 const EXTRA_TAB_META: Record<ExtraTabId, ExtraTabMeta> = {
   mood:          { label: "🎭 雰囲気",  activeBorder: "border-violet-400/70", activeBg: "bg-violet-500/15",  activeText: "text-violet-200",  activeShadow: "shadow-[0_0_10px_rgba(139,92,246,0.22)]" },
-  colorStrategy: { label: "🎨 色戦略",  activeBorder: "border-teal-400/70",   activeBg: "bg-teal-500/15",    activeText: "text-teal-200",    activeShadow: "shadow-[0_0_8px_rgba(45,212,191,0.22)]"  },
-  artStyle:      { label: "🖌 絵柄",    activeBorder: "border-fuchsia-400/70", activeBg: "bg-fuchsia-500/15", activeText: "text-fuchsia-200", activeShadow: "shadow-[0_0_8px_rgba(217,70,239,0.22)]"  },
+  globalStyle:   { label: "🎨 全体スタイル", activeBorder: "border-fuchsia-400/70", activeBg: "bg-fuchsia-500/15", activeText: "text-fuchsia-200", activeShadow: "shadow-[0_0_8px_rgba(217,70,239,0.22)]"  },
   ng:            { label: "🚫 NG指定",     activeBorder: "border-rose-400/70",   activeBg: "bg-rose-500/15",    activeText: "text-rose-200",    activeShadow: "shadow-[0_0_8px_rgba(244,63,94,0.22)]"   },
 };
 
@@ -1442,11 +1441,6 @@ function MoodTabContent({
   autoMoodCategories: string[];
   onMoodsChange: (moods: Mood[], autoCategories: string[]) => void;
 }) {
-  const [detailOpen, setDetailOpen] = useState(() =>
-    hasDetailSelection(moods, autoMoodCategories)
-  );
-  const detailActive = hasDetailSelection(moods, autoMoodCategories);
-
   const handleSelect = (group: MoodGroup, selection: "skip" | "auto" | Mood) => {
     const newMoods = moods.filter((m) => !group.moods.some((gm) => gm.id === m));
     const newAuto = autoMoodCategories.filter((c) => c !== group.label);
@@ -1475,42 +1469,16 @@ function MoodTabContent({
         />
       ))}
 
-      <div className="mt-3 pt-2.5 border-t border-white/8">
-        <button
-          type="button"
-          onClick={() => setDetailOpen((v) => !v)}
-          className={[
-            "inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-lg border transition-all leading-none",
-            detailOpen
-              ? "border-violet-400/60 bg-violet-500/12 text-violet-200"
-              : detailActive
-                ? "border-violet-400/50 bg-violet-500/10 text-violet-300 shadow-[0_0_8px_rgba(139,92,246,0.2)]"
-                : "border-bg-border/50 bg-transparent text-text-muted/60 hover:text-text-muted hover:border-bg-border/80",
-          ].join(" ")}
-        >
-          {detailOpen ? "▲" : "▼"}
-          &nbsp;詳細オプション（反射・空気感・色調・空間）
-          {detailActive && !detailOpen && (
-            <span className="ml-0.5 inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-violet-500/50 text-[9px] font-black text-white leading-none">
-              ●
-            </span>
-          )}
-        </button>
-      </div>
-
-      {detailOpen && (
-        <div className="mt-1 pl-1 border-l-2 border-violet-500/20 space-y-0">
-          {MOOD_GROUPS_DETAIL.map((group) => (
-            <MoodGroupRow
-              key={group.label}
-              group={group}
-              moods={moods}
-              autoMoodCategories={autoMoodCategories}
-              onSelect={handleSelect}
-            />
-          ))}
-        </div>
-      )}
+      {/* 詳細オプション（反射・空気感・色調・空間）：折りたたみ廃止＝基本群に続けて常時表示 */}
+      {MOOD_GROUPS_DETAIL.map((group) => (
+        <MoodGroupRow
+          key={group.label}
+          group={group}
+          moods={moods}
+          autoMoodCategories={autoMoodCategories}
+          onSelect={handleSelect}
+        />
+      ))}
     </div>
   );
 }
@@ -1656,6 +1624,27 @@ function ColorStrategyTabContent({
   );
 }
 
+/** 全体スタイルタブ：絵柄＋色戦略（どちらもグローバル＝scope非依存・全案に適用）を1セクションに集約 */
+function GlobalStyleTabContent({
+  artStyle,
+  onArtStyleChange,
+  colorStrategy,
+  onColorStrategyChange,
+}: {
+  artStyle: ArtStyle | null;
+  onArtStyleChange: (v: ArtStyle | null) => void;
+  colorStrategy: ColorStrategy | null;
+  onColorStrategyChange: (v: ColorStrategy | null) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <ArtStyleTabContent artStyle={artStyle} onArtStyleChange={onArtStyleChange} />
+      <div className="border-t border-white/8" />
+      <ColorStrategyTabContent colorStrategy={colorStrategy} onColorStrategyChange={onColorStrategyChange} />
+    </div>
+  );
+}
+
 /** NG指定タブ：追加指示 + NG指定 + 禁止モチーフ */
 function NgTabContent({
   extraInstructions,
@@ -1764,8 +1753,7 @@ export function DetailsCard({
   function countTab(t: TabId): number {
     switch (t) {
       case "mood":          return moods.length + autoMoodCategories.length;
-      case "colorStrategy": return colorStrategy ? 1 : 0;
-      case "artStyle":      return artStyle ? 1 : 0;
+      case "globalStyle":   return (artStyle ? 1 : 0) + (colorStrategy ? 1 : 0);
       case "ng":            return (extraInstructions.trim() ? 1 : 0) + (ngList.trim() ? 1 : 0) + forbiddenTokens.length;
       case "aspect_ratio":  return value.aspectRatio?.preset && value.aspectRatio.preset !== "skip" ? 1 : 0;
       default: {
@@ -1877,8 +1865,7 @@ export function DetailsCard({
       case "lighting":      return <LightingContent   d={value} chg={onChange} />;
       case "aspect_ratio":  return <AspectRatioContent d={value} upd={update} />;
       case "mood":          return <MoodTabContent moods={moods} autoMoodCategories={autoMoodCategories} onMoodsChange={onMoodsChange} />;
-      case "artStyle":      return <ArtStyleTabContent artStyle={artStyle} onArtStyleChange={onArtStyleChange} />;
-      case "colorStrategy": return <ColorStrategyTabContent colorStrategy={colorStrategy} onColorStrategyChange={onColorStrategyChange} />;
+      case "globalStyle":   return <GlobalStyleTabContent artStyle={artStyle} onArtStyleChange={onArtStyleChange} colorStrategy={colorStrategy} onColorStrategyChange={onColorStrategyChange} />;
       case "ng":            return <NgTabContent extraInstructions={extraInstructions} onExtraInstructionsChange={onExtraInstructionsChange} ngList={ngList} onNgListChange={onNgListChange} forbiddenTokens={forbiddenTokens} onForbiddenTokensChange={onForbiddenTokensChange} />;
       default:              return null;
     }
@@ -1935,7 +1922,11 @@ export function DetailsCard({
           P4: 選択あり（件数>0）のカテゴリを上に安定ソート（元の順序は保持） */}
       <div className="space-y-1.5">
         {[...allTabs]
-          .sort((a, b) => (countTab(b) > 0 ? 1 : 0) - (countTab(a) > 0 ? 1 : 0))
+          // globalStyle（絵柄＋色戦略）は最上部固定（rank 2）→ 選択済み（rank 1）→ 未選択（rank 0）
+          .sort((a, b) => {
+            const rank = (t: TabId) => (t === "globalStyle" ? 2 : countTab(t) > 0 ? 1 : 0);
+            return rank(b) - rank(a);
+          })
           .map((t) => {
           const open     = openTabs.has(t);
           const count    = countTab(t);

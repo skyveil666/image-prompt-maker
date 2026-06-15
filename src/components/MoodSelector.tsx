@@ -55,7 +55,8 @@ export const MOOD_GROUPS_BASIC: MoodGroup[] = [
     moods: [
       { id: "minimal",  label: "ミニマル"  },
       { id: "luxe",     label: "高級感"    },
-      { id: "decadent", label: "退廃的"    },
+      // 退廃的(decadent) は UI ピッカーから除去（ChatGPT画像ブロック誘発語・P8/#69）。
+      // mood ID 自体は types/server・保存データ・VIRAL_MOOD_POOL 等のため温存（非破壊）。
       { id: "street",   label: "ストリート" },
     ],
   },
