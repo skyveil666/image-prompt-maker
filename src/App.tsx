@@ -1690,7 +1690,8 @@ export default function App() {
     setMoods(next.moods);
     setAutoMoodCategories(next.autoMoodCategories ?? []);
     setViralMode(next.viralMode);
-    setExtraInstructions(next.extraInstructions);
+    // バズるnoteは生成payload(pendingRunRef)にだけ載せる。生の追加指示stateへは書き戻さない
+    // （書き戻すと押すたびにnoteが蓄積＝S2/Dの回帰。ユーザーの追加指示はそのまま保持）。
     setActiveWorldPresets([]);
     setWorldCombinedNote("");
     setActiveGodModes([]);

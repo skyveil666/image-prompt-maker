@@ -19,6 +19,7 @@ import type {
 } from "../types";
 import { DEFAULT_DETAILS } from "../types";
 import type { ZozoTrend } from "./zozoTrend";
+import { stripViralImageNote } from "./viralNote";
 
 // ─── 定数 ─────────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,8 @@ export function loadSettings(): PersistedSettings {
       // ネストオブジェクトは明示的にマージ（欠損フィールドを補完するため）
       details: mergeDetails(p.details),
     };
+    // 蓄積したバズるnoteを除去（handleImageViral 書き戻し回帰の後始末・生のユーザー入力は保持・冪等）。
+    loaded.extraInstructions = stripViralImageNote(loaded.extraInstructions);
     // デフォルトアスペクト比を適用：保存データが "skip" でデフォルトが設定されている場合
     if (loaded.defaultAspectRatio && loaded.details.aspectRatio.preset === "skip") {
       loaded.details = {
