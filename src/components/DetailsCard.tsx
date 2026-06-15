@@ -1674,6 +1674,10 @@ function NgTabContent({
 }) {
   return (
     <div className="space-y-3">
+      <p className="text-[11px] text-rose-200/85 bg-rose-500/8 border border-rose-400/25 rounded-lg px-2.5 py-1.5 leading-snug">
+        🚫 <b>NGはこの欄に入力します</b>（「NG指定（任意）」テキスト欄／下の「禁止モチーフ」）。
+        詳細設定のグリッドではNG指定できません（グリッドは候補の選択のみ）。
+      </p>
       <div className="grid sm:grid-cols-2 gap-2">
         <div>
           <label className="block text-xs text-text-muted/70 mb-1 font-medium">
