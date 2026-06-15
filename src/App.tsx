@@ -2252,6 +2252,7 @@ export default function App() {
               }}
               onShowReferenceHistory={() => setCompareOpen(true)}
               onShowAnalysis={() => setAnalysisCenterOpen(true)}
+              onShowPostingCalendar={() => { setAnalysisInitialTab("plan"); setAnalysisCenterOpen(true); }}
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
               onOpenSelectionPrompt={() => setSelectionModalOpen(true)}
@@ -2261,17 +2262,7 @@ export default function App() {
 
             <div className="space-y-5 mt-5 lg:mt-0 min-w-0 pb-24">
 
-              {/* 📅 1ヶ月生成カレンダー：分析センターの plan タブを開く誘導ボタン（Phase1・直接起動はしない） */}
-              <div className="flex justify-end items-center gap-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => { setAnalysisInitialTab("plan"); setAnalysisCenterOpen(true); }}
-                  className="text-[12px] font-semibold px-3 py-1.5 rounded-lg border border-accent/40 bg-accent/8 text-accent/90 hover:bg-accent/15 hover:border-accent/60 transition leading-none"
-                  title="分析センター内の「1ヶ月生成カレンダー」タブを開きます"
-                >
-                  📅 1ヶ月生成カレンダー
-                </button>
-              </div>
+              {/* 📅 1ヶ月生成カレンダー入口は左メニュー（ImageSidebar・分析センター直後）へ移設。 */}
 
               {/* 🔁 復元確認バナー：「同じ構成で再生成」後に表示 */}
               {restoredItem && (
