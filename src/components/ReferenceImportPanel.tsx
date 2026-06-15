@@ -140,21 +140,25 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   }, [flash]);
 
   // Ctrl+V / Cmd+V / スクショ貼付（クリップボードに画像がある時だけ作動・テキスト貼付は妨げない）
+  // ピッカーが open の時だけ購読する（閉じている間は貼付を生成用 ImageUploader に渡す）。
+  // 画像を処理する時は capture フェーズで先取りし、stopImmediatePropagation で
+  // ImageUploader（window/bubble）等の他リスナーへの伝播を止める＝左の画像選択欄への二重ロードを防ぐ。
   useEffect(() => {
+    if (!open) return;
     const onPaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const it of items) {
         if (it.type.startsWith("image/")) {
           const f = it.getAsFile();
-          if (f) { e.preventDefault(); loadFile(f); }
+          if (f) { e.preventDefault(); e.stopImmediatePropagation(); loadFile(f); }
           return;
         }
       }
     };
-    window.addEventListener("paste", onPaste);
-    return () => window.removeEventListener("paste", onPaste);
-  }, [loadFile]);
+    window.addEventListener("paste", onPaste, true);
+    return () => window.removeEventListener("paste", onPaste, true);
+  }, [open, loadFile]);
 
   const setField = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
   const toggleSel = (k: string) => setSelected((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
