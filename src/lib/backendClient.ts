@@ -1,4 +1,5 @@
 import type { GeneratedProposal, PromptInputs } from "../types";
+import { applyNgGate } from "./ngGate";
 
 export interface BackendResponse {
   proposals: GeneratedProposal[];
@@ -46,8 +47,14 @@ export async function generateViaBackend(
   inputs: PromptInputs,
   imageDataUrl: string | null,
   recentGenres: string[] = [],
-  recentSubStyles: string[] = []
+  recentSubStyles: string[] = [],
+  rawNgList = "",
+  forbiddenTokens: string[] = []
 ): Promise<BackendResponse> {
+  // 🔒 NG出口一括適用：/api/generate への唯一の送信関数。どの経路（runGenerate /
+  //    インラインアレンジ）を通っても、fetch 直前に NG を冪等復元する（ビルダーが
+  //    extraInstructions を置換しても漏れない）。送信はこの1回が唯一の真実。
+  const gated = applyNgGate(inputs, rawNgList, forbiddenTokens);
   const res = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -61,9 +68,9 @@ export async function generateViaBackend(
       locks: inputs.locks,
       safety: inputs.safety,
       details: inputs.details,
-      extraInstructions: inputs.extraInstructions,
+      extraInstructions: gated.extraInstructions,
       faceLock: inputs.faceLock,
-      ngList: inputs.ngList,
+      ngList: gated.ngList,
       viralMode: inputs.viralMode,
       strength: inputs.strength,
       glossLevel: inputs.glossLevel,
