@@ -12,6 +12,7 @@
 import { useCallback, useState } from "react";
 import type { Scope } from "../types";
 import { DominatorBadge, summarizeNote } from "./DominatorBadge";
+import { sectionNgLabels } from "../lib/sectionNg";
 
 // ── ラベル ──────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,10 @@ interface Props {
   avoidRealBackground: boolean;
   /** 背景2D化の解除（avoidRealBackground を false に）。 */
   onClearAvoidRealBg: () => void;
+  /** セクションNG（フィールド強制skip）の現在値。非空なら「本文から除外」バッジを出す。 */
+  sectionNg: string[];
+  /** セクションNGの一括解除（setSectionNg([])。値は保持・フラグだけ外す）。 */
+  onClearSectionNg: () => void;
 }
 
 // ── チップ ───────────────────────────────────────────────────────────────────
@@ -107,7 +112,7 @@ export function ReflectionStatusBar(p: Props) {
   const refNote = p.referenceNoteText.trim();
   // 背景2D化（avoidRealBackground）は既定ON・非永続だが、背景が変更対象の時だけ実際に発火する（server側ゲートと一致）
   const bgStylizeActive = p.avoidRealBackground && p.scopes.includes("background");
-  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive;
+  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive || p.sectionNg.length > 0;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
 
   return (
@@ -141,6 +146,15 @@ export function ReflectionStatusBar(p: Props) {
               summaryTitle="背景の風景・空間をイラスト調に寄せる（人物・顔・肌は実写維持）。既定ON・背景が変更対象の時だけ全案に効く。"
               onClear={p.onClearAvoidRealBg}
               clearTitle="背景2D化をOFFにする（実写背景を許可。回避▼トグルと同じ設定）"
+            />
+          )}
+          {p.sectionNg.length > 0 && (
+            <DominatorBadge
+              label="🚫 セクションNG（本文から除外）"
+              summary={sectionNgLabels(p.sectionNg).join("・")}
+              summaryTitle={`見出しダブルクリックでNG指定した詳細項目を、全案の本文から除外します：${sectionNgLabels(p.sectionNg).join("、")}`}
+              onClear={p.onClearSectionNg}
+              clearTitle="セクションNGを全解除（見出しの赤を外す。フィールドの値は保持）"
             />
           )}
         </div>

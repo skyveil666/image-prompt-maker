@@ -2159,6 +2159,8 @@ export default function App() {
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
             onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
             onClearReference={() => setReferenceNote({})}
+            sectionNg={sectionNg}
+            onClearSectionNg={() => setSectionNg([])}
             onToast={showPresetToast}
           />
         ) : (
@@ -2311,6 +2313,8 @@ export default function App() {
                 onClearReference={() => setReferenceNote({})}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
+                sectionNg={sectionNg}
+                onClearSectionNg={() => setSectionNg([])}
               />
 
 
