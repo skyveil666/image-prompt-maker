@@ -963,3 +963,26 @@ live.complete(message);
 - **修正（4ファイル・§4非接触）**: ①App `handleImageViral` の `setExtraInstructions(next.extraInstructions)` **書き戻し除去**（note は生成 payload=`pendingRunRef` にのみ・生の追加指示 state は汚さない）②新規 `src/lib/viralNote.ts`＝`VIRAL_IMAGE_NOTE`(note 単一ソース)＋`stripViralImageNote`(蓄積note除去・生入力保持・冪等)③`quickActions` インラインnote→`VIRAL_IMAGE_NOTE` 参照(payload経路は不変)④`settingsPersist loadSettings` で蓄積noteを**起動時除去**(既存データ後始末・冪等)。
 - **不変**: バズるモード/viralModeバッジ・NG肯定誘導(S3)・参照適用・/api/generate payload構造・サーバ・§4・NG再設計(S1〜S4)。
 - **検証**: front tsc0/build0・Playwright隔離4330＝バズる**3連打**で payload note **各1回**・eiLen **585〜586で安定(蓄積0)**／ユーザー追加指示は payload に保持(note1回)／seed した note×3 が reload で除去・ユーザー入力「MYINPUT_KEEP」保持／console0(残はroute.abort=実装外)。
+
+### 2026-06-16: 「この画像でバズる」設定保持(S1・`dca64aa`)＋ avoidRealBackground 永続化(S2a・`d74938e`)
+
+- **S1**: バズる(`buildImageViralInputs`)が `details: AUTO_DETAILS` で毎回リセットしていたのを `keepSetElseAuto`(設定済みは保持・未設定skipのみauto補完)へ。「更新するたびリセット→繰り返し」を解消。viralMode/scopes/note は不変。
+- **S2a**: 背景2D化 `avoidRealBackground` を `usePersistedSettings` へ移管し永続化（写実背景を減らす設定をセッション跨ぎ保持）。表示/解除は既存 DominatorBadge（§5既済）。
+- **検証**: 隔離4330 payload＝place保持/skip→auto補完・avoidReal の default true 保存＋seeded false が reload 維持。tsc0/build0。
+
+### 2026-06-16: NG全経路一貫化(A・出口ゲート)＋セクションNG(B・見出しdblclick強制skip) — 「NGに入れても出る」の根治
+
+- **元症状/真因**: NG（特に「室内」）に入れても出力に出る。真因＝**ステージ型プリセット(世界観/カルチャー/神引き)が `details.background.place` 等を「値」として本文に明示設定**し、S3の肯定誘導(室内→「屋外」)は**ソフトで本文の明示値に勝てない**(本文矛盾=漏れ②)。調査で「肯定誘導の消失(漏れ①)」は当時非アクティブ(直接送信はappend/ステージ型はbuildInputs再合成)と判明。
+- **解決機構(§4サーバ無改修)**:
+  - **A1a(`6e4874b`)**: `/api/generate` 唯一の送信関数 `generateViaBackend` の fetch 直前で **`applyNgGate` を1回**(新 `src/lib/ngGate.ts`)。NG(ngForBlock)+S3肯定誘導(positiveGuidance)を冪等保証。runGenerate を通らない**インラインアレンジ(App 1899)も同関数を通る**ため両送信経路を1か所でカバー。
+  - **B1(`cb4edcd`)**: 新 persisted **`sectionNg: string[]`("category.field")＝値レイヤ(AutoOr)とは別の sticky 強制skipフラグ**。`generateViaBackend` 内で `applyNgGate → applySectionNg` を1回ずつ(触る領域=extraInstructions/ngList vs details で分離=順序非依存)。`applySectionNg`=対象を `"skip"` 上書き＋**multiOverrides[key] を delete**(サーバは既存の「`!== "skip"` の時だけ本文化」分岐をそのまま利用)。
+  - **B2a/rollout(`04650ab`/`a2c782d`)**: 見出し(CellSectionLabel)**ダブルクリックで sectionNg トグル**(rose赤+🚫・`select-none`+mousedown抑止で選択誤爆防止)。全13カテゴリ約100フィールドへ展開。
+  - **B2b(`7db76a2`)**: ReflectionStatusBar/ArrangePreviewPanel に「🚫セクションNG(本文から除外)」バッジ+一括解除(§5・アレンジ経路もapplySectionNgを通るためミラー必須)。B1が実際に本文除外するため**事実通り**表示。
+- **設計原則の実例(教訓)**:
+  - **investigation-first**: 当初「約28ビルダーが肯定誘導を落とす」と診断→実装中に「ステージ型はbuildInputs再合成で落とさない/真因は本文矛盾」と**途中修正**(憶測でなくコードで裏取り)。
+  - **単一出口へ収束**: runGenerate冒頭案は**インラインアレンジ(1899)が漏れる**と停止条件で検出→`generateViaBackend`内(真の単一出口)へ。
+  - **キー同形を型で担保**: `ngKey: SectionNgKey = keyof typeof SECTION_NG_LABELS` で「ngKey↔ラベル↔applySectionNg/multiOverrides」のずれを **tsc が検出**(rollout 91件を型で安全に機械追加)。
+- **穴1〜3の対処(applySectionNg)**: ①multiOverridesキーは client(`mc`)↔server(`getMultiVals`)↔sectionNg が**同形 "category.field"**(bigObject等details名)＝サーバが multiOverrides(≥2)を field値より優先するため delete必須・変換不要。②`mo` は実delete時のみ書き戻し。③inputs/details/各カテゴリを**非変異**(遅延シャローコピー・無変更なら同一参照)＝表示計算と送信で同一inputsを2回通しても安全。
+- **検証(隔離4330/payload横取り)**: A1a=全経路で肯定誘導が乗る・冪等・空extra throwなし／B1=place/time skip強制(値上書き)・非変異・no-op／B2a=dblclick往復＋onChange誤爆なし／rollout=lighting.intensity 値上書きskip／**B2b 穴1 e2e=multiOverrides["background.place"]生成→場所dblclick NG→生成→place="skip"＋multiOverrides消失**。tsc -b 0・vite build 0。push済 `7db76a2`。
+- **A2(サーバ本文スクラブ・§4)＝条件付き保留(やり残しではない)**: B(フィールド強制skip)で元症状が実用上消えているなら **A2不要＝§4不触のまま理想形**。B を通しても**稀に本文にNG語が残るパターンが実機で出た場合のみ**、A2を承認ゲート分離で検討。＝「Bの効果次第で不要になる可能性が高い項目」。次に引き継ぐ人は『A2残=未完成』と誤読しないこと。
+- **不変**: §4サーバ(promptSystem/gemini/scopeFilter)・/api/generate payload構造・カメラ/Reference Picker履歴・NG↔Reference別系統・既存「設定なし/おまかせ」GridCell・通常NGロジック。
