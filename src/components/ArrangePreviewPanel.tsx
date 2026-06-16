@@ -13,7 +13,6 @@ import type { ArrangeResult, Count, GeneratedProposal, PromptHistoryItem, Scope 
 import { ARRANGE_AXES, ALL_SCOPE_LABELS, arrangeCandidateScopes } from "../lib/arrange";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 import { DominatorBadge, summarizeNote } from "./DominatorBadge";
-import { sectionNgLabels } from "../lib/sectionNg";
 import {
   MAX_RESULT_IMAGES, RATING_LABELS,
   AXIS_RATING_META, type RatingAxisKey,
@@ -76,10 +75,6 @@ interface Props {
   onClearWorld?:        () => void;
   /** 参照画像適用の解除（App の referenceNote をクリア）。 */
   onClearReference?:    () => void;
-  /** セクションNG（フィールド強制skip）の現在値。非空なら「本文から除外」バッジを出す。 */
-  sectionNg?:           string[];
-  /** セクションNGの一括解除（App の setSectionNg([])）。 */
-  onClearSectionNg?:    () => void;
 
   // ── アレンジ生成枚数（アレンジ専用・メイン案数とは独立・非永続）──
   /** このアレンジで生成する案数（2-6）。未指定なら 2。 */
@@ -515,8 +510,6 @@ export function ArrangePreviewPanel({
   onClearAvoidRealBg = () => {},
   onClearWorld = () => {},
   onClearReference = () => {},
-  sectionNg = [],
-  onClearSectionNg = () => {},
   arrangeCount = 2,
   onArrangeCountChange = () => {},
 }: Props) {
@@ -529,7 +522,7 @@ export function ArrangePreviewPanel({
   const worldNote = worldCombinedNote.trim();
   const refNote   = referenceNoteText.trim();
   const bgStylizeActive = avoidRealBackground && selectedScopes.includes("background");
-  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive || sectionNg.length > 0;
+  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive;
 
   // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
@@ -685,15 +678,6 @@ export function ArrangePreviewPanel({
                     summaryTitle={referenceNoteText}
                     onClear={onClearReference}
                     clearTitle="参照画像からの適用を全案から解除する"
-                  />
-                )}
-                {sectionNg.length > 0 && (
-                  <DominatorBadge
-                    label="🚫 セクションNG（本文から除外）"
-                    summary={sectionNgLabels(sectionNg).join("・")}
-                    summaryTitle={`見出しダブルクリックでNG指定した詳細項目を、このアレンジの全案からも除外します：${sectionNgLabels(sectionNg).join("、")}`}
-                    onClear={onClearSectionNg}
-                    clearTitle="セクションNGを全解除（フィールドの値は保持）"
                   />
                 )}
               </div>

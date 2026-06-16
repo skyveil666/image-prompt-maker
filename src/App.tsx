@@ -145,7 +145,7 @@ export default function App() {
     details, setDetails,
     extraInstructions, setExtraInstructions,
     ngList, setNgList,
-    sectionNg, setSectionNg,
+    tagNg,
     bodyPoseLock, setBodyPoseLock,
     colorMoodLock, setColorMoodLock,
     compositionLock, setCompositionLock,
@@ -779,7 +779,7 @@ export default function App() {
         // マンネリ回避：直近ジャンル＋サブジャンルを渡し、返ってきたものを履歴に積む
         const recentGenres    = getRecentGenres();
         const recentSubStyles = getRecentSubStyles();
-        const result = await generateViaBackend(inputs, imageDataUrl, recentGenres, recentSubStyles, ngList, forbiddenTokens, sectionNg);
+        const result = await generateViaBackend(inputs, imageDataUrl, recentGenres, recentSubStyles, ngList, forbiddenTokens, tagNg);
         if (result.retried) {
           setPresetToastMsg("再試行しました（1回目は失敗しましたが成功しました）");
           setPresetToastHint("");
@@ -853,7 +853,7 @@ export default function App() {
         setArrangeSource(null);
       }
     },
-    [imageDataUrl, runBiasAnalysis, ngList, forbiddenTokens, sectionNg]
+    [imageDataUrl, runBiasAnalysis, ngList, forbiddenTokens, tagNg]
   );
 
   // skyveilProfile/Strength は後で宣言されるため、handleGenerate からは ref 経由で参照（TDZ回避）
@@ -1897,7 +1897,7 @@ export default function App() {
       try {
         const recentGenres    = getRecentGenres();
         const recentSubStyles = getRecentSubStyles();
-        const res = await generateViaBackend(arrangeInputs, imageDataUrl, recentGenres, recentSubStyles, ngList, forbiddenTokens, sectionNg);
+        const res = await generateViaBackend(arrangeInputs, imageDataUrl, recentGenres, recentSubStyles, ngList, forbiddenTokens, tagNg);
         const usedGenres = res.proposals.map((p) => p.genre).filter((g): g is string => Boolean(g));
         if (usedGenres.length > 0) pushRecentGenres(usedGenres);
         const usedSub = res.proposals
@@ -1917,7 +1917,7 @@ export default function App() {
         return null;
       }
     },
-    [buildInputs, imageDataUrl, showPresetToast, ngList, forbiddenTokens, sectionNg]
+    [buildInputs, imageDataUrl, showPresetToast, ngList, forbiddenTokens, tagNg]
   );
 
   /** アレンジ案をお気に入りとして履歴へ保存する（生成画像・評価・派生元メタを含む）。 */
@@ -2159,8 +2159,6 @@ export default function App() {
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
             onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
             onClearReference={() => setReferenceNote({})}
-            sectionNg={sectionNg}
-            onClearSectionNg={() => setSectionNg([])}
             onToast={showPresetToast}
           />
         ) : (
@@ -2313,8 +2311,6 @@ export default function App() {
                 onClearReference={() => setReferenceNote({})}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
-                sectionNg={sectionNg}
-                onClearSectionNg={() => setSectionNg([])}
               />
 
 
@@ -2513,8 +2509,6 @@ export default function App() {
                 onNgListChange={setNgList}
                 forbiddenTokens={forbiddenTokens}
                 onForbiddenTokensChange={setForbiddenTokens}
-                sectionNg={sectionNg}
-                onToggleSectionNg={(key) => setSectionNg((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))}
               />
 
 

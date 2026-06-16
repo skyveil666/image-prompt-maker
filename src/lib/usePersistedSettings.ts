@@ -36,7 +36,7 @@ export function usePersistedSettings() {
   const [details, setDetails] = useState<DetailSettings>(s0.details);
   const [extraInstructions, setExtraInstructions] = useState(s0.extraInstructions);
   const [ngList, setNgList] = useState(s0.ngList);
-  const [sectionNg, setSectionNg] = useState<string[]>(s0.sectionNg ?? []);
+  const [tagNg, setTagNg] = useState<string[]>(s0.tagNg ?? []);
   const [bodyPoseLock, setBodyPoseLock] = useState(s0.bodyPoseLock);
   const [colorMoodLock, setColorMoodLock] = useState(s0.colorMoodLock);
   const [compositionLock, setCompositionLock] = useState(s0.compositionLock);
@@ -78,7 +78,7 @@ export function usePersistedSettings() {
   useEffect(() => {
     saveSettings({
       scopes, moods, autoMoodCategories, count, details,
-      extraInstructions, ngList, sectionNg, viralMode, strength, glossLevel,
+      extraInstructions, ngList, tagNg, viralMode, strength, glossLevel,
       dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
       promptTarget, avoidCliche, avoidRealBackground,
       bodyPoseLock, colorMoodLock, compositionLock,
@@ -90,7 +90,7 @@ export function usePersistedSettings() {
     });
   }, [
     scopes, moods, autoMoodCategories, count, details,
-    extraInstructions, ngList, sectionNg, viralMode, strength, glossLevel,
+    extraInstructions, ngList, tagNg, viralMode, strength, glossLevel,
     dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
     promptTarget, avoidCliche, avoidRealBackground,
     bodyPoseLock, colorMoodLock, compositionLock,
@@ -113,7 +113,7 @@ export function usePersistedSettings() {
       setDetails(next.details);
       setExtraInstructions(next.extraInstructions);
       setNgList(next.ngList);
-      setSectionNg(next.sectionNg);
+      setTagNg(next.tagNg);
       setViralMode(next.viralMode);
       setStrength(next.strength);
       setGlossLevel(next.glossLevel);
@@ -150,7 +150,7 @@ export function usePersistedSettings() {
     details, setDetails,
     extraInstructions, setExtraInstructions,
     ngList, setNgList,
-    sectionNg, setSectionNg,
+    tagNg, setTagNg,
     bodyPoseLock, setBodyPoseLock,
     colorMoodLock, setColorMoodLock,
     compositionLock, setCompositionLock,

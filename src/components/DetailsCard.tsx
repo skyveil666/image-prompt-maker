@@ -1,4 +1,4 @@
-import { Suspense, lazy, useRef, useState, createContext, useContext } from "react";
+import { Suspense, lazy, useRef, useState } from "react";
 import type { ArtStyle, Camera3DState, ColorStrategy, DetailSettings, Mood, Scope } from "../types";
 import { DEFAULT_DETAILS, AUTO_DETAILS } from "../types";
 import { describeCameraAngle } from "../lib/cameraAngle";
@@ -113,14 +113,6 @@ import { GridCell, CellSectionLabel, CellGrid } from "./GridCell";
 import { ExtraInstructions } from "./ExtraInstructions";
 import { NgInput } from "./NgInput";
 import { ForbiddenTokens } from "./ForbiddenTokens";
-import type { SectionNgKey } from "../lib/sectionNg";
-
-/** セクションNG（見出しダブルクリック）の供給 Context。DetailsCard が provide し、
- *  FieldSection / MultiFieldSection が consume する（プロップ・ドリリング削減）。 */
-const SectionNgCtx = createContext<{ ng: readonly string[]; toggle: (k: string) => void }>({
-  ng: [],
-  toggle: () => {},
-});
 import {
   MOOD_GROUPS_BASIC,
   MOOD_GROUPS_DETAIL,
@@ -173,9 +165,6 @@ interface Props {
   onNgListChange: (v: string) => void;
   forbiddenTokens: string[];
   onForbiddenTokensChange: (tokens: string[]) => void;
-  /** セクションNG（フィールド強制skip）の現在値と、見出しダブルクリックのトグル。 */
-  sectionNg: string[];
-  onToggleSectionNg: (key: string) => void;
 }
 
 type Updater = <K extends keyof DetailSettings>(
@@ -395,25 +384,16 @@ function FieldSection({
   options,
   onChange,
   noTopMargin = false,
-  ngKey,
 }: {
   label: string;
   value: string;
   options: PresetItem[];
   onChange: (v: string) => void;
   noTopMargin?: boolean;
-  ngKey?: SectionNgKey;
 }) {
-  const ngCtx = useContext(SectionNgCtx);
-  const ngActive = !!(ngKey && ngCtx.ng.includes(ngKey));
   return (
     <div>
-      <CellSectionLabel
-        label={label}
-        noTopMargin={noTopMargin}
-        ngActive={ngActive}
-        onToggleNg={ngKey ? () => ngCtx.toggle(ngKey) : undefined}
-      />
+      <CellSectionLabel label={label} noTopMargin={noTopMargin} />
       <CellGrid>
         <GridCell
           jaLabel="設定なし"
@@ -458,7 +438,6 @@ function MultiFieldSection({
   onChange,
   noTopMargin = false,
   maxSelect = 3,
-  ngKey,
 }: {
   label: string;
   singleValue: string;
@@ -467,10 +446,7 @@ function MultiFieldSection({
   onChange: (single: string, multi: string[]) => void;
   noTopMargin?: boolean;
   maxSelect?: number;
-  ngKey?: SectionNgKey;
 }) {
-  const ngCtx = useContext(SectionNgCtx);
-  const ngActive = !!(ngKey && ngCtx.ng.includes(ngKey));
   // 有効な選択セット: multiValues が 2+ ならそれ、
   // そうでなければ singleValue から1個分を導出
   const activeSet =
@@ -512,8 +488,6 @@ function MultiFieldSection({
         noTopMargin={noTopMargin}
         count={activeSet.length > 0 ? activeSet.length : undefined}
         maxCount={maxSelect}
-        ngActive={ngActive}
-        onToggleNg={ngKey ? () => ngCtx.toggle(ngKey) : undefined}
       />
       <CellGrid>
         <GridCell
@@ -617,25 +591,25 @@ function HairContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
   const mc = makeMultiChanger(d, chg, "hair");
   return (
     <div>
-      <FieldSection ngKey="hair.hairStyle" label="スタイル系統" value={d.hair.hairStyle ?? "skip"} options={HAIR_STYLES} noTopMargin
+      <FieldSection label="スタイル系統" value={d.hair.hairStyle ?? "skip"} options={HAIR_STYLES} noTopMargin
         onChange={(v) => upd("hair", { hairStyle: v as DetailSettings["hair"]["hairStyle"] })} />
-      <FieldSection ngKey="hair.length" label="長さ" value={d.hair.length} options={HAIR_LENGTHS}
+      <FieldSection label="長さ" value={d.hair.length} options={HAIR_LENGTHS}
         onChange={(v) => upd("hair", { length: v as DetailSettings["hair"]["length"] })} />
-      <MultiFieldSection ngKey="hair.shape" label="形" singleValue={d.hair.shape} multiValues={d.multiOverrides?.["hair.shape"] ?? []} options={HAIR_SHAPES}
+      <MultiFieldSection label="形" singleValue={d.hair.shape} multiValues={d.multiOverrides?.["hair.shape"] ?? []} options={HAIR_SHAPES}
         onChange={mc("hair.shape", "shape")} />
-      <MultiFieldSection ngKey="hair.color" label="髪色" singleValue={d.hair.color} multiValues={d.multiOverrides?.["hair.color"] ?? []} options={HAIR_COLORS}
+      <MultiFieldSection label="髪色" singleValue={d.hair.color} multiValues={d.multiOverrides?.["hair.color"] ?? []} options={HAIR_COLORS}
         onChange={mc("hair.color", "color")} />
-      <MultiFieldSection ngKey="hair.texture" label="質感" singleValue={d.hair.texture} multiValues={d.multiOverrides?.["hair.texture"] ?? []} options={HAIR_TEXTURES}
+      <MultiFieldSection label="質感" singleValue={d.hair.texture} multiValues={d.multiOverrides?.["hair.texture"] ?? []} options={HAIR_TEXTURES}
         onChange={mc("hair.texture", "texture")} />
-      <FieldSection ngKey="hair.colorMode" label="カラーモード" value={d.hair.colorMode} options={HAIR_COLOR_MODES}
+      <FieldSection label="カラーモード" value={d.hair.colorMode} options={HAIR_COLOR_MODES}
         onChange={(v) => upd("hair", { colorMode: v as DetailSettings["hair"]["colorMode"] })} />
-      <FieldSection ngKey="hair.bangs" label="前髪" value={d.hair.bangs} options={HAIR_BANGS}
+      <FieldSection label="前髪" value={d.hair.bangs} options={HAIR_BANGS}
         onChange={(v) => upd("hair", { bangs: v as DetailSettings["hair"]["bangs"] })} />
-      <MultiFieldSection ngKey="hair.tips" label="毛先" singleValue={d.hair.tips} multiValues={d.multiOverrides?.["hair.tips"] ?? []} options={HAIR_TIPS}
+      <MultiFieldSection label="毛先" singleValue={d.hair.tips} multiValues={d.multiOverrides?.["hair.tips"] ?? []} options={HAIR_TIPS}
         onChange={mc("hair.tips", "tips")} />
-      <FieldSection ngKey="hair.volume" label="ボリューム" value={d.hair.volume} options={HAIR_VOLUMES}
+      <FieldSection label="ボリューム" value={d.hair.volume} options={HAIR_VOLUMES}
         onChange={(v) => upd("hair", { volume: v as DetailSettings["hair"]["volume"] })} />
-      <MultiFieldSection ngKey="hair.accessory" label="アクセサリー" singleValue={d.hair.accessory} multiValues={d.multiOverrides?.["hair.accessory"] ?? []} options={HAIR_ACCESSORIES}
+      <MultiFieldSection label="アクセサリー" singleValue={d.hair.accessory} multiValues={d.multiOverrides?.["hair.accessory"] ?? []} options={HAIR_ACCESSORIES}
         onChange={mc("hair.accessory", "accessory")} />
     </div>
   );
@@ -645,21 +619,21 @@ function OutfitContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
   const mc = makeMultiChanger(d, chg, "outfit");
   return (
     <div>
-      <MultiFieldSection ngKey="outfit.style" label="系統" singleValue={d.outfit.style} multiValues={d.multiOverrides?.["outfit.style"] ?? []} options={OUTFIT_STYLES} noTopMargin
+      <MultiFieldSection label="系統" singleValue={d.outfit.style} multiValues={d.multiOverrides?.["outfit.style"] ?? []} options={OUTFIT_STYLES} noTopMargin
         onChange={mc("outfit.style", "style")} />
-      <MultiFieldSection ngKey="outfit.color" label="色方向" singleValue={d.outfit.color} multiValues={d.multiOverrides?.["outfit.color"] ?? []} options={OUTFIT_COLORS}
+      <MultiFieldSection label="色方向" singleValue={d.outfit.color} multiValues={d.multiOverrides?.["outfit.color"] ?? []} options={OUTFIT_COLORS}
         onChange={mc("outfit.color", "color")} />
-      <MultiFieldSection ngKey="outfit.material" label="素材" singleValue={d.outfit.material} multiValues={d.multiOverrides?.["outfit.material"] ?? []} options={OUTFIT_MATERIALS}
+      <MultiFieldSection label="素材" singleValue={d.outfit.material} multiValues={d.multiOverrides?.["outfit.material"] ?? []} options={OUTFIT_MATERIALS}
         onChange={mc("outfit.material", "material")} />
-      <MultiFieldSection ngKey="outfit.silhouette" label="シルエット" singleValue={d.outfit.silhouette} multiValues={d.multiOverrides?.["outfit.silhouette"] ?? []} options={OUTFIT_SILHOUETTES}
+      <MultiFieldSection label="シルエット" singleValue={d.outfit.silhouette} multiValues={d.multiOverrides?.["outfit.silhouette"] ?? []} options={OUTFIT_SILHOUETTES}
         onChange={mc("outfit.silhouette", "silhouette")} />
-      <FieldSection ngKey="outfit.exposure" label="露出" value={d.outfit.exposure} options={OUTFIT_EXPOSURES}
+      <FieldSection label="露出" value={d.outfit.exposure} options={OUTFIT_EXPOSURES}
         onChange={(v) => upd("outfit", { exposure: v as DetailSettings["outfit"]["exposure"] })} />
-      <FieldSection ngKey="outfit.decoration" label="装飾量" value={d.outfit.decoration} options={OUTFIT_DECORATIONS}
+      <FieldSection label="装飾量" value={d.outfit.decoration} options={OUTFIT_DECORATIONS}
         onChange={(v) => upd("outfit", { decoration: v as DetailSettings["outfit"]["decoration"] })} />
-      <FieldSection ngKey="outfit.season" label="季節感" value={d.outfit.season} options={OUTFIT_SEASONS}
+      <FieldSection label="季節感" value={d.outfit.season} options={OUTFIT_SEASONS}
         onChange={(v) => upd("outfit", { season: v as DetailSettings["outfit"]["season"] })} />
-      <FieldSection ngKey="outfit.luxury" label="高級感" value={d.outfit.luxury} options={OUTFIT_LUXURIES}
+      <FieldSection label="高級感" value={d.outfit.luxury} options={OUTFIT_LUXURIES}
         onChange={(v) => upd("outfit", { luxury: v as DetailSettings["outfit"]["luxury"] })} />
     </div>
   );
@@ -692,27 +666,27 @@ function BackgroundContent({ d, upd, chg }: {
         ))}
       </CellGrid>
       {/* Individual field grids */}
-      <MultiFieldSection ngKey="background.style" label="背景スタイル" singleValue={d.background.style ?? "skip"} multiValues={d.multiOverrides?.["background.style"] ?? []} options={BG_STYLES}
+      <MultiFieldSection label="背景スタイル" singleValue={d.background.style ?? "skip"} multiValues={d.multiOverrides?.["background.style"] ?? []} options={BG_STYLES}
         onChange={mc("background.style", "style")} />
-      <MultiFieldSection ngKey="background.place" label="場所" singleValue={d.background.place} multiValues={d.multiOverrides?.["background.place"] ?? []} options={BG_PLACES}
+      <MultiFieldSection label="場所" singleValue={d.background.place} multiValues={d.multiOverrides?.["background.place"] ?? []} options={BG_PLACES}
         onChange={(single, multi) => {
           const mo = { ...(d.multiOverrides ?? {}) };
           if (multi.length < 2) delete mo["background.place"]; else mo["background.place"] = multi;
           chg({ ...d, background: { ...d.background, place: single as DetailSettings["background"]["place"] }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
         }} />
-      <MultiFieldSection ngKey="background.color" label="色" singleValue={d.background.color} multiValues={d.multiOverrides?.["background.color"] ?? []} options={BG_COLORS}
+      <MultiFieldSection label="色" singleValue={d.background.color} multiValues={d.multiOverrides?.["background.color"] ?? []} options={BG_COLORS}
         onChange={mc("background.color", "color")} />
-      <FieldSection ngKey="background.time" label="時間帯" value={d.background.time} options={BG_TIMES}
+      <FieldSection label="時間帯" value={d.background.time} options={BG_TIMES}
         onChange={(v) => upd("background", { time: v as DetailSettings["background"]["time"] })} />
-      <FieldSection ngKey="background.weather" label="天候" value={d.background.weather} options={BG_WEATHERS}
+      <FieldSection label="天候" value={d.background.weather} options={BG_WEATHERS}
         onChange={(v) => upd("background", { weather: v as DetailSettings["background"]["weather"] })} />
-      <FieldSection ngKey="background.density" label="密度" value={d.background.density} options={BG_DENSITIES}
+      <FieldSection label="密度" value={d.background.density} options={BG_DENSITIES}
         onChange={(v) => upd("background", { density: v as DetailSettings["background"]["density"] })} />
-      <MultiFieldSection ngKey="background.effect" label="空間効果" singleValue={d.background.effect} multiValues={d.multiOverrides?.["background.effect"] ?? []} options={BG_EFFECTS}
+      <MultiFieldSection label="空間効果" singleValue={d.background.effect} multiValues={d.multiOverrides?.["background.effect"] ?? []} options={BG_EFFECTS}
         onChange={mc("background.effect", "effect")} />
-      <FieldSection ngKey="background.depth" label="奥行き" value={d.background.depth} options={BG_DEPTHS}
+      <FieldSection label="奥行き" value={d.background.depth} options={BG_DEPTHS}
         onChange={(v) => upd("background", { depth: v as DetailSettings["background"]["depth"] })} />
-      <FieldSection ngKey="background.info" label="情報量" value={d.background.info} options={BG_INFOS}
+      <FieldSection label="情報量" value={d.background.info} options={BG_INFOS}
         onChange={(v) => upd("background", { info: v as DetailSettings["background"]["info"] })} />
       {/* 文字背景 / 書（アコーディオン） */}
       <div className="mt-3 pt-2.5 border-t border-white/8">
@@ -739,13 +713,13 @@ function BackgroundContent({ d, upd, chg }: {
       </div>
       {textOpen && (
         <div className="mt-1 pl-1 border-l-2 border-emerald-500/20">
-          <FieldSection ngKey="background.textType" label="文字の種類" value={d.background.textType} options={BG_TEXT_TYPES} noTopMargin
+          <FieldSection label="文字の種類" value={d.background.textType} options={BG_TEXT_TYPES} noTopMargin
             onChange={(v) => upd("background", { textType: v as DetailSettings["background"]["textType"] })} />
-          <FieldSection ngKey="background.textMood" label="雰囲気" value={d.background.textMood} options={BG_TEXT_MOODS}
+          <FieldSection label="雰囲気" value={d.background.textMood} options={BG_TEXT_MOODS}
             onChange={(v) => upd("background", { textMood: v as DetailSettings["background"]["textMood"] })} />
-          <FieldSection ngKey="background.textLayout" label="配置" value={d.background.textLayout} options={BG_TEXT_LAYOUTS}
+          <FieldSection label="配置" value={d.background.textLayout} options={BG_TEXT_LAYOUTS}
             onChange={(v) => upd("background", { textLayout: v as DetailSettings["background"]["textLayout"] })} />
-          <FieldSection ngKey="background.textTexture" label="質感" value={d.background.textTexture} options={BG_TEXT_TEXTURES}
+          <FieldSection label="質感" value={d.background.textTexture} options={BG_TEXT_TEXTURES}
             onChange={(v) => upd("background", { textTexture: v as DetailSettings["background"]["textTexture"] })} />
         </div>
       )}
@@ -757,21 +731,21 @@ function PoseContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
   const mc = makeMultiChanger(d, chg, "pose");
   return (
     <div>
-      <FieldSection ngKey="pose.type" label="種類" value={d.pose.type} options={POSE_TYPES} noTopMargin
+      <FieldSection label="種類" value={d.pose.type} options={POSE_TYPES} noTopMargin
         onChange={(v) => upd("pose", { type: v as DetailSettings["pose"]["type"] })} />
-      <MultiFieldSection ngKey="pose.impression" label="印象" singleValue={d.pose.impression} multiValues={d.multiOverrides?.["pose.impression"] ?? []} options={POSE_IMPRESSIONS}
+      <MultiFieldSection label="印象" singleValue={d.pose.impression} multiValues={d.multiOverrides?.["pose.impression"] ?? []} options={POSE_IMPRESSIONS}
         onChange={mc("pose.impression", "impression")} />
-      <FieldSection ngKey="pose.gaze" label="視線" value={d.pose.gaze} options={POSE_GAZES}
+      <FieldSection label="視線" value={d.pose.gaze} options={POSE_GAZES}
         onChange={(v) => upd("pose", { gaze: v as DetailSettings["pose"]["gaze"] })} />
-      <MultiFieldSection ngKey="pose.hand" label="手の位置" singleValue={d.pose.hand} multiValues={d.multiOverrides?.["pose.hand"] ?? []} options={POSE_HANDS}
+      <MultiFieldSection label="手の位置" singleValue={d.pose.hand} multiValues={d.multiOverrides?.["pose.hand"] ?? []} options={POSE_HANDS}
         onChange={mc("pose.hand", "hand")} />
-      <MultiFieldSection ngKey="pose.foot" label="足の位置" singleValue={d.pose.foot} multiValues={d.multiOverrides?.["pose.foot"] ?? []} options={POSE_FEET}
+      <MultiFieldSection label="足の位置" singleValue={d.pose.foot} multiValues={d.multiOverrides?.["pose.foot"] ?? []} options={POSE_FEET}
         onChange={mc("pose.foot", "foot")} />
-      <FieldSection ngKey="pose.balance" label="重心" value={d.pose.balance} options={POSE_BALANCES}
+      <FieldSection label="重心" value={d.pose.balance} options={POSE_BALANCES}
         onChange={(v) => upd("pose", { balance: v as DetailSettings["pose"]["balance"] })} />
-      <MultiFieldSection ngKey="pose.motion" label="動き" singleValue={d.pose.motion} multiValues={d.multiOverrides?.["pose.motion"] ?? []} options={POSE_MOTIONS}
+      <MultiFieldSection label="動き" singleValue={d.pose.motion} multiValues={d.multiOverrides?.["pose.motion"] ?? []} options={POSE_MOTIONS}
         onChange={mc("pose.motion", "motion")} />
-      <FieldSection ngKey="pose.orientation" label="体の向き" value={d.pose.orientation} options={POSE_ORIENTATIONS}
+      <FieldSection label="体の向き" value={d.pose.orientation} options={POSE_ORIENTATIONS}
         onChange={(v) => upd("pose", { orientation: v as DetailSettings["pose"]["orientation"] })} />
     </div>
   );
@@ -814,17 +788,17 @@ function CameraContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
           🎥 3D指定中：角度・距離・レンズ・構図・画角・視点高さは3Dピッカーが優先します（解除はプリセット「設定なし／おまかせ」で）。
         </p>
       )}
-      <MultiFieldSection ngKey="camera.angle" label="角度" singleValue={d.camera.angle} multiValues={d.multiOverrides?.["camera.angle"] ?? []} options={CAMERA_ANGLES}
+      <MultiFieldSection label="角度" singleValue={d.camera.angle} multiValues={d.multiOverrides?.["camera.angle"] ?? []} options={CAMERA_ANGLES}
         onChange={mc("camera.angle", "angle")} />
-      <MultiFieldSection ngKey="camera.distance" label="距離" singleValue={d.camera.distance} multiValues={d.multiOverrides?.["camera.distance"] ?? []} options={CAMERA_DISTANCES}
+      <MultiFieldSection label="距離" singleValue={d.camera.distance} multiValues={d.multiOverrides?.["camera.distance"] ?? []} options={CAMERA_DISTANCES}
         onChange={mc("camera.distance", "distance")} />
-      <MultiFieldSection ngKey="camera.lens" label="レンズ感" singleValue={d.camera.lens} multiValues={d.multiOverrides?.["camera.lens"] ?? []} options={CAMERA_LENSES}
+      <MultiFieldSection label="レンズ感" singleValue={d.camera.lens} multiValues={d.multiOverrides?.["camera.lens"] ?? []} options={CAMERA_LENSES}
         onChange={mc("camera.lens", "lens")} />
-      <MultiFieldSection ngKey="camera.composition" label="構図" singleValue={d.camera.composition} multiValues={d.multiOverrides?.["camera.composition"] ?? []} options={CAMERA_COMPOSITIONS}
+      <MultiFieldSection label="構図" singleValue={d.camera.composition} multiValues={d.multiOverrides?.["camera.composition"] ?? []} options={CAMERA_COMPOSITIONS}
         onChange={mc("camera.composition", "composition")} />
-      <FieldSection ngKey="camera.fov" label="画角" value={d.camera.fov} options={CAMERA_FOVS}
+      <FieldSection label="画角" value={d.camera.fov} options={CAMERA_FOVS}
         onChange={(v) => upd("camera", { fov: v as DetailSettings["camera"]["fov"] })} />
-      <FieldSection ngKey="camera.eyeHeight" label="視点高さ" value={d.camera.eyeHeight} options={CAMERA_EYE_HEIGHTS}
+      <FieldSection label="視点高さ" value={d.camera.eyeHeight} options={CAMERA_EYE_HEIGHTS}
         onChange={(v) => upd("camera", { eyeHeight: v as DetailSettings["camera"]["eyeHeight"] })} />
       </div>
       <div>
@@ -846,23 +820,23 @@ function PropsContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (
   const mc = makeMultiChanger(d, chg, "props");
   return (
     <div>
-      <MultiFieldSection ngKey="props.category" label="カテゴリ" singleValue={d.props.category} multiValues={d.multiOverrides?.["props.category"] ?? []} options={PROPS_CATEGORIES} noTopMargin
+      <MultiFieldSection label="カテゴリ" singleValue={d.props.category} multiValues={d.multiOverrides?.["props.category"] ?? []} options={PROPS_CATEGORIES} noTopMargin
         onChange={(single, multi) => {
           const mo = { ...(d.multiOverrides ?? {}) };
           if (multi.length < 2) delete mo["props.category"]; else mo["props.category"] = multi;
           chg({ ...d, props: { ...d.props, category: single as DetailSettings["props"]["category"] }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
         }} />
-      <MultiFieldSection ngKey="props.hold" label="持たせ方" singleValue={d.props.hold} multiValues={d.multiOverrides?.["props.hold"] ?? []} options={PROPS_HOLDS}
+      <MultiFieldSection label="持たせ方" singleValue={d.props.hold} multiValues={d.multiOverrides?.["props.hold"] ?? []} options={PROPS_HOLDS}
         onChange={mc("props.hold", "hold")} />
-      <FieldSection ngKey="props.size" label="サイズ" value={d.props.size} options={PROPS_SIZES}
+      <FieldSection label="サイズ" value={d.props.size} options={PROPS_SIZES}
         onChange={(v) => upd("props", { size: v as DetailSettings["props"]["size"] })} />
-      <FieldSection ngKey="props.glow" label="光り方" value={d.props.glow} options={PROPS_GLOWS}
+      <FieldSection label="光り方" value={d.props.glow} options={PROPS_GLOWS}
         onChange={(v) => upd("props", { glow: v as DetailSettings["props"]["glow"] })} />
-      <MultiFieldSection ngKey="props.vibe" label="雰囲気" singleValue={d.props.vibe} multiValues={d.multiOverrides?.["props.vibe"] ?? []} options={PROPS_VIBES}
+      <MultiFieldSection label="雰囲気" singleValue={d.props.vibe} multiValues={d.multiOverrides?.["props.vibe"] ?? []} options={PROPS_VIBES}
         onChange={mc("props.vibe", "vibe")} />
-      <MultiFieldSection ngKey="props.placement" label="配置" singleValue={d.props.placement} multiValues={d.multiOverrides?.["props.placement"] ?? []} options={PROPS_PLACEMENTS}
+      <MultiFieldSection label="配置" singleValue={d.props.placement} multiValues={d.multiOverrides?.["props.placement"] ?? []} options={PROPS_PLACEMENTS}
         onChange={mc("props.placement", "placement")} />
-      <FieldSection ngKey="props.count" label="個数" value={d.props.count} options={PROPS_COUNTS}
+      <FieldSection label="個数" value={d.props.count} options={PROPS_COUNTS}
         onChange={(v) => upd("props", { count: v as DetailSettings["props"]["count"] })} />
     </div>
   );
@@ -954,15 +928,15 @@ function BigObjectContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; ch
           );
         })}
       </div>
-      <FieldSection ngKey="bigObject.type" label="種類" value={d.bigObject.type} options={BIG_OBJECT_TYPES}
+      <FieldSection label="種類" value={d.bigObject.type} options={BIG_OBJECT_TYPES}
         onChange={(v) => upd("bigObject", { type: v as DetailSettings["bigObject"]["type"] })} />
-      <MultiFieldSection ngKey="bigObject.condition" label="状態" singleValue={d.bigObject.condition} multiValues={d.multiOverrides?.["bigObject.condition"] ?? []} options={BIG_OBJECT_CONDITIONS}
+      <MultiFieldSection label="状態" singleValue={d.bigObject.condition} multiValues={d.multiOverrides?.["bigObject.condition"] ?? []} options={BIG_OBJECT_CONDITIONS}
         onChange={mc("bigObject.condition", "condition")} />
-      <FieldSection ngKey="bigObject.placement" label="配置" value={d.bigObject.placement} options={BIG_OBJECT_PLACEMENTS}
+      <FieldSection label="配置" value={d.bigObject.placement} options={BIG_OBJECT_PLACEMENTS}
         onChange={(v) => upd("bigObject", { placement: v as DetailSettings["bigObject"]["placement"] })} />
-      <FieldSection ngKey="bigObject.size" label="サイズ" value={d.bigObject.size} options={BIG_OBJECT_SIZES}
+      <FieldSection label="サイズ" value={d.bigObject.size} options={BIG_OBJECT_SIZES}
         onChange={(v) => upd("bigObject", { size: v as DetailSettings["bigObject"]["size"] })} />
-      <MultiFieldSection ngKey="bigObject.mood" label="雰囲気" singleValue={d.bigObject.mood} multiValues={d.multiOverrides?.["bigObject.mood"] ?? []} options={BIG_OBJECT_MOODS}
+      <MultiFieldSection label="雰囲気" singleValue={d.bigObject.mood} multiValues={d.multiOverrides?.["bigObject.mood"] ?? []} options={BIG_OBJECT_MOODS}
         onChange={mc("bigObject.mood", "mood")} />
     </div>
   );
@@ -976,17 +950,17 @@ function VehicleContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg:
       <div className="mb-3 rounded-xl border border-orange-400/25 bg-orange-500/8 px-3 py-2 text-[11px] text-orange-200/70 leading-relaxed">
         🚗 <span className="text-orange-200/90 font-semibold">人物が主役</span>、乗り物は脇役。乗り物のジャンル・種類の順に選ぶと絞り込めます。ミリタリーは展示・停止状態のみ。
       </div>
-      <FieldSection ngKey="vehicle.genre" label="ジャンル" value={d.vehicle.genre} options={VEHICLE_GENRES} noTopMargin
+      <FieldSection label="ジャンル" value={d.vehicle.genre} options={VEHICLE_GENRES} noTopMargin
         onChange={(v) => upd("vehicle", { genre: v as DetailSettings["vehicle"]["genre"] })} />
-      <FieldSection ngKey="vehicle.type" label="種類" value={d.vehicle.type} options={VEHICLE_TYPES}
+      <FieldSection label="種類" value={d.vehicle.type} options={VEHICLE_TYPES}
         onChange={(v) => upd("vehicle", { type: v as DetailSettings["vehicle"]["type"] })} />
-      <FieldSection ngKey="vehicle.interaction" label="関わり方" value={d.vehicle.interaction} options={VEHICLE_INTERACTIONS}
+      <FieldSection label="関わり方" value={d.vehicle.interaction} options={VEHICLE_INTERACTIONS}
         onChange={(v) => upd("vehicle", { interaction: v as DetailSettings["vehicle"]["interaction"] })} />
-      <FieldSection ngKey="vehicle.era" label="時代感" value={d.vehicle.era} options={VEHICLE_ERAS}
+      <FieldSection label="時代感" value={d.vehicle.era} options={VEHICLE_ERAS}
         onChange={(v) => upd("vehicle", { era: v as DetailSettings["vehicle"]["era"] })} />
-      <MultiFieldSection ngKey="vehicle.material" label="素材感" singleValue={d.vehicle.material} multiValues={d.multiOverrides?.["vehicle.material"] ?? []} options={VEHICLE_MATERIALS}
+      <MultiFieldSection label="素材感" singleValue={d.vehicle.material} multiValues={d.multiOverrides?.["vehicle.material"] ?? []} options={VEHICLE_MATERIALS}
         onChange={mc("vehicle.material", "material")} />
-      <MultiFieldSection ngKey="vehicle.atmosphere" label="雰囲気" singleValue={d.vehicle.atmosphere} multiValues={d.multiOverrides?.["vehicle.atmosphere"] ?? []} options={VEHICLE_ATMOSPHERES}
+      <MultiFieldSection label="雰囲気" singleValue={d.vehicle.atmosphere} multiValues={d.multiOverrides?.["vehicle.atmosphere"] ?? []} options={VEHICLE_ATMOSPHERES}
         onChange={mc("vehicle.atmosphere", "atmosphere")} />
     </div>
   );
@@ -1000,15 +974,15 @@ function MythContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (n
       <div className="mb-3 rounded-xl border border-amber-400/25 bg-amber-500/8 px-3 py-2 text-[11px] text-amber-200/70 leading-relaxed">
         🐉 <span className="text-amber-200/90 font-semibold">人物が主役</span>、幻獣は演出要素。既存作品（ガンダム・ポケモン・DQ・FF等）の固有キャラクターは使わず、オリジナルデザインで描写します。
       </div>
-      <MultiFieldSection ngKey="myth.region" label="神話地域" singleValue={d.myth.region} multiValues={d.multiOverrides?.["myth.region"] ?? []} options={MYTH_REGIONS} noTopMargin
+      <MultiFieldSection label="神話地域" singleValue={d.myth.region} multiValues={d.multiOverrides?.["myth.region"] ?? []} options={MYTH_REGIONS} noTopMargin
         onChange={mc("myth.region", "region")} />
-      <MultiFieldSection ngKey="myth.creature" label="幻獣種別" singleValue={d.myth.creature} multiValues={d.multiOverrides?.["myth.creature"] ?? []} options={MYTH_CREATURES}
+      <MultiFieldSection label="幻獣種別" singleValue={d.myth.creature} multiValues={d.multiOverrides?.["myth.creature"] ?? []} options={MYTH_CREATURES}
         onChange={mc("myth.creature", "creature")} />
-      <MultiFieldSection ngKey="myth.interaction" label="配置・関わり方" singleValue={d.myth.interaction} multiValues={d.multiOverrides?.["myth.interaction"] ?? []} options={MYTH_INTERACTIONS}
+      <MultiFieldSection label="配置・関わり方" singleValue={d.myth.interaction} multiValues={d.multiOverrides?.["myth.interaction"] ?? []} options={MYTH_INTERACTIONS}
         onChange={mc("myth.interaction", "interaction")} />
-      <MultiFieldSection ngKey="myth.style" label="描写スタイル" singleValue={d.myth.style} multiValues={d.multiOverrides?.["myth.style"] ?? []} options={MYTH_STYLES}
+      <MultiFieldSection label="描写スタイル" singleValue={d.myth.style} multiValues={d.multiOverrides?.["myth.style"] ?? []} options={MYTH_STYLES}
         onChange={mc("myth.style", "style")} />
-      <FieldSection ngKey="myth.size" label="サイズ感" value={d.myth.size} options={MYTH_SIZES}
+      <FieldSection label="サイズ感" value={d.myth.size} options={MYTH_SIZES}
         onChange={(v) => upd("myth", { size: v as DetailSettings["myth"]["size"] })} />
     </div>
   );
@@ -1041,17 +1015,17 @@ function LightingContent({ d, chg }: { d: DetailSettings; chg: (n: DetailSetting
           />
         ))}
       </CellGrid>
-      <MultiFieldSection ngKey="lighting.direction" label="光源方向" singleValue={d.lighting.direction} multiValues={d.multiOverrides?.["lighting.direction"] ?? []} options={LIGHT_DIRECTIONS}
+      <MultiFieldSection label="光源方向" singleValue={d.lighting.direction} multiValues={d.multiOverrides?.["lighting.direction"] ?? []} options={LIGHT_DIRECTIONS}
         onChange={mc("lighting.direction", "direction")} />
-      <MultiFieldSection ngKey="lighting.intensity" label="強さ" singleValue={d.lighting.intensity} multiValues={d.multiOverrides?.["lighting.intensity"] ?? []} options={LIGHT_INTENSITIES}
+      <MultiFieldSection label="強さ" singleValue={d.lighting.intensity} multiValues={d.multiOverrides?.["lighting.intensity"] ?? []} options={LIGHT_INTENSITIES}
         onChange={mc("lighting.intensity", "intensity")} />
-      <MultiFieldSection ngKey="lighting.temperature" label="色温度" singleValue={d.lighting.temperature} multiValues={d.multiOverrides?.["lighting.temperature"] ?? []} options={LIGHT_TEMPS}
+      <MultiFieldSection label="色温度" singleValue={d.lighting.temperature} multiValues={d.multiOverrides?.["lighting.temperature"] ?? []} options={LIGHT_TEMPS}
         onChange={mc("lighting.temperature", "temperature")} />
-      <MultiFieldSection ngKey="lighting.shadow" label="影" singleValue={d.lighting.shadow} multiValues={d.multiOverrides?.["lighting.shadow"] ?? []} options={LIGHT_SHADOWS}
+      <MultiFieldSection label="影" singleValue={d.lighting.shadow} multiValues={d.multiOverrides?.["lighting.shadow"] ?? []} options={LIGHT_SHADOWS}
         onChange={mc("lighting.shadow", "shadow")} />
-      <MultiFieldSection ngKey="lighting.reflection" label="反射" singleValue={d.lighting.reflection} multiValues={d.multiOverrides?.["lighting.reflection"] ?? []} options={LIGHT_REFLECTIONS}
+      <MultiFieldSection label="反射" singleValue={d.lighting.reflection} multiValues={d.multiOverrides?.["lighting.reflection"] ?? []} options={LIGHT_REFLECTIONS}
         onChange={mc("lighting.reflection", "reflection")} />
-      <MultiFieldSection ngKey="lighting.atmosphere" label="空気感" singleValue={d.lighting.atmosphere} multiValues={d.multiOverrides?.["lighting.atmosphere"] ?? []} options={LIGHT_ATMOSPHERES}
+      <MultiFieldSection label="空気感" singleValue={d.lighting.atmosphere} multiValues={d.multiOverrides?.["lighting.atmosphere"] ?? []} options={LIGHT_ATMOSPHERES}
         onChange={mc("lighting.atmosphere", "atmosphere")} />
     </div>
   );
@@ -1065,13 +1039,13 @@ function CyberContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: (
       <div className="mb-3 rounded-xl border border-teal-400/25 bg-teal-500/8 px-3 py-2 text-[11px] text-teal-200/70 leading-relaxed">
         🤖 体の<span className="text-teal-200/90 font-semibold">一部だけ</span>をSF的に変化させます。顔・表情・体型・ポーズは維持。傷・欠損・血液表現は禁止。
       </div>
-      <MultiFieldSection ngKey="cyber.part" label="変化する部位" singleValue={d.cyber.part} multiValues={d.multiOverrides?.["cyber.part"] ?? []} options={CYBER_PARTS} noTopMargin
+      <MultiFieldSection label="変化する部位" singleValue={d.cyber.part} multiValues={d.multiOverrides?.["cyber.part"] ?? []} options={CYBER_PARTS} noTopMargin
         onChange={mc("cyber.part", "part")} />
-      <MultiFieldSection ngKey="cyber.type" label="機械化タイプ" singleValue={d.cyber.type} multiValues={d.multiOverrides?.["cyber.type"] ?? []} options={CYBER_TYPES}
+      <MultiFieldSection label="機械化タイプ" singleValue={d.cyber.type} multiValues={d.multiOverrides?.["cyber.type"] ?? []} options={CYBER_TYPES}
         onChange={mc("cyber.type", "type")} />
-      <MultiFieldSection ngKey="cyber.texture" label="質感" singleValue={d.cyber.texture} multiValues={d.multiOverrides?.["cyber.texture"] ?? []} options={CYBER_TEXTURES}
+      <MultiFieldSection label="質感" singleValue={d.cyber.texture} multiValues={d.multiOverrides?.["cyber.texture"] ?? []} options={CYBER_TEXTURES}
         onChange={mc("cyber.texture", "texture")} />
-      <MultiFieldSection ngKey="cyber.glowColor" label="発光色" singleValue={d.cyber.glowColor} multiValues={d.multiOverrides?.["cyber.glowColor"] ?? []} options={CYBER_GLOW_COLORS}
+      <MultiFieldSection label="発光色" singleValue={d.cyber.glowColor} multiValues={d.multiOverrides?.["cyber.glowColor"] ?? []} options={CYBER_GLOW_COLORS}
         onChange={mc("cyber.glowColor", "glowColor")} />
       {/* 変化量：おまかせボタンなし */}
       <div>
@@ -1107,25 +1081,25 @@ function CosplayContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg:
   const mc = makeMultiChanger(d, chg, "cosplay");
   return (
     <div>
-      <MultiFieldSection ngKey="cosplay.genre" label="ジャンル系統" singleValue={d.cosplay.genre} multiValues={d.multiOverrides?.["cosplay.genre"] ?? []} options={COSPLAY_GENRES} noTopMargin
+      <MultiFieldSection label="ジャンル系統" singleValue={d.cosplay.genre} multiValues={d.multiOverrides?.["cosplay.genre"] ?? []} options={COSPLAY_GENRES} noTopMargin
         onChange={mc("cosplay.genre", "genre")} />
-      <FieldSection ngKey="cosplay.cuteStyle" label="かわいい系" value={d.cosplay.cuteStyle} options={COSPLAY_CUTE_STYLES}
+      <FieldSection label="かわいい系" value={d.cosplay.cuteStyle} options={COSPLAY_CUTE_STYLES}
         onChange={(v) => upd("cosplay", { cuteStyle: v as DetailSettings["cosplay"]["cuteStyle"] })} />
-      <FieldSection ngKey="cosplay.jobGenre" label="職種・役割系" value={d.cosplay.jobGenre} options={COSPLAY_JOB_GENRES}
+      <FieldSection label="職種・役割系" value={d.cosplay.jobGenre} options={COSPLAY_JOB_GENRES}
         onChange={(v) => upd("cosplay", { jobGenre: v as DetailSettings["cosplay"]["jobGenre"] })} />
-      <FieldSection ngKey="cosplay.japaneseStyle" label="和風系" value={d.cosplay.japaneseStyle} options={COSPLAY_JAPANESE_STYLES}
+      <FieldSection label="和風系" value={d.cosplay.japaneseStyle} options={COSPLAY_JAPANESE_STYLES}
         onChange={(v) => upd("cosplay", { japaneseStyle: v as DetailSettings["cosplay"]["japaneseStyle"] })} />
-      <FieldSection ngKey="cosplay.fantasyStyle" label="ファンタジー系" value={d.cosplay.fantasyStyle} options={COSPLAY_FANTASY_STYLES}
+      <FieldSection label="ファンタジー系" value={d.cosplay.fantasyStyle} options={COSPLAY_FANTASY_STYLES}
         onChange={(v) => upd("cosplay", { fantasyStyle: v as DetailSettings["cosplay"]["fantasyStyle"] })} />
-      <FieldSection ngKey="cosplay.scifiStyle" label="SF・近未来系" value={d.cosplay.scifiStyle} options={COSPLAY_SCIFI_STYLES}
+      <FieldSection label="SF・近未来系" value={d.cosplay.scifiStyle} options={COSPLAY_SCIFI_STYLES}
         onChange={(v) => upd("cosplay", { scifiStyle: v as DetailSettings["cosplay"]["scifiStyle"] })} />
-      <FieldSection ngKey="cosplay.darkStyle" label="ダーク系" value={d.cosplay.darkStyle} options={COSPLAY_DARK_STYLES}
+      <FieldSection label="ダーク系" value={d.cosplay.darkStyle} options={COSPLAY_DARK_STYLES}
         onChange={(v) => upd("cosplay", { darkStyle: v as DetailSettings["cosplay"]["darkStyle"] })} />
-      <FieldSection ngKey="cosplay.occupation" label="職業コスプレ" value={d.cosplay.occupation} options={COSPLAY_OCCUPATIONS}
+      <FieldSection label="職業コスプレ" value={d.cosplay.occupation} options={COSPLAY_OCCUPATIONS}
         onChange={(v) => upd("cosplay", { occupation: v as DetailSettings["cosplay"]["occupation"] })} />
-      <FieldSection ngKey="cosplay.decoration" label="装飾レベル" value={d.cosplay.decoration} options={COSPLAY_DECORATIONS}
+      <FieldSection label="装飾レベル" value={d.cosplay.decoration} options={COSPLAY_DECORATIONS}
         onChange={(v) => upd("cosplay", { decoration: v as DetailSettings["cosplay"]["decoration"] })} />
-      <MultiFieldSection ngKey="cosplay.item" label="持ち物・小物" singleValue={d.cosplay.item} multiValues={d.multiOverrides?.["cosplay.item"] ?? []} options={COSPLAY_ITEMS}
+      <MultiFieldSection label="持ち物・小物" singleValue={d.cosplay.item} multiValues={d.multiOverrides?.["cosplay.item"] ?? []} options={COSPLAY_ITEMS}
         onChange={mc("cosplay.item", "item")} />
       {/* 露出：おまかせボタンなし（安全のため） */}
       <div>
@@ -1153,7 +1127,7 @@ function CosplayContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg:
           ))}
         </CellGrid>
       </div>
-      <MultiFieldSection ngKey="cosplay.colorDir" label="カラー方向" singleValue={d.cosplay.colorDir} multiValues={d.multiOverrides?.["cosplay.colorDir"] ?? []} options={COSPLAY_COLOR_DIRS}
+      <MultiFieldSection label="カラー方向" singleValue={d.cosplay.colorDir} multiValues={d.multiOverrides?.["cosplay.colorDir"] ?? []} options={COSPLAY_COLOR_DIRS}
         onChange={mc("cosplay.colorDir", "colorDir")} />
     </div>
   );
@@ -1228,27 +1202,27 @@ function ForegroundContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; c
       <div className="mb-3 rounded-xl border border-lime-400/25 bg-lime-500/8 px-3 py-2 text-[11px] text-lime-200/70 leading-relaxed">
         🌿 人物の<span className="text-lime-200/90 font-semibold">手前</span>にエフェクトを重ねます。顔・目・表情は隠さず、ポーズ・衣装は変更しません。
       </div>
-      <FieldSection ngKey="foreground.preset" label="プリセット" value={d.foreground.preset} options={FG_PRESETS} noTopMargin
+      <FieldSection label="プリセット" value={d.foreground.preset} options={FG_PRESETS} noTopMargin
         onChange={(v) => upd("foreground", { preset: v as DetailSettings["foreground"]["preset"] })} />
-      <MultiFieldSection ngKey="foreground.effectType" label="エフェクト種類" singleValue={d.foreground.effectType} multiValues={d.multiOverrides?.["foreground.effectType"] ?? []} options={FG_EFFECT_TYPES}
+      <MultiFieldSection label="エフェクト種類" singleValue={d.foreground.effectType} multiValues={d.multiOverrides?.["foreground.effectType"] ?? []} options={FG_EFFECT_TYPES}
         onChange={mc("foreground.effectType", "effectType")} />
-      <MultiFieldSection ngKey="foreground.swirlType" label="回転・渦" singleValue={d.foreground.swirlType} multiValues={d.multiOverrides?.["foreground.swirlType"] ?? []} options={FG_SWIRL_TYPES}
+      <MultiFieldSection label="回転・渦" singleValue={d.foreground.swirlType} multiValues={d.multiOverrides?.["foreground.swirlType"] ?? []} options={FG_SWIRL_TYPES}
         onChange={mc("foreground.swirlType", "swirlType")} />
-      <MultiFieldSection ngKey="foreground.digitalType" label="HUD・デジタル" singleValue={d.foreground.digitalType} multiValues={d.multiOverrides?.["foreground.digitalType"] ?? []} options={FG_DIGITAL_TYPES}
+      <MultiFieldSection label="HUD・デジタル" singleValue={d.foreground.digitalType} multiValues={d.multiOverrides?.["foreground.digitalType"] ?? []} options={FG_DIGITAL_TYPES}
         onChange={mc("foreground.digitalType", "digitalType")} />
-      <MultiFieldSection ngKey="foreground.artType" label="アート表現" singleValue={d.foreground.artType} multiValues={d.multiOverrides?.["foreground.artType"] ?? []} options={FG_ART_TYPES}
+      <MultiFieldSection label="アート表現" singleValue={d.foreground.artType} multiValues={d.multiOverrides?.["foreground.artType"] ?? []} options={FG_ART_TYPES}
         onChange={mc("foreground.artType", "artType")} />
-      <MultiFieldSection ngKey="foreground.position" label="位置" singleValue={d.foreground.position} multiValues={d.multiOverrides?.["foreground.position"] ?? []} options={FG_POSITIONS}
+      <MultiFieldSection label="位置" singleValue={d.foreground.position} multiValues={d.multiOverrides?.["foreground.position"] ?? []} options={FG_POSITIONS}
         onChange={mc("foreground.position", "position")} />
-      <FieldSection ngKey="foreground.density" label="密度" value={d.foreground.density} options={FG_DENSITIES}
+      <FieldSection label="密度" value={d.foreground.density} options={FG_DENSITIES}
         onChange={(v) => upd("foreground", { density: v as DetailSettings["foreground"]["density"] })} />
-      <MultiFieldSection ngKey="foreground.motion" label="動き" singleValue={d.foreground.motion} multiValues={d.multiOverrides?.["foreground.motion"] ?? []} options={FG_MOTIONS}
+      <MultiFieldSection label="動き" singleValue={d.foreground.motion} multiValues={d.multiOverrides?.["foreground.motion"] ?? []} options={FG_MOTIONS}
         onChange={mc("foreground.motion", "motion")} />
-      <MultiFieldSection ngKey="foreground.color" label="色方向" singleValue={d.foreground.color} multiValues={d.multiOverrides?.["foreground.color"] ?? []} options={FG_COLORS}
+      <MultiFieldSection label="色方向" singleValue={d.foreground.color} multiValues={d.multiOverrides?.["foreground.color"] ?? []} options={FG_COLORS}
         onChange={mc("foreground.color", "color")} />
-      <FieldSection ngKey="foreground.depth" label="奥行き" value={d.foreground.depth} options={FG_DEPTHS}
+      <FieldSection label="奥行き" value={d.foreground.depth} options={FG_DEPTHS}
         onChange={(v) => upd("foreground", { depth: v as DetailSettings["foreground"]["depth"] })} />
-      <FieldSection ngKey="foreground.visibility" label="視認性" value={d.foreground.visibility} options={FG_VISIBILITIES}
+      <FieldSection label="視認性" value={d.foreground.visibility} options={FG_VISIBILITIES}
         onChange={(v) => upd("foreground", { visibility: v as DetailSettings["foreground"]["visibility"] })} />
     </div>
   );
@@ -1721,8 +1695,6 @@ export function DetailsCard({
   onNgListChange,
   forbiddenTokens,
   onForbiddenTokensChange,
-  sectionNg,
-  onToggleSectionNg,
 }: Props) {
   const scopeKeyOf = (t: TabId): string => (t === "big_object" ? "bigObject" : t);
   const isScopeTab = (t: TabId): boolean => !(EXTRA_TAB_IDS as string[]).includes(t);
@@ -1854,7 +1826,6 @@ export function DetailsCard({
   };
 
   return (
-    <SectionNgCtx.Provider value={{ ng: sectionNg, toggle: onToggleSectionNg }}>
     <section className="card">
       {/* Header + utility buttons */}
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
@@ -1980,6 +1951,5 @@ export function DetailsCard({
         設定なし＝プロンプト省略　おまかせ＝案ごとに変化　選択＝固定
       </p>
     </section>
-    </SectionNgCtx.Provider>
   );
 }

@@ -35,8 +35,8 @@ export interface PersistedSettings {
   details:            DetailSettings;
   extraInstructions:  string;
   ngList:             string;
-  /** セクションNG：詳細フィールド単位の強制skip（"category.field" 形式・sticky・値レイヤとは別フラグ）*/
-  sectionNg:          string[];
+  /** タグ個別NG："category.field:value" 形式。送信ゲートで en 語へ解決し【NG】(ngList)へ合流する。*/
+  tagNg:              string[];
   viralMode:          boolean;
   strength:           number;
   glossLevel:         number;
@@ -88,7 +88,7 @@ export const SETTINGS_DEFAULTS: PersistedSettings = {
   details:            DEFAULT_DETAILS,
   extraInstructions:  "",
   ngList:             "",
-  sectionNg:          [],
+  tagNg:              [],
   viralMode:          false,
   strength:           2,
   glossLevel:         3,
