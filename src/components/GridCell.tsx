@@ -106,6 +106,8 @@ export function CellSectionLabel({
   compact = false,
   count,
   maxCount,
+  ngActive = false,
+  onToggleNg,
 }: {
   label: string;
   noTopMargin?: boolean;
@@ -114,6 +116,10 @@ export function CellSectionLabel({
   count?: number;
   /** 最大選択数（count と併用して N/maxCount 表示） */
   maxCount?: number;
+  /** セクションNG中（rose赤＋🚫表示＝この項目を本文から除外）。 */
+  ngActive?: boolean;
+  /** 見出しダブルクリックでセクションNGをトグル。未指定＝NG操作なし（アスペクト比/プリセット等は既存どおり）。 */
+  onToggleNg?: () => void;
 }) {
   const icon = SECTION_ICONS[label];
   return (
@@ -125,11 +131,23 @@ export function CellSectionLabel({
           : (compact ? "mt-2 mb-1" : "mt-4 mb-2"),
       ].join(" ")}
     >
-      {/* 左揃えのラベル */}
+      {/* 左揃えのラベル（onToggleNg があれば見出しダブルクリックでセクションNGトグル） */}
       <span
-        className="flex items-center gap-1.5 text-[15px] font-semibold whitespace-nowrap leading-none shrink-0"
-        style={{ color: "#b388ff" }}
+        className={[
+          "flex items-center gap-1.5 text-[15px] font-semibold whitespace-nowrap leading-none shrink-0",
+          onToggleNg ? "cursor-pointer select-none" : "",
+        ].join(" ")}
+        style={{ color: ngActive ? "#fb7185" : "#b388ff" }}
+        onDoubleClick={onToggleNg}
+        // ダブルクリックのテキスト選択誤爆を防ぐ（2回目の mousedown を抑止）
+        onMouseDown={onToggleNg ? (e) => { if (e.detail > 1) e.preventDefault(); } : undefined}
+        title={
+          onToggleNg
+            ? (ngActive ? "セクションNG中（本文から除外）— ダブルクリックで解除" : "ダブルクリックでこの項目をNG（本文から除外）")
+            : undefined
+        }
       >
+        {ngActive && <span className="text-[12px] leading-none">🚫</span>}
         {icon && <span className="text-[14px] leading-none">{icon}</span>}
         {label}
         {count !== undefined && count > 0 && maxCount !== undefined && (

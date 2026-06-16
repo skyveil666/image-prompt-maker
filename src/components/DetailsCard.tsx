@@ -1,4 +1,4 @@
-import { Suspense, lazy, useRef, useState } from "react";
+import { Suspense, lazy, useRef, useState, createContext, useContext } from "react";
 import type { ArtStyle, Camera3DState, ColorStrategy, DetailSettings, Mood, Scope } from "../types";
 import { DEFAULT_DETAILS, AUTO_DETAILS } from "../types";
 import { describeCameraAngle } from "../lib/cameraAngle";
@@ -113,6 +113,14 @@ import { GridCell, CellSectionLabel, CellGrid } from "./GridCell";
 import { ExtraInstructions } from "./ExtraInstructions";
 import { NgInput } from "./NgInput";
 import { ForbiddenTokens } from "./ForbiddenTokens";
+import type { SectionNgKey } from "../lib/sectionNg";
+
+/** セクションNG（見出しダブルクリック）の供給 Context。DetailsCard が provide し、
+ *  FieldSection / MultiFieldSection が consume する（プロップ・ドリリング削減）。 */
+const SectionNgCtx = createContext<{ ng: readonly string[]; toggle: (k: string) => void }>({
+  ng: [],
+  toggle: () => {},
+});
 import {
   MOOD_GROUPS_BASIC,
   MOOD_GROUPS_DETAIL,
@@ -165,6 +173,9 @@ interface Props {
   onNgListChange: (v: string) => void;
   forbiddenTokens: string[];
   onForbiddenTokensChange: (tokens: string[]) => void;
+  /** セクションNG（フィールド強制skip）の現在値と、見出しダブルクリックのトグル。 */
+  sectionNg: string[];
+  onToggleSectionNg: (key: string) => void;
 }
 
 type Updater = <K extends keyof DetailSettings>(
@@ -384,16 +395,25 @@ function FieldSection({
   options,
   onChange,
   noTopMargin = false,
+  ngKey,
 }: {
   label: string;
   value: string;
   options: PresetItem[];
   onChange: (v: string) => void;
   noTopMargin?: boolean;
+  ngKey?: SectionNgKey;
 }) {
+  const ngCtx = useContext(SectionNgCtx);
+  const ngActive = !!(ngKey && ngCtx.ng.includes(ngKey));
   return (
     <div>
-      <CellSectionLabel label={label} noTopMargin={noTopMargin} />
+      <CellSectionLabel
+        label={label}
+        noTopMargin={noTopMargin}
+        ngActive={ngActive}
+        onToggleNg={ngKey ? () => ngCtx.toggle(ngKey) : undefined}
+      />
       <CellGrid>
         <GridCell
           jaLabel="設定なし"
@@ -438,6 +458,7 @@ function MultiFieldSection({
   onChange,
   noTopMargin = false,
   maxSelect = 3,
+  ngKey,
 }: {
   label: string;
   singleValue: string;
@@ -446,7 +467,10 @@ function MultiFieldSection({
   onChange: (single: string, multi: string[]) => void;
   noTopMargin?: boolean;
   maxSelect?: number;
+  ngKey?: SectionNgKey;
 }) {
+  const ngCtx = useContext(SectionNgCtx);
+  const ngActive = !!(ngKey && ngCtx.ng.includes(ngKey));
   // 有効な選択セット: multiValues が 2+ ならそれ、
   // そうでなければ singleValue から1個分を導出
   const activeSet =
@@ -488,6 +512,8 @@ function MultiFieldSection({
         noTopMargin={noTopMargin}
         count={activeSet.length > 0 ? activeSet.length : undefined}
         maxCount={maxSelect}
+        ngActive={ngActive}
+        onToggleNg={ngKey ? () => ngCtx.toggle(ngKey) : undefined}
       />
       <CellGrid>
         <GridCell
@@ -666,27 +692,27 @@ function BackgroundContent({ d, upd, chg }: {
         ))}
       </CellGrid>
       {/* Individual field grids */}
-      <MultiFieldSection label="背景スタイル" singleValue={d.background.style ?? "skip"} multiValues={d.multiOverrides?.["background.style"] ?? []} options={BG_STYLES}
+      <MultiFieldSection ngKey="background.style" label="背景スタイル" singleValue={d.background.style ?? "skip"} multiValues={d.multiOverrides?.["background.style"] ?? []} options={BG_STYLES}
         onChange={mc("background.style", "style")} />
-      <MultiFieldSection label="場所" singleValue={d.background.place} multiValues={d.multiOverrides?.["background.place"] ?? []} options={BG_PLACES}
+      <MultiFieldSection ngKey="background.place" label="場所" singleValue={d.background.place} multiValues={d.multiOverrides?.["background.place"] ?? []} options={BG_PLACES}
         onChange={(single, multi) => {
           const mo = { ...(d.multiOverrides ?? {}) };
           if (multi.length < 2) delete mo["background.place"]; else mo["background.place"] = multi;
           chg({ ...d, background: { ...d.background, place: single as DetailSettings["background"]["place"] }, multiOverrides: Object.keys(mo).length > 0 ? mo : undefined });
         }} />
-      <MultiFieldSection label="色" singleValue={d.background.color} multiValues={d.multiOverrides?.["background.color"] ?? []} options={BG_COLORS}
+      <MultiFieldSection ngKey="background.color" label="色" singleValue={d.background.color} multiValues={d.multiOverrides?.["background.color"] ?? []} options={BG_COLORS}
         onChange={mc("background.color", "color")} />
-      <FieldSection label="時間帯" value={d.background.time} options={BG_TIMES}
+      <FieldSection ngKey="background.time" label="時間帯" value={d.background.time} options={BG_TIMES}
         onChange={(v) => upd("background", { time: v as DetailSettings["background"]["time"] })} />
-      <FieldSection label="天候" value={d.background.weather} options={BG_WEATHERS}
+      <FieldSection ngKey="background.weather" label="天候" value={d.background.weather} options={BG_WEATHERS}
         onChange={(v) => upd("background", { weather: v as DetailSettings["background"]["weather"] })} />
-      <FieldSection label="密度" value={d.background.density} options={BG_DENSITIES}
+      <FieldSection ngKey="background.density" label="密度" value={d.background.density} options={BG_DENSITIES}
         onChange={(v) => upd("background", { density: v as DetailSettings["background"]["density"] })} />
-      <MultiFieldSection label="空間効果" singleValue={d.background.effect} multiValues={d.multiOverrides?.["background.effect"] ?? []} options={BG_EFFECTS}
+      <MultiFieldSection ngKey="background.effect" label="空間効果" singleValue={d.background.effect} multiValues={d.multiOverrides?.["background.effect"] ?? []} options={BG_EFFECTS}
         onChange={mc("background.effect", "effect")} />
-      <FieldSection label="奥行き" value={d.background.depth} options={BG_DEPTHS}
+      <FieldSection ngKey="background.depth" label="奥行き" value={d.background.depth} options={BG_DEPTHS}
         onChange={(v) => upd("background", { depth: v as DetailSettings["background"]["depth"] })} />
-      <FieldSection label="情報量" value={d.background.info} options={BG_INFOS}
+      <FieldSection ngKey="background.info" label="情報量" value={d.background.info} options={BG_INFOS}
         onChange={(v) => upd("background", { info: v as DetailSettings["background"]["info"] })} />
       {/* 文字背景 / 書（アコーディオン） */}
       <div className="mt-3 pt-2.5 border-t border-white/8">
@@ -1695,6 +1721,8 @@ export function DetailsCard({
   onNgListChange,
   forbiddenTokens,
   onForbiddenTokensChange,
+  sectionNg,
+  onToggleSectionNg,
 }: Props) {
   const scopeKeyOf = (t: TabId): string => (t === "big_object" ? "bigObject" : t);
   const isScopeTab = (t: TabId): boolean => !(EXTRA_TAB_IDS as string[]).includes(t);
@@ -1826,6 +1854,7 @@ export function DetailsCard({
   };
 
   return (
+    <SectionNgCtx.Provider value={{ ng: sectionNg, toggle: onToggleSectionNg }}>
     <section className="card">
       {/* Header + utility buttons */}
       <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
@@ -1951,5 +1980,6 @@ export function DetailsCard({
         設定なし＝プロンプト省略　おまかせ＝案ごとに変化　選択＝固定
       </p>
     </section>
+    </SectionNgCtx.Provider>
   );
 }

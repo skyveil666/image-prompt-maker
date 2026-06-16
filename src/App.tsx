@@ -145,7 +145,7 @@ export default function App() {
     details, setDetails,
     extraInstructions, setExtraInstructions,
     ngList, setNgList,
-    sectionNg,
+    sectionNg, setSectionNg,
     bodyPoseLock, setBodyPoseLock,
     colorMoodLock, setColorMoodLock,
     compositionLock, setCompositionLock,
@@ -2509,6 +2509,8 @@ export default function App() {
                 onNgListChange={setNgList}
                 forbiddenTokens={forbiddenTokens}
                 onForbiddenTokensChange={setForbiddenTokens}
+                sectionNg={sectionNg}
+                onToggleSectionNg={(key) => setSectionNg((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))}
               />
 
 
