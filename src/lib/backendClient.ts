@@ -1,5 +1,5 @@
 import type { GeneratedProposal, PromptInputs } from "../types";
-import { applyNgGate } from "./ngGate";
+import { applyNgGate, applySectionNg } from "./ngGate";
 
 export interface BackendResponse {
   proposals: GeneratedProposal[];
@@ -49,12 +49,16 @@ export async function generateViaBackend(
   recentGenres: string[] = [],
   recentSubStyles: string[] = [],
   rawNgList = "",
-  forbiddenTokens: string[] = []
+  forbiddenTokens: string[] = [],
+  sectionNg: string[] = []
 ): Promise<BackendResponse> {
   // 🔒 NG出口一括適用：/api/generate への唯一の送信関数。どの経路（runGenerate /
   //    インラインアレンジ）を通っても、fetch 直前に NG を冪等復元する（ビルダーが
   //    extraInstructions を置換しても漏れない）。送信はこの1回が唯一の真実。
-  const gated = applyNgGate(inputs, rawNgList, forbiddenTokens);
+  let gated = applyNgGate(inputs, rawNgList, forbiddenTokens);
+  // 🚫 セクションNG：対象フィールドを送信直前に強制 skip（プリセットに勝つ sticky）。
+  // applyNgGate(ngList/extraInstructions) と applySectionNg(details) は触る領域が分離＝順序非依存。
+  gated = applySectionNg(gated, sectionNg);
   const res = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -67,7 +71,7 @@ export async function generateViaBackend(
       count: inputs.count,
       locks: inputs.locks,
       safety: inputs.safety,
-      details: inputs.details,
+      details: gated.details,
       extraInstructions: gated.extraInstructions,
       faceLock: inputs.faceLock,
       ngList: gated.ngList,

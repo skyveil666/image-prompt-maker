@@ -145,6 +145,7 @@ export default function App() {
     details, setDetails,
     extraInstructions, setExtraInstructions,
     ngList, setNgList,
+    sectionNg,
     bodyPoseLock, setBodyPoseLock,
     colorMoodLock, setColorMoodLock,
     compositionLock, setCompositionLock,
@@ -778,7 +779,7 @@ export default function App() {
         // マンネリ回避：直近ジャンル＋サブジャンルを渡し、返ってきたものを履歴に積む
         const recentGenres    = getRecentGenres();
         const recentSubStyles = getRecentSubStyles();
-        const result = await generateViaBackend(inputs, imageDataUrl, recentGenres, recentSubStyles, ngList, forbiddenTokens);
+        const result = await generateViaBackend(inputs, imageDataUrl, recentGenres, recentSubStyles, ngList, forbiddenTokens, sectionNg);
         if (result.retried) {
           setPresetToastMsg("再試行しました（1回目は失敗しましたが成功しました）");
           setPresetToastHint("");
@@ -852,7 +853,7 @@ export default function App() {
         setArrangeSource(null);
       }
     },
-    [imageDataUrl, runBiasAnalysis, ngList, forbiddenTokens]
+    [imageDataUrl, runBiasAnalysis, ngList, forbiddenTokens, sectionNg]
   );
 
   // skyveilProfile/Strength は後で宣言されるため、handleGenerate からは ref 経由で参照（TDZ回避）
@@ -1896,7 +1897,7 @@ export default function App() {
       try {
         const recentGenres    = getRecentGenres();
         const recentSubStyles = getRecentSubStyles();
-        const res = await generateViaBackend(arrangeInputs, imageDataUrl, recentGenres, recentSubStyles, ngList, forbiddenTokens);
+        const res = await generateViaBackend(arrangeInputs, imageDataUrl, recentGenres, recentSubStyles, ngList, forbiddenTokens, sectionNg);
         const usedGenres = res.proposals.map((p) => p.genre).filter((g): g is string => Boolean(g));
         if (usedGenres.length > 0) pushRecentGenres(usedGenres);
         const usedSub = res.proposals
@@ -1916,7 +1917,7 @@ export default function App() {
         return null;
       }
     },
-    [buildInputs, imageDataUrl, showPresetToast, ngList, forbiddenTokens]
+    [buildInputs, imageDataUrl, showPresetToast, ngList, forbiddenTokens, sectionNg]
   );
 
   /** アレンジ案をお気に入りとして履歴へ保存する（生成画像・評価・派生元メタを含む）。 */
