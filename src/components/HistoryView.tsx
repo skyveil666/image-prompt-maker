@@ -49,6 +49,10 @@ interface Props {
   onClearWorld?:        () => void;
   /** 参照画像適用の解除。 */
   onClearReference?:    () => void;
+  /** タグ個別NG（per-tag NG）の現在値。ArrangePreviewPanel へ中継（アレンジも全案に効く）。 */
+  tagNg?:               string[];
+  /** タグ個別NGの一括解除。ArrangePreviewPanel へ中継。 */
+  onClearTagNg?:        () => void;
   /** トースト表示（プロンプト全文コピー完了通知などに使用）。 */
   onToast?: (msg: string) => void;
 }
@@ -93,6 +97,7 @@ export function HistoryView({
   favoriteProfile = null, favoriteLearnEnabled = false, recoverySlot,
   avoidRealBackground, worldCombinedNote, referenceNoteText,
   onClearAvoidRealBg, onClearWorld, onClearReference,
+  tagNg = [], onClearTagNg = () => {},
   onToast,
 }: Props) {
   const [analysisOpen, setAnalysisOpen] = useState(false);
@@ -683,6 +688,8 @@ export function HistoryView({
               onClearAvoidRealBg={onClearAvoidRealBg}
               onClearWorld={onClearWorld}
               onClearReference={onClearReference}
+              tagNg={tagNg}
+              onClearTagNg={onClearTagNg}
               arrangeCount={arrangeCount}
               onArrangeCountChange={setArrangeCount}
               onSaveFavorite={(p, ls) => {

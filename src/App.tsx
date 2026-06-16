@@ -145,7 +145,7 @@ export default function App() {
     details, setDetails,
     extraInstructions, setExtraInstructions,
     ngList, setNgList,
-    tagNg,
+    tagNg, setTagNg,
     bodyPoseLock, setBodyPoseLock,
     colorMoodLock, setColorMoodLock,
     compositionLock, setCompositionLock,
@@ -170,6 +170,12 @@ export default function App() {
     activeBoosts, setActiveBoosts,
     windLevel, setWindLevel,
   } = usePersistedSettings();
+
+  // per-tag NG（タグ個別NG）：タグのダブルクリックで tagNg をトグル（DetailsCard 側）。tagNg は永続。
+  const onToggleTagNg = useCallback((fieldKey: string, value: string) => {
+    const key = `${fieldKey}:${value}`;
+    setTagNg((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
+  }, [setTagNg]);
 
   // ── B: カメラが変更対象から外れたら 3D カメラ指定(custom3D)を自動解除 ─────────────
   // 3Dピッカーは camera タブ内にしか無く、custom3D は camera ∈ scopes のときだけ本文へ反映される。
@@ -2159,6 +2165,8 @@ export default function App() {
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
             onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
             onClearReference={() => setReferenceNote({})}
+            tagNg={tagNg}
+            onClearTagNg={() => setTagNg([])}
             onToast={showPresetToast}
           />
         ) : (
@@ -2311,6 +2319,8 @@ export default function App() {
                 onClearReference={() => setReferenceNote({})}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
+                tagNg={tagNg}
+                onClearTagNg={() => setTagNg([])}
               />
 
 
@@ -2509,6 +2519,8 @@ export default function App() {
                 onNgListChange={setNgList}
                 forbiddenTokens={forbiddenTokens}
                 onForbiddenTokensChange={setForbiddenTokens}
+                tagNg={tagNg}
+                onToggleTagNg={onToggleTagNg}
               />
 
 

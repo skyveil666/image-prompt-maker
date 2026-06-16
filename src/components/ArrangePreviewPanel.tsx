@@ -13,6 +13,7 @@ import type { ArrangeResult, Count, GeneratedProposal, PromptHistoryItem, Scope 
 import { ARRANGE_AXES, ALL_SCOPE_LABELS, arrangeCandidateScopes } from "../lib/arrange";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 import { DominatorBadge, summarizeNote } from "./DominatorBadge";
+import { tagNgToLabels } from "../data/tagNgOptions";
 import {
   MAX_RESULT_IMAGES, RATING_LABELS,
   AXIS_RATING_META, type RatingAxisKey,
@@ -75,6 +76,10 @@ interface Props {
   onClearWorld?:        () => void;
   /** 参照画像適用の解除（App の referenceNote をクリア）。 */
   onClearReference?:    () => void;
+  /** タグ個別NG（per-tag NG）の現在値。非空なら「本文から除外」バッジを出す（アレンジも全案に効く）。 */
+  tagNg?:               string[];
+  /** タグ個別NGの一括解除（App の setTagNg([])）。 */
+  onClearTagNg?:        () => void;
 
   // ── アレンジ生成枚数（アレンジ専用・メイン案数とは独立・非永続）──
   /** このアレンジで生成する案数（2-6）。未指定なら 2。 */
@@ -510,6 +515,8 @@ export function ArrangePreviewPanel({
   onClearAvoidRealBg = () => {},
   onClearWorld = () => {},
   onClearReference = () => {},
+  tagNg = [],
+  onClearTagNg = () => {},
   arrangeCount = 2,
   onArrangeCountChange = () => {},
 }: Props) {
@@ -522,7 +529,9 @@ export function ArrangePreviewPanel({
   const worldNote = worldCombinedNote.trim();
   const refNote   = referenceNoteText.trim();
   const bgStylizeActive = avoidRealBackground && selectedScopes.includes("background");
-  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive;
+  // 🚫 タグ個別NG（per-tag NG）：アレンジは {...current} で同設定を継承するため、ここでも常時可視化＋解除（§5）。
+  const tagNgLabels = tagNgToLabels(tagNg);
+  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive || tagNg.length > 0;
 
   // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
@@ -678,6 +687,15 @@ export function ArrangePreviewPanel({
                     summaryTitle={referenceNoteText}
                     onClear={onClearReference}
                     clearTitle="参照画像からの適用を全案から解除する"
+                  />
+                )}
+                {tagNg.length > 0 && (
+                  <DominatorBadge
+                    label="🚫 タグNG（本文から除外）"
+                    summary={tagNgLabels.join("・")}
+                    summaryTitle={`NG設定モードで除外したタグをこのアレンジの全案からも除外します：${tagNgLabels.join("、")}`}
+                    onClear={onClearTagNg}
+                    clearTitle="タグNGを全解除（値の選択は保持）"
                   />
                 )}
               </div>

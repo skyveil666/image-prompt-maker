@@ -6,11 +6,15 @@ import type { ReactNode } from "react";
 //   "skip"  → 設定なし  — active: gray
 //   "auto"  → おまかせ  — active: violet/purple
 //   "value" → 具体選択  — active: blue-indigo (default)
+//   "ng"    → NG中（タグ個別NG）— 赤背景＋取り消し線＋「NG」ラベル（active問わず赤・遠目で判別）
 interface GridCellProps {
   jaLabel: string;
   active: boolean;
-  cellKind?: "skip" | "auto" | "value";
+  cellKind?: "skip" | "auto" | "value" | "ng";
   onClick: () => void;
+  /** ダブルクリック時のハンドラ（タグ個別NGのトグルに使用）。未指定＝ダブルクリック無効。
+   *  指定時はシングルクリック(onClick)を detail===1 のみに限定し、2クリック目で値選択が誤発火しないようにする。 */
+  onDoubleClick?: () => void;
   title?: string;
   compact?: boolean;
 }
@@ -23,7 +27,9 @@ function getCellFontClass(label: string): string {
   return "text-[12px]";
 }
 
-export function GridCell({ jaLabel, active, cellKind = "value", onClick, title, compact = false }: GridCellProps) {
+export function GridCell({ jaLabel, active, cellKind = "value", onClick, onDoubleClick, title, compact = false }: GridCellProps) {
+  const isNg = cellKind === "ng";
+
   const activeStyle =
     cellKind === "skip"
       ? "bg-[#32363f] border-[#5a6070] shadow-[0_0_10px_rgba(150,160,180,0.3)] text-slate-100"
@@ -38,6 +44,10 @@ export function GridCell({ jaLabel, active, cellKind = "value", onClick, title, 
       ? "bg-[#111420] border-[#1a1f34] text-white/55 hover:bg-[#161a2b] hover:border-[#2a3050] hover:text-white/80"
       : "bg-[#171b2c] border-[#252e44] text-white/72 hover:bg-[#1e2338] hover:border-[#354060] hover:text-text-base";
 
+  // NG タグ：赤背景＋取り消し線＋「NG」ラベルの3点併用で「除外中」を遠目に判別させる（active 問わず赤）
+  const ngStyle =
+    "bg-rose-600/30 border-rose-400/85 shadow-[0_0_10px_rgba(244,63,94,0.45)] text-rose-50 hover:bg-rose-600/45 hover:border-rose-300";
+
   const checkColor =
     cellKind === "skip" ? "text-slate-400" : cellKind === "auto" ? "text-violet-300" : "text-blue-300";
 
@@ -46,17 +56,23 @@ export function GridCell({ jaLabel, active, cellKind = "value", onClick, title, 
   return (
     <button
       type="button"
-      onClick={onClick}
-      title={title ?? jaLabel}
+      // ダブルクリックNG対応：onDoubleClick がある時はシングルクリック値選択を detail<=1 に限定（2クリック目 detail=2 の誤発火防止）。
+      onClick={(e) => { if (!onDoubleClick || e.detail <= 1) onClick(); }}
+      onDoubleClick={onDoubleClick}
+      // ダブルクリックのテキスト選択誤爆を防ぐ（2回目の mousedown を抑止）。select-none と併用。
+      onMouseDown={onDoubleClick ? (e) => { if (e.detail > 1) e.preventDefault(); } : undefined}
+      title={isNg ? `NG中（本文から除外）：${jaLabel}` : (title ?? jaLabel)}
       className={[
-        `relative inline-flex items-center justify-center rounded-md border px-2 py-1 ${compact ? "min-h-[28px]" : "min-h-[34px]"} whitespace-nowrap text-center transition-all duration-150 select-none`,
-        active ? activeStyle : inactiveStyle,
+        `relative inline-flex items-center justify-center rounded-md border ${isNg ? "pl-6 pr-2" : "px-2"} py-1 ${compact ? "min-h-[28px]" : "min-h-[34px]"} whitespace-nowrap text-center transition-all duration-150 select-none`,
+        isNg ? ngStyle : active ? activeStyle : inactiveStyle,
       ].join(" ")}
     >
-      {active && (
+      {isNg ? (
+        <span className="absolute top-0.5 left-0.5 px-1 text-[9px] font-black leading-tight rounded-[3px] bg-rose-500 text-white">NG</span>
+      ) : active ? (
         <span className={`absolute top-0.5 right-0.5 text-[10px] leading-none ${checkColor}`}>✓</span>
-      )}
-      <span className={`${fontClass} font-semibold leading-snug`}>{jaLabel}</span>
+      ) : null}
+      <span className={`${fontClass} font-semibold leading-snug ${isNg ? "line-through decoration-rose-100/90 decoration-2" : ""}`}>{jaLabel}</span>
     </button>
   );
 }

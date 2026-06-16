@@ -94,3 +94,11 @@ export function tagNgToNgTerms(tagNg: string[]): string[] {
 export function isTagNg(tagNg: string[], fieldKey: string, value: string): boolean {
   return tagNg.includes(`${fieldKey}:${value}`);
 }
+
+/** UI表示用：tagNg(キー配列) → 日本語ラベル配列（label 優先・無ければ value）。バッジ要約に使う。 */
+export function tagNgToLabels(tagNg: string[]): string[] {
+  return tagNg.map((key) => {
+    const opt = lookupTagOption(key);
+    return opt?.label || key.slice(key.lastIndexOf(":") + 1);
+  });
+}
