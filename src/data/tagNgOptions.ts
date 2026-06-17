@@ -102,3 +102,23 @@ export function tagNgToLabels(tagNg: string[]): string[] {
     return opt?.label || key.slice(key.lastIndexOf(":") + 1);
   });
 }
+
+/**
+ * ②候補除外（§4 1b）用：tagNg から「背景候補の事前除外に使う id」を category 別に取り出す。
+ * 対象＝background.place / background.style のみ（サーバの「背景バリエーション指示」が
+ * 場所・スタイルを選ぶ block ゆえ）。time/weather/density/info は“場所”を選ばない別軸なので含めない。
+ * 送信時に tagNg から導出する **読み取り専用の派生値**（新規 persist なし・migration なし）。
+ */
+export function tagNgToBgExclude(tagNg: string[]): { place: string[]; style: string[] } {
+  const place: string[] = [];
+  const style: string[] = [];
+  for (const key of tagNg) {
+    const i = key.lastIndexOf(":");
+    if (i < 0) continue;
+    const fieldKey = key.slice(0, i);   // 例 "background.place"
+    const value = key.slice(i + 1);     // 例 "greenhouse"
+    if (fieldKey === "background.place") place.push(value);
+    else if (fieldKey === "background.style") style.push(value);
+  }
+  return { place, style };
+}

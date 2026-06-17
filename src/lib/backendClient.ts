@@ -1,5 +1,6 @@
 import type { GeneratedProposal, PromptInputs } from "../types";
 import { applyNgGate } from "./ngGate";
+import { tagNgToBgExclude } from "../data/tagNgOptions";
 
 export interface BackendResponse {
   proposals: GeneratedProposal[];
@@ -49,13 +50,17 @@ export async function generateViaBackend(
   recentGenres: string[] = [],
   recentSubStyles: string[] = [],
   rawNgList = "",
-  forbiddenTokens: string[] = []
+  forbiddenTokens: string[] = [],
+  tagNg: string[] = []
 ): Promise<BackendResponse> {
   // 🔒 NG出口一括適用：/api/generate への唯一の送信関数。どの経路（runGenerate /
   //    インラインアレンジ）を通っても、fetch 直前に NG を冪等復元する。送信はこの1回が唯一の真実。
-  // 🚫 ①tagNg分離：タグ個別NG(tagNg) はここで【NG】へ合流させない（＝内部候補除外専用へ分離）。
-  //    【NG】(ngList) はユーザーの手動NG欄(rawNgList)のみ＝既存どおり維持。
+  // 🚫 ①tagNg分離：タグ個別NG(tagNg) は【NG】(ngList) へ合流させない。
+  //    【NG】はユーザーの手動NG欄(rawNgList)のみ＝既存どおり維持。
   const gated = applyNgGate(inputs, rawNgList, forbiddenTokens);
+  // 🚫 ②候補除外：tagNg → 背景候補の事前除外 id（place/style）。サーバの「背景バリエーション指示」が
+  //    参照して NG済みの場所/スタイルを積極採用リストから外す（本文の【NG】とは別経路・読み取り専用派生）。
+  const ngExclude = tagNgToBgExclude(tagNg);
   const res = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -72,6 +77,7 @@ export async function generateViaBackend(
       extraInstructions: gated.extraInstructions,
       faceLock: inputs.faceLock,
       ngList: gated.ngList,
+      ngExclude,
       viralMode: inputs.viralMode,
       strength: inputs.strength,
       glossLevel: inputs.glossLevel,
