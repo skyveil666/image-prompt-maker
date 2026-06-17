@@ -353,6 +353,9 @@ export interface GenerateRequest {
    */
   expression?: Expression | null;
   ngList: string;
+  /** ②候補除外（§4 1b）：NG指定された背景 id（place/style）。「背景バリエーション指示」が
+   *  積極採用リストから外し＋絶対禁止節に列挙する。本文【NG】(ngList) とは別経路。 */
+  ngExclude?: { place?: string[]; style?: string[] };
   viralMode: boolean;
   /** Prompt Strength 1〜5。省略時は 3（標準）。*/
   strength?: number;

@@ -114,6 +114,13 @@ app.post("/api/generate", async (req, res) => {
     extraInstructions: raw.extraInstructions ?? "",
     faceLock: raw.faceLock ?? true,
     ngList: raw.ngList ?? "",
+    // ②候補除外：背景NGの id（place/style）を転送。サーバの「背景バリエーション指示」が参照する。
+    ...(raw.ngExclude && {
+      ngExclude: {
+        place: (raw.ngExclude.place ?? []).slice(0, 40).map(String),
+        style: (raw.ngExclude.style ?? []).slice(0, 40).map(String),
+      },
+    }),
     viralMode: raw.viralMode ?? false,
     // Optional sliders — must be forwarded so promptSystem can use them
     ...(raw.strength            !== undefined && { strength:            raw.strength }),

@@ -526,6 +526,35 @@ const BG_LABELS = {
   },
 } as const;
 
+// ─── ②候補除外（§4 1b）──────────────────────────────────────────────────────────
+// NG指定された背景 id を「絶対禁止節フレーズ」と「積極採用リストから抜く literal」に解決する。
+// 過剰除外防止の肝：nature は "自然"全般にせずプリセット名ピンポイント／greenhouse は無機質な
+// ガラス空間を巻き込まない（温室＝植物ドームのみ）。海/空/夕焼け/花畑 等は許可節で明示的に残す。
+const BG_BAN_OVERRIDE: Record<string, string[]> = {
+  nature:     ["幻想自然空間"],
+  greenhouse: ["温室", "ガラス植物ドーム", "植物園", "観葉植物の多い室内"],
+  forest:     ["森", "幻想森層"],
+  garden:     ["庭園", "空想庭園"],
+};
+// 「背景バリエーション指示」の積極採用リストに literal で載っている語だけ trim（海/空/花畑は対象外＝残る）。
+const BG_VARIETY_TRIM: Record<string, string> = {
+  forest: "森", watercolor: "水彩", ink_wash: "水墨", oil_painting: "油絵",
+};
+function resolveBgExclude(ng?: { place?: string[]; style?: string[] }): { ban: string[]; trim: Set<string> } {
+  const ban: string[] = [];
+  const trim = new Set<string>();
+  const add = (ids: string[] | undefined, labelMap: Record<string, string>) => {
+    for (const id of ids ?? []) {
+      const phrases = BG_BAN_OVERRIDE[id] ?? [labelMap[id] ?? id];  // override優先＝nature を"自然"へ広げない
+      for (const p of phrases) if (p && !ban.includes(p)) ban.push(p);
+      if (BG_VARIETY_TRIM[id]) trim.add(BG_VARIETY_TRIM[id]);
+    }
+  };
+  add(ng?.place, BG_LABELS.place as Record<string, string>);
+  add(ng?.style, BG_LABELS.style as Record<string, string>);
+  return { ban, trim };
+}
+
 const POSE_LABELS = {
   type: {
     stand: "立ち", sit: "座り", crouch: "しゃがみ", turn: "振り向き", walk: "歩き", float: "浮遊", action: "アクション",
@@ -1114,6 +1143,7 @@ function describeDetails(
   details: DetailSettings,
   _pt: PromptTarget = "full",
   subStylePlan?: SubStylePlan,
+  ngExclude?: { place?: string[]; style?: string[] },
 ): string {
   // OUTFIT_LABELS.exposure はすでに全モード共通の安全表現を使用している
   const exposureLabel = (v: string): string =>
@@ -1402,13 +1432,21 @@ function describeDetails(
     const styleUnset = !b.style || b.style === "auto" || b.style === "skip";
     const placeUnset = b.place === "auto" || b.place === "skip";
     if (styleUnset && placeUnset) {
+      // ②候補除外（§4 1b）: ユーザーNG指定の背景(place/style)を、積極採用リストから trim ＋ 絶対禁止節へ。
+      //   海/空/夕焼け/花畑 等の非NG候補は残す（過剰除外防止・許可節で明示）。ngExclude 空なら従来文言そのまま。
+      const { ban: bgBan, trim: bgTrim } = resolveBgExclude(ngExclude);
+      const trimCsv = (csv: string): string => csv.split("・").filter((t) => !bgTrim.has(t)).join("・");
       lines.push(
         "【背景バリエーション指示】背景の場所・スタイルが明示指定されていないため、案ごとに多様な方向から選ぶ：\n" +
         "- ネオン街・サイバー都市・電脳都市・雨の路地・日本語ネオンサイン・ブレードランナー風はデフォルト採用禁止（全案の15%以内）。\n" +
-        "- 【自然系】森・花畑・海辺・空・雲海・雨上がり・湖・水辺 を積極的に採用する。\n" +
-        "- 【抽象系】単色・グラデーション・光粒子・幾何学・現代アート・水彩・水墨・油絵・ミニマル を均等に使う。\n" +
+        "- 【自然系】" + trimCsv("森・花畑・海辺・空・雲海・雨上がり・湖・水辺") + " を積極的に採用する。\n" +
+        "- 【抽象系】" + trimCsv("単色・グラデーション・光粒子・幾何学・現代アート・水彩・水墨・油絵・ミニマル") + " を均等に使う。\n" +
         "- 【室内系】スタジオ・白空間・黒空間・美術館・ホテル・ラウンジ・ガラス空間・未来室内 も選択肢に含める。\n" +
         "- 【幻想系】幻想空間・月夜・神秘空間・夢空間・ファンタジー背景 も積極的に採用する。\n" +
+        (bgBan.length
+          ? "- 【絶対禁止（ユーザーNG指定・全案で一切使わない）】：" + bgBan.join("・") + "。\n" +
+            "  ただし海・海岸・空・夕焼け・雲海・湖・水辺・花畑・草原・都市・夜景・室内（植物なし）など、植物/温室が主役でない背景は除外しない。\n"
+          : "") +
         "- 各案で背景の方向性を明確に差別化し、同じ傾向が連続しないようにする。"
       );
     }
@@ -4012,7 +4050,7 @@ export function buildSystemPrompt(
   // 固定ムードもおまかせも何もなければ「中庸トーン」
   const moodLine = fixedMoodLine || (autoCats.length === 0 ? "中庸トーン" : "（固定雰囲気なし）");
 
-  const detailLines = describeDetails(req.scopes, safeDetails(req.details ?? {}), pt, subStylePlan);
+  const detailLines = describeDetails(req.scopes, safeDetails(req.details ?? {}), pt, subStylePlan, req.ngExclude);
   const lockLine = lockLineJa(req.locks, req.scopes, pt);
   const safety = safetyJa(req);
   const extra = req.extraInstructions.trim();
