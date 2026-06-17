@@ -4,7 +4,7 @@ import { MIN_SAMPLES } from "../../lib/preferenceProfile";
 import { STRENGTH_TO_FAVORITE, type SkyveilStrength, type SkyveilProfile } from "../../lib/skyveilProfile";
 import type { SuccessPromptPattern } from "../../lib/successPatterns";
 import type { ZozoTrend } from "../../lib/zozoTrend";
-import type { Scope } from "../../types";
+import type { Scope, DetailSettings } from "../../types";
 import type { WorldPreset } from "../QuickActions";
 
 interface BoostAreaProps {
@@ -33,6 +33,9 @@ interface BoostAreaProps {
   windLevel: number;
   setZozoApplied: (t: ZozoTrend | null) => void;
   setWindLevel: (n: number) => void;
+  // 👗 衣装スライダー（露出3段・派手さ4段）— details.outfit を単一ソースに読み書き
+  details: DetailSettings;
+  onOutfitField: (field: "exposure" | "decoration", id: string) => void;
   // 共通
   showPresetToast: (msg: string, hint?: string) => void;
 }
@@ -66,6 +69,8 @@ export function BoostArea({
   windLevel,
   setZozoApplied,
   setWindLevel,
+  details,
+  onOutfitField,
   showPresetToast,
 }: BoostAreaProps) {
   return (
@@ -145,6 +150,9 @@ export function BoostArea({
           scopes.includes("foreground") || scopes.includes("pose") ||
           scopes.includes("camera")
         }
+        outfitExposure={details.outfit.exposure}
+        outfitDecoration={details.outfit.decoration}
+        onOutfitField={onOutfitField}
       />
     </div>
   );

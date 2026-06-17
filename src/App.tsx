@@ -2445,6 +2445,10 @@ export default function App() {
                     setZozoApplied={setZozoApplied}
                     setWindLevel={setWindLevel}
                     showPresetToast={showPresetToast}
+                    details={details}
+                    onOutfitField={(field, id) =>
+                      setDetails((d) => ({ ...d, outfit: { ...d.outfit, [field]: id } as typeof d.outfit }))
+                    }
                   />
                 }
                 scopeFlashKey={scopeFlashKey}
