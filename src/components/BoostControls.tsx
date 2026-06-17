@@ -63,7 +63,7 @@ function labelOf(items: { id: string; label: string }[], value: string): string 
  * - 押下時のみ onPick を呼ぶ（レンダでは書かない＝グリッドの非スライダー値を壊さない）。
  */
 function OutfitLevelRow({
-  icon, label, value, steps, currentLabel, disabled, onPick,
+  icon, label, value, steps, currentLabel, disabled, disabledHint, onPick,
 }: {
   icon: string;
   label: string;
@@ -71,45 +71,55 @@ function OutfitLevelRow({
   steps: readonly { id: string; label: string }[];
   currentLabel: string;
   disabled: boolean;
+  disabledHint?: string;
   onPick: (id: string) => void;
 }) {
   const onSlider = steps.some((s) => s.id === value);
   const offSliderConcrete = !onSlider && value !== "skip" && value !== "auto";
   return (
-    <div className={[
-      "flex items-center gap-1.5 flex-wrap",
-      disabled ? "opacity-40 pointer-events-none" : "",
-    ].join(" ")}>
-      <span
-        className="text-[12px] font-semibold text-sky-200/90 leading-none shrink-0 min-w-[3.5rem]"
-        title={`衣装の${label}（衣装ON時のみ反映）`}
-      >
-        {icon} {label}
-      </span>
-      <span className="flex rounded-md border border-sky-400/30 overflow-hidden">
-        {steps.map((o) => {
-          const active = value === o.id;
-          return (
-            <button
-              key={o.id}
-              type="button"
-              onClick={() => onPick(active ? "skip" : o.id)}
-              title={o.label}
-              className={[
-                "text-[12px] font-bold px-2.5 py-0.5 leading-none transition",
-                active
-                  ? "bg-sky-500/70 text-white shadow-[0_0_6px_rgba(56,189,248,0.45)]"
-                  : "text-sky-200/60 hover:bg-sky-400/15 hover:text-sky-100",
-              ].join(" ")}
-            >
-              {o.label}
-            </button>
-          );
-        })}
-      </span>
-      {offSliderConcrete && (
-        <span className="text-[11px] text-amber-300/75 leading-none whitespace-nowrap">
-          詳細設定で「{currentLabel}」選択中
+    <div className="flex items-center gap-1.5 shrink-0">
+      {/* 操作部：disabled 時のみグレー（チップを読めるよう opacity は内側に閉じる）*/}
+      <div className={[
+        "flex items-center gap-1.5",
+        disabled ? "opacity-40 pointer-events-none" : "",
+      ].join(" ")}>
+        <span
+          className="text-[12px] font-semibold text-sky-200/90 leading-none shrink-0"
+          title={`衣装の${label}（衣装ON時のみ反映）`}
+        >
+          {icon} {label}
+        </span>
+        <span className="flex rounded-md border border-sky-400/30 overflow-hidden">
+          {steps.map((o) => {
+            const active = value === o.id;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => onPick(active ? "skip" : o.id)}
+                title={o.label}
+                className={[
+                  "text-[12px] font-bold px-2.5 py-0.5 leading-none transition",
+                  active
+                    ? "bg-sky-500/70 text-white shadow-[0_0_6px_rgba(56,189,248,0.45)]"
+                    : "text-sky-200/60 hover:bg-sky-400/15 hover:text-sky-100",
+                ].join(" ")}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </span>
+        {!disabled && offSliderConcrete && (
+          <span className="text-[11px] text-amber-300/75 leading-none whitespace-nowrap">
+            詳細設定で「{currentLabel}」選択中
+          </span>
+        )}
+      </div>
+      {/* グレー理由チップ：full opacity（disabled の外側）*/}
+      {disabled && disabledHint && (
+        <span className="text-[10px] font-bold text-amber-300/85 border border-amber-400/40 bg-amber-400/10 rounded-full px-1.5 py-0.5 leading-none whitespace-nowrap select-none">
+          {disabledHint}
         </span>
       )}
     </div>
@@ -127,60 +137,77 @@ export function BoostControls({
       <div className="rounded-2xl border border-cyan-400/50 bg-cyan-500/8 px-3 py-2">
         <div className="flex items-center gap-1.5 mb-1.5">
           <span className="text-[13px] font-bold text-cyan-200/90 leading-none select-none">全体補助</span>
-          <span className="text-[10px] text-text-muted/45 leading-none">風のなびき（髪・衣装・前景・ポーズ・カメラに反映）</span>
         </div>
-        {/* ── 風の強さ（0〜5）── 既存のまま（中身・サイズ・色 無改変）── */}
-      <div className="flex items-center gap-x-2.5 gap-y-0.5 flex-wrap">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className={[
-            "text-[12px] font-semibold leading-none",
-            windLevel > 0 && windApplicable ? "text-cyan-200"
-            : windLevel > 0 ? "text-cyan-200/40"
-            : "text-text-muted/55",
-          ].join(" ")} title="風の強さ（髪・衣装・前景演出・ポーズ・カメラのいずれかON時のみ反映）">
-            🌬️ 風
-          </span>
-          <span className="flex rounded-md border border-cyan-400/30 overflow-hidden">
-            {WIND_LEVELS.map((o) => {
-              const active = windLevel === o.value;
-              return (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => onWindLevelChange(o.value)}
-                  title={o.full}
-                  className={[
-                    "text-[12px] font-bold w-6 py-0.5 leading-none transition",
-                    active
-                      ? (o.value === 0
-                          ? "bg-text-muted/30 text-white"
-                          : "bg-cyan-500/70 text-white shadow-[0_0_6px_rgba(34,211,238,0.45)]")
-                      : "text-cyan-200/60 hover:bg-cyan-400/15 hover:text-cyan-100",
-                  ].join(" ")}
-                >
-                  {o.label}
-                </button>
-              );
-            })}
-          </span>
-          {windLevel > 0 && !windApplicable && (
-            <span className="text-[11px] text-amber-300/75 leading-none whitespace-nowrap">
-              ⚠ 未反映（対象スコープOFF）
+        {/* ── 横一列：風・露出・派手さ（gap-x-5・flex-wrap で幅狭時は折り返し）── */}
+        <div className="flex items-center gap-x-5 gap-y-1.5 flex-wrap">
+          {/* 風グループ（既存のまま＋風desc を segmented 直後に短縮内包）*/}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={[
+              "text-[12px] font-semibold leading-none",
+              windLevel > 0 && windApplicable ? "text-cyan-200"
+              : windLevel > 0 ? "text-cyan-200/40"
+              : "text-text-muted/55",
+            ].join(" ")} title="風の強さ（髪・衣装・前景演出・ポーズ・カメラのいずれかON時のみ反映）">
+              🌬️ 風
             </span>
-          )}
+            <span className="flex rounded-md border border-cyan-400/30 overflow-hidden">
+              {WIND_LEVELS.map((o) => {
+                const active = windLevel === o.value;
+                return (
+                  <button
+                    key={o.value}
+                    type="button"
+                    onClick={() => onWindLevelChange(o.value)}
+                    title={o.full}
+                    className={[
+                      "text-[12px] font-bold w-6 py-0.5 leading-none transition",
+                      active
+                        ? (o.value === 0
+                            ? "bg-text-muted/30 text-white"
+                            : "bg-cyan-500/70 text-white shadow-[0_0_6px_rgba(34,211,238,0.45)]")
+                        : "text-cyan-200/60 hover:bg-cyan-400/15 hover:text-cyan-100",
+                    ].join(" ")}
+                  >
+                    {o.label}
+                  </button>
+                );
+              })}
+            </span>
+            <span className="text-[10px] text-text-muted/40 leading-none whitespace-nowrap select-none">髪/衣装/前景/ポーズ/カメラ</span>
+            {windLevel > 0 && !windApplicable && (
+              <span className="text-[11px] text-amber-300/75 leading-none whitespace-nowrap">
+                ⚠ 未反映（対象スコープOFF）
+              </span>
+            )}
+          </div>
+          {/* 露出（3段）：衣装スコープ連動・OFF時「衣装ON」チップ */}
+          <OutfitLevelRow
+            icon="👗"
+            label="露出"
+            value={outfitExposure}
+            steps={OUTFIT_EXPOSURE_STEPS}
+            currentLabel={labelOf(OUTFIT_EXPOSURES, outfitExposure)}
+            disabled={!outfitScopeOn}
+            disabledHint="衣装ON"
+            onPick={(id) => onOutfitField("exposure", id)}
+          />
+          {/* 派手さ（4段）*/}
+          <OutfitLevelRow
+            icon="✨"
+            label="派手さ"
+            value={outfitDecoration}
+            steps={OUTFIT_FLASHY_STEPS}
+            currentLabel={labelOf(OUTFIT_DECORATIONS, outfitDecoration)}
+            disabled={!outfitScopeOn}
+            disabledHint="衣装ON"
+            onPick={(id) => onOutfitField("decoration", id)}
+          />
         </div>
-      </div>
       </div>
 
-      {/* ── 衣装補助（ZOZO＋露出＋派手さ）＝sky カード（SkyveilBar 意匠で統一）── */}
+      {/* ── 衣装補助＝sky カード（見出しは ZOZO に一本化・露出/派手さは全体補助カードへ移設）── */}
       <div className="rounded-2xl border border-sky-400/50 bg-sky-500/8 px-3 py-2">
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[13px] font-bold text-sky-200/90 leading-none select-none">👗 衣装補助</span>
-          {!outfitScopeOn && (
-            <span className="text-[10px] text-amber-300/70 leading-none">衣装ONで使えます</span>
-          )}
-        </div>
-        {/* 自動トレンド（ZOZO）── 既存のまま embedded（外枠は当 sky カードが担う） */}
+        {/* 自動トレンド（ZOZO）── embedded（外枠は当 sky カードが担う・ZOZO 自前で見出し＋衣装OFF表示を持つ）*/}
         <ZozoTrendBar
           embedded
           outfitScopeOn={outfitScopeOn}
@@ -190,31 +217,6 @@ export function BoostControls({
           onSetPriority={onZozoSetPriority}
           onClear={onZozoClear}
         />
-        {/* ── 小区切り＋小ラベル：手動調整（自動トレンドと値系を分節）── */}
-        <div className="mt-1.5 pt-1.5 border-t border-sky-400/15">
-          <span className="block mb-1 text-[10px] font-semibold text-sky-200/55 leading-none select-none">手動調整（露出・派手さ）</span>
-          {/* 露出（3段）・派手さ（4段）スライダー：details.outfit を単一ソースに（DetailsCard グリッドとミラー）── 中身・サイズ・色 無改変 */}
-          <div className="space-y-1">
-            <OutfitLevelRow
-              icon="👗"
-              label="露出"
-              value={outfitExposure}
-              steps={OUTFIT_EXPOSURE_STEPS}
-              currentLabel={labelOf(OUTFIT_EXPOSURES, outfitExposure)}
-              disabled={!outfitScopeOn}
-              onPick={(id) => onOutfitField("exposure", id)}
-            />
-            <OutfitLevelRow
-              icon="✨"
-              label="派手さ"
-              value={outfitDecoration}
-              steps={OUTFIT_FLASHY_STEPS}
-              currentLabel={labelOf(OUTFIT_DECORATIONS, outfitDecoration)}
-              disabled={!outfitScopeOn}
-              onPick={(id) => onOutfitField("decoration", id)}
-            />
-          </div>
-        </div>
       </div>
     </div>
   );
