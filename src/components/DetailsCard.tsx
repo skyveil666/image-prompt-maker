@@ -1993,7 +1993,7 @@ export function DetailsCard({
                   {isScopeTab(t) && (
                     <p className="mb-2 flex items-center gap-1.5 rounded-md border border-rose-400/35 bg-rose-500/10 px-2 py-1 text-[11.5px] font-semibold text-rose-200 leading-snug">
                       <span className="text-[13px] leading-none">🚫</span>
-                      タグを<span className="underline decoration-rose-300 underline-offset-2">ダブルクリック</span>でNG設定（もう一度でNG解除）。シングルクリックは通常の選択です。
+                      タグを<span className="underline decoration-rose-300 underline-offset-2">ダブルクリック</span>でNG指定（もう一度で解除）。シングルクリックは通常の選択。※NG適用は準備中（現在は生成に未反映）。
                     </p>
                   )}
                   {renderTabContent(t)}

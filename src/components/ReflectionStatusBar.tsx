@@ -58,7 +58,7 @@ interface Props {
   avoidRealBackground: boolean;
   /** 背景2D化の解除（avoidRealBackground を false に）。 */
   onClearAvoidRealBg: () => void;
-  /** タグ個別NG（per-tag NG）の現在値。非空なら「本文から除外」バッジを出す（全案の【NG】に効く）。 */
+  /** タグ個別NG（per-tag NG）の現在値。非空なら「タグNG（候補除外・準備中）」バッジを出す（①でtagNgは【NG】非合流＝現在は生成に未反映・Step2で候補除外を実効化）。 */
   tagNg: string[];
   /** タグ個別NGの一括解除（setTagNg([])）。 */
   onClearTagNg: () => void;
@@ -152,9 +152,9 @@ export function ReflectionStatusBar(p: Props) {
           )}
           {p.tagNg.length > 0 && (
             <DominatorBadge
-              label="🚫 タグNG（本文から除外）"
+              label="🚫 タグNG（候補除外・準備中）"
               summary={tagNgLabels.join("・")}
-              summaryTitle={`NG設定モードで除外したタグを全案の本文から除外します：${tagNgLabels.join("、")}`}
+              summaryTitle={`NG指定したタグ（候補からの除外を準備中・現在は生成に未反映）：${tagNgLabels.join("、")}`}
               onClear={p.onClearTagNg}
               clearTitle="タグNGを全解除（値の選択は保持）"
             />

@@ -61,7 +61,7 @@ export function GridCell({ jaLabel, active, cellKind = "value", onClick, onDoubl
       onDoubleClick={onDoubleClick}
       // ダブルクリックのテキスト選択誤爆を防ぐ（2回目の mousedown を抑止）。select-none と併用。
       onMouseDown={onDoubleClick ? (e) => { if (e.detail > 1) e.preventDefault(); } : undefined}
-      title={isNg ? `NG中（本文から除外）：${jaLabel}` : (title ?? jaLabel)}
+      title={isNg ? `NG指定（候補除外を準備中・現在は未反映）：${jaLabel}` : (title ?? jaLabel)}
       className={[
         `relative inline-flex items-center justify-center rounded-md border ${isNg ? "pl-6 pr-2" : "px-2"} py-1 ${compact ? "min-h-[28px]" : "min-h-[34px]"} whitespace-nowrap text-center transition-all duration-150 select-none`,
         isNg ? ngStyle : active ? activeStyle : inactiveStyle,

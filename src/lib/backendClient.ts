@@ -1,6 +1,5 @@
 import type { GeneratedProposal, PromptInputs } from "../types";
 import { applyNgGate } from "./ngGate";
-import { tagNgToNgTerms } from "../data/tagNgOptions";
 
 export interface BackendResponse {
   proposals: GeneratedProposal[];
@@ -50,16 +49,13 @@ export async function generateViaBackend(
   recentGenres: string[] = [],
   recentSubStyles: string[] = [],
   rawNgList = "",
-  forbiddenTokens: string[] = [],
-  tagNg: string[] = []
+  forbiddenTokens: string[] = []
 ): Promise<BackendResponse> {
   // 🔒 NG出口一括適用：/api/generate への唯一の送信関数。どの経路（runGenerate /
   //    インラインアレンジ）を通っても、fetch 直前に NG を冪等復元する。送信はこの1回が唯一の真実。
-  // 🚫 タグ個別NG：tagNg("category.field:value") を en 語に解決し、ユーザーNG欄(rawNgList)と
-  //    合流して【NG】(ngForBlock) に載せる（applyNgGate の ngList 経路を再利用・値選択は不変）。
-  const tagTerms = tagNgToNgTerms(tagNg);
-  const effectiveNg = [rawNgList, ...tagTerms].filter(Boolean).join("\n");
-  const gated = applyNgGate(inputs, effectiveNg, forbiddenTokens);
+  // 🚫 ①tagNg分離：タグ個別NG(tagNg) はここで【NG】へ合流させない（＝内部候補除外専用へ分離）。
+  //    【NG】(ngList) はユーザーの手動NG欄(rawNgList)のみ＝既存どおり維持。
+  const gated = applyNgGate(inputs, rawNgList, forbiddenTokens);
   const res = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

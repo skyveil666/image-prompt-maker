@@ -76,7 +76,7 @@ interface Props {
   onClearWorld?:        () => void;
   /** 参照画像適用の解除（App の referenceNote をクリア）。 */
   onClearReference?:    () => void;
-  /** タグ個別NG（per-tag NG）の現在値。非空なら「本文から除外」バッジを出す（アレンジも全案に効く）。 */
+  /** タグ個別NG（per-tag NG）の現在値。非空なら「タグNG（候補除外・準備中）」バッジを出す（①でtagNgは【NG】非合流＝現在は生成に未反映・Step2で候補除外を実効化）。 */
   tagNg?:               string[];
   /** タグ個別NGの一括解除（App の setTagNg([])）。 */
   onClearTagNg?:        () => void;
@@ -691,9 +691,9 @@ export function ArrangePreviewPanel({
                 )}
                 {tagNg.length > 0 && (
                   <DominatorBadge
-                    label="🚫 タグNG（本文から除外）"
+                    label="🚫 タグNG（候補除外・準備中）"
                     summary={tagNgLabels.join("・")}
-                    summaryTitle={`NG設定モードで除外したタグをこのアレンジの全案からも除外します：${tagNgLabels.join("、")}`}
+                    summaryTitle={`NG指定したタグ（候補からの除外を準備中・現在は生成に未反映）：${tagNgLabels.join("、")}`}
                     onClear={onClearTagNg}
                     clearTitle="タグNGを全解除（値の選択は保持）"
                   />
