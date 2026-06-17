@@ -28,7 +28,6 @@ import {
   buildAntiTemplateInputs,
   buildArrangeInputs,
   buildCombinedWorldInputs,
-  buildImageViralInputs,
   WORLD_PRESET_DISPLAY,
 } from "./lib/quickActions";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
@@ -1689,24 +1688,6 @@ export default function App() {
   // 重複整理：SNS系はバズボタン（viralMode）・世界観はQuickActionsプリセットに一本化。
   // ※カルチャーの hint/bgPlace ワンショット注入（見えない支配）もこれで消滅。
 
-  /** ⚡ この画像でバズる：画像を元にSNSバズり最強設定を適用して即座に生成 */
-  const handleImageViral = useCallback(() => {
-    if (!imageDataUrl) return;
-    const next = buildImageViralInputs(buildInputs());
-    setScopes(next.scopes);
-    setMoods(next.moods);
-    setAutoMoodCategories(next.autoMoodCategories ?? []);
-    setViralMode(next.viralMode);
-    // バズるnoteは生成payload(pendingRunRef)にだけ載せる。生の追加指示stateへは書き戻さない
-    // （書き戻すと押すたびにnoteが蓄積＝S2/Dの回帰。ユーザーの追加指示はそのまま保持）。
-    setActiveWorldPresets([]);
-    setWorldCombinedNote("");
-    setActiveGodModes([]);
-    setScopeFlashKey((k) => k + 1);
-    // 設定適用後に即座に生成実行
-    pendingRunRef.current = next;
-    setPendingRunKey((k) => k + 1);
-  }, [imageDataUrl, buildInputs]);
 
   // ─── リセット系 ────────────────────────────────────────────────────────────────
 
@@ -2272,7 +2253,6 @@ export default function App() {
               onShowAnalysis={() => setAnalysisCenterOpen(true)}
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
-              onImageViral={imageDataUrl ? handleImageViral : undefined}
             />
 
             <div className="space-y-5 mt-5 lg:mt-0 min-w-0 pb-24">

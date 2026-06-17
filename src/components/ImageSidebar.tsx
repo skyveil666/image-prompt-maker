@@ -27,8 +27,6 @@ interface Props {
   onShowAnalysis: () => void;
   onToggleExplorer: () => void;
   explorerOpen: boolean;
-  /** 「この画像でバズる」一発生成ボタンのコールバック（画像あり時のみ表示） */
-  onImageViral?: () => void;
 }
 
 // Scope→ラベルは scopeLabels.ts に一本化（SCOPE_LABEL は別名 import）。
@@ -46,7 +44,6 @@ export function ImageSidebar({
   onShowAnalysis,
   onToggleExplorer,
   explorerOpen,
-  onImageViral,
 }: Props) {
   const [recents, setRecents] = useState<RecentImageItem[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
@@ -238,17 +235,6 @@ export function ImageSidebar({
       <section className="card">
         <h2 className="section-title">画像</h2>
         <ImageUploader value={imageDataUrl} onChange={handleUpload} />
-        {imageDataUrl && onImageViral && (
-          <button
-            type="button"
-            onClick={onImageViral}
-            disabled={generating}
-            className="w-full mt-2 rounded-xl px-3 py-3 text-[13px] font-bold border border-rose-500/55 bg-gradient-to-r from-rose-600/20 to-orange-500/15 text-rose-100 hover:from-rose-600/30 hover:to-orange-500/25 hover:border-rose-500/75 transition flex items-center justify-center gap-2 shadow-[0_0_14px_rgba(244,63,94,0.18)] disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <span className="text-base">⚡</span>
-            <span>この画像でバズる</span>
-          </button>
-        )}
       </section>
 
       {toast && (
