@@ -986,3 +986,52 @@ live.complete(message);
 - **検証(隔離4330/payload横取り)**: A1a=全経路で肯定誘導が乗る・冪等・空extra throwなし／B1=place/time skip強制(値上書き)・非変異・no-op／B2a=dblclick往復＋onChange誤爆なし／rollout=lighting.intensity 値上書きskip／**B2b 穴1 e2e=multiOverrides["background.place"]生成→場所dblclick NG→生成→place="skip"＋multiOverrides消失**。tsc -b 0・vite build 0。push済 `7db76a2`。
 - **A2(サーバ本文スクラブ・§4)＝条件付き保留(やり残しではない)**: B(フィールド強制skip)で元症状が実用上消えているなら **A2不要＝§4不触のまま理想形**。B を通しても**稀に本文にNG語が残るパターンが実機で出た場合のみ**、A2を承認ゲート分離で検討。＝「Bの効果次第で不要になる可能性が高い項目」。次に引き継ぐ人は『A2残=未完成』と誤読しないこと。
 - **不変**: §4サーバ(promptSystem/gemini/scopeFilter)・/api/generate payload構造・カメラ/Reference Picker履歴・NG↔Reference別系統・既存「設定なし/おまかせ」GridCell・通常NGロジック。
+
+### 2026-06-16: セクションNG を per-tag NG（タグ個別→ngList/en語）へ全面置換＋UI 2回作り直し — 粒度と操作性の取り違えを根治
+
+- **背景（前項Bの破棄）**: 上記 B（見出しダブルクリック＝フィールド丸ごと強制skip）はユーザーに却下。理由＝**粒度の取り違え**：欲しかったのは「背景スタイルの水彩画/水墨画/アクリル画を1個ずつNG」（**値レベル**）なのに、Bは「背景スタイル欄を丸ごとskip」（**フィールドレベル**）＝1値だけ除外できない。加えて見出しダブルクリックは**気付けない隠し操作**だった。
+- **置換後の機構（per-tag NG・§4不触）**:
+  - **B-new-1(`e8496cd`)＝送信合流＋旧撤去**: 新 persisted **`tagNg: string[]`("category.field:value" 形式)**。`src/data/tagNgOptions.ts`(新規・`FIELD_OPTIONS`＝全約100フィールドの presets options を単一ソース化)で **key→en語**に解決し、`generateViaBackend` で `rawNgList` に連結→`applyNgGate`→`ngForBlock`(【NG】)へ合流（既存 ngList 経路の再利用＝`applySectionNg` は不使用）。**details(値選択)は不変**。旧 `applySectionNg`関数・`sectionNg.ts`・DetailsCard の Context/ngKey props 100件・GridCell dblclick・§5旧バッジを**全撤去**。
+  - **B-new-2(`a592027`)＝UI（タグ直接ダブルクリック）**: プリセットタグを**ダブルクリックでNG／再ダブルクリックで解除**（NG設定モードボタンは廃止）。**シングルクリックは従来どおり値選択**（`onClick` を `e.detail<=1` 限定にしてダブルクリック2クリック目の誤発火を防止＋`select-none`/`mousedown e.detail>1 preventDefault` で選択誤爆抑止）。**NG化時は値選択を自動解除**（details/multiOverrides から外す＝「選択済みなのにNG」の矛盾防止。解除時は値を復活させない＝未選択へ）。NGタグ＝**赤背景＋取り消し線＋「NG」ラベルの3点**。各スコープカテゴリ先頭に**操作説明文を常時表示**（隠し操作にしない）。§5バッジ（ReflectionStatusBar/ArrangePreviewPanel の「🚫タグNG(本文から除外)」＋一括解除）は per-tag 版で残置。
+- **教訓（同じ失敗を繰り返さないため・最重要）**:
+  1. **粒度を最初に確定**：除外の単位が「フィールド」か「値」かを実装前に握る。「フィールド丸ごとskipでは1値だけ除外できない」＝値の除外は ngList/【NG】経路（en語）でやる。
+  2. **操作は画面に文字で明示**：ダブルクリック等の操作は**隠れていると失敗**する。常時表示の説明文＋見た目の状態（赤NG3点）をセットで。「自分だけ分かる」はNG。
+  3. UIは**作り直し2回**（モードボタン→ダブルクリック直接）で着地。実機確認をユーザーが行ってから commit する運用。
+- **特殊3つ（NG非対応・対象外）**: `cyber.intensity`(変化量)・`cosplay.exposure`(露出)・`aspectRatio`(比率)はインラインGridCellブロック（FieldSection不使用）かつ FIELD_OPTIONS外＝レベル/単一比率でNG無意味のため非対応（必要なら FIELD_OPTIONS＋fieldKey追加で対応可）。
+- **A2（サーバ本文スクラブ・§4）＝条件付き保留 継続**: per-tag NG は値を本文に明示しない（NG化で details 値選択を外す）ため本文矛盾が出にくい。実機で稀にNG語残存が出た時のみ A2 を承認ゲート分離で検討。『A2残=未完成』と誤読しないこと。
+- **検証(隔離4330/payload横取り)**: シングル=値選択（NG化せず混ざらない）／ダブル非選択タグ=NG（3点表示＋`tagNg`＋値skip解除）／再ダブル=解除（値復活なし）／**1個だけ除外**＝水彩画NG＋アクリル画選択→`ngList="watercolor painting"`＋`details.style="acrylic"`／説明文常時表示／tsc -b 0・vite build 0・console 0。push済 `a592027`（develop=origin/develop 同期）。
+
+### 2026-06-17: 「この画像でバズる」＋「1ヶ月生成カレンダー」全撤去／温室(植物)背景の再採用を根治（NG を「候補除外フィルタ」へ再設計：① tagNg分離 → ②(1) ngExclude → ②(2)§4 背景バリエーション指示の NG対応）
+
+**全5コミット push 済・develop=origin/develop 完全同期 `8329078`**（2026-06-17 `git push`＝`a592027..8329078`）。実装順＝① → ②(1) → 撤去A → 撤去B → ②(2)§4。
+
+#### 温室修正（NG＝「候補除外フィルタ」への再設計・通常生成の一般機能）
+- **設計核心**: NG は**ネガティブプロンプト（画像モデルへの否定指定）ではない**。**採用前に NG 候補を内部で除外するフィルタ**として働かせる。温室/植物が「消しても出てくる」真因＝`server/src/promptSystem.ts` の「背景バリエーション指示」ブロック（**背景 scope ON ＋ place/style＝auto/skip 時に発火**）が自然系(森)/幻想系/室内系を**積極採用**する→温室・観葉植物が再浮上。**この発火は viralMode 非依存＝通常生成で起きる**ため、下記①②はバズる撤去後も一般機能として残す。
+- **① tagNg を【NG】出力から分離（`d71f83a`）**: `backendClient` が `tagNg` を `payload.ngList`(【NG】本文)へ合流していたのを停止。`tagNg`＝**候補除外専用**、手動「NG指定欄」(`ngList`)は従来どおり【NG】出力を維持。§5バッジ文言を実態整合（「🚫 タグNG（本文から除外）」→「🚫 タグNG（候補から除外…）」）。
+- **②(1) client：tagNg→ngExclude（`9d1ee80`）**: `tagNgToBgExclude`(tagNgOptions.ts) で `tagNg`("background.place:greenhouse" 等) を `ngExclude:{place:string[];style:string[]}`(id 配列) に変換し `/api/generate` payload へ追加（`ngList` とは別フィールド）。
+- **②(2)§4 server：背景バリエーション指示を NG対応化（`8329078`・承認ゲート分離で実装）**: `types.ts GenerateRequest` に `ngExclude?` 追加・`index.ts` が forward（place/style 各 slice(0,40)・String 化）。`promptSystem.ts` に `BG_BAN_OVERRIDE`／`BG_VARIETY_TRIM`／`resolveBgExclude` を新設し `describeDetails` 経由で「背景バリエーション指示」を書き換え：(a)自然系/抽象系の**積極採用行から該当語を trim**、(b)末尾に**禁止節**「【絶対禁止（ユーザーNG指定・全案で一切使わない）】：…」＋**許可節**を追記（bgBan が空なら従来出力＝無変更）。
+- **除外語彙（誤爆防止＝最重要・命）**:
+  - **除外する**＝温室クラスタのみ：`greenhouse`(温室/ガラス植物ドーム/植物園/観葉植物の多い室内)／`forest`(森/幻想森層)／`garden`(庭園/空想庭園)／`nature`＝広い「自然」ではなく**プリセット名 "幻想自然空間" 1語のみ**ピンポイント。
+  - **残す**＝花畑・海・海岸・空・夕焼け・雲海・湖・水辺・草原・都市・夜景・**室内（植物なし）**・**ガラス空間（無機質）**。「植物/温室が主役でない背景は除外しない」許可節で明示。
+  - trim は**完全一致トークンのみ**（"森"/"水彩"等）＝兄弟（海/空/夕焼け）は残る。greenhouse 除外がガラス空間（無機質）を巻き込まない。**13/13 決定的テスト PASS**（temp test は使用後削除）。
+
+#### 撤去A：「1ヶ月生成カレンダー」全撤去（`18c2e08`）
+- 分析センターの **plan タブ**（投稿カレンダー）を全撤去。`src/components/MonthlyCalendarSection.tsx`／`src/lib/postingCalendar.ts` を**削除**。`DuplicateAnalysisPanel` の plan タブ/`onUseCalendarTheme`/`"plan"` 型、`App` の `onShowPostingCalendar`/`onUseCalendarTheme` 配線、`ImageSidebar` のカレンダー誘導ボタンを撤去。
+- **左メニューの「📅 カレンダー/履歴」（HistoryView の CalendarView）は別物＝残置**（履歴閲覧。投稿計画カレンダーとは無関係）。
+
+#### 撤去B：「この画像でバズる」一発生成 全撤去（`b300a8c`）
+- 専用4点を撤去：`ImageSidebar` の「この画像でバズる」ボタン＋`onImageViral` prop／`App` の `handleImageViral`／`quickActions` の `buildImageViralInputs`・`keepSetElseAuto` import／`viralNote.ts` の `VIRAL_IMAGE_NOTE` 定数。
+- **viralMode 基盤は残置**（バズる撤去で巻き込まない）：履歴バッジ `HistoryItemRow`・分析 `aiAgent`/`favoriteProfile`(viralRatio)・サマリ `GenerationSummary`・サーバ `viralBlock`・`types` の viralMode が共有。**今後 chaosEngine／履歴復元から viralMode は発火しうる**。`viralNote.ts` の `stripViralImageNote`＋マーカーは既存データ後始末用に残置（`settingsPersist` が起動時に呼ぶ）。
+
+#### per-tag NG の真因（続14 から継続・再掲）
+1. **粒度の取り違え**：フィールド丸ごと skip では「1値だけ除外」ができない＝除外は値レベル（ngList/【NG】の en語経路）でやる。
+2. **隠し操作は失敗する**：ダブルクリック等は画面に文字で明示しないと気付かれない（常時表示の説明文＋赤NG3点をセットで）。
+
+#### 既知の残課題（別タスク・今回対象外・条件付き保留）
+- バズる撤去で**当面は顕在化しない**が、通常生成でも (あ)温室除外後の**図書館等への偏り**（採用候補が痩せて別の特定背景へ集中）、(い)**Gemini 提案文への植物/温室の部分復活**（バリエーション指示を抑えても本文生成で滲む）が起こりうる。
+- 必要なら **③＝最終 proposal 検出**（生成結果に NG 語が残っていたら警告／再抽選）で対処。**条件付き保留として記録（『未完成』ではない）**。
+- **A2（サーバ本文スクラブ・§4）＝条件付き保留 継続**（続13/14 から）：per-tag NG は値を本文明示しないため本文矛盾が出にくい。実機で稀に NG語残存が出た時のみ承認ゲート分離で検討。
+
+#### 検証・不変
+- **検証**: front `tsc -b` 0／server `tsc` 0／`vite build` 0／§4 は決定的テスト 13/13 PASS。
+- **不変**: §4 の他要素・`/api/generate` payload 既存構造・viralMode 消費先・履歴カレンダー（HistoryView）・通常NGロジック・per-tag NG（続14）は無変更。
