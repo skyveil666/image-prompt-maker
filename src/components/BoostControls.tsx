@@ -122,13 +122,14 @@ export function BoostControls({
   outfitExposure, outfitDecoration, onOutfitField,
 }: Props) {
   return (
-    <div className="space-y-1">
-      {/* ── 全体補助（風のなびき。お気に入り傾向は「あなたの好み（skyveil）」に集約）── */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-[10px] font-bold text-text-muted/60 leading-none select-none">全体補助</span>
-        <span className="text-[10px] text-text-muted/40 leading-none">風のなびき（髪・衣装・前景・ポーズ・カメラに反映）</span>
-      </div>
-      {/* ── 風の強さ（0〜5）── */}
+    <div className="space-y-2">
+      {/* ── 全体補助（風のなびき）＝cyan カード（SkyveilBar 意匠：rounded-2xl＋枠/50＋tint/8）── */}
+      <div className="rounded-2xl border border-cyan-400/50 bg-cyan-500/8 px-3 py-2">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[13px] font-bold text-cyan-200/90 leading-none select-none">全体補助</span>
+          <span className="text-[10px] text-text-muted/45 leading-none">風のなびき（髪・衣装・前景・ポーズ・カメラに反映）</span>
+        </div>
+        {/* ── 風の強さ（0〜5）── 既存のまま（中身・サイズ・色 無改変）── */}
       <div className="flex items-center gap-x-2.5 gap-y-0.5 flex-wrap">
         <div className="flex items-center gap-1.5 shrink-0">
           <span className={[
@@ -169,15 +170,17 @@ export function BoostControls({
           )}
         </div>
       </div>
+      </div>
 
-      {/* ── 衣装補助（衣装ON時のみ有効）── */}
-      <div className="border-t border-bg-border/30 pt-1">
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <span className="text-[10px] font-bold text-text-muted/60 leading-none select-none">衣装補助</span>
+      {/* ── 衣装補助（ZOZO＋露出＋派手さ）＝sky カード（SkyveilBar 意匠で統一）── */}
+      <div className="rounded-2xl border border-sky-400/50 bg-sky-500/8 px-3 py-2">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <span className="text-[13px] font-bold text-sky-200/90 leading-none select-none">👗 衣装補助</span>
           {!outfitScopeOn && (
             <span className="text-[10px] text-amber-300/70 leading-none">衣装ONで使えます</span>
           )}
         </div>
+        {/* 自動トレンド（ZOZO）── 既存のまま embedded（外枠は当 sky カードが担う） */}
         <ZozoTrendBar
           embedded
           outfitScopeOn={outfitScopeOn}
@@ -187,26 +190,30 @@ export function BoostControls({
           onSetPriority={onZozoSetPriority}
           onClear={onZozoClear}
         />
-        {/* 露出（3段）・派手さ（4段）スライダー：details.outfit を単一ソースに（DetailsCard グリッドとミラー） */}
-        <div className="mt-1 space-y-1">
-          <OutfitLevelRow
-            icon="👗"
-            label="露出"
-            value={outfitExposure}
-            steps={OUTFIT_EXPOSURE_STEPS}
-            currentLabel={labelOf(OUTFIT_EXPOSURES, outfitExposure)}
-            disabled={!outfitScopeOn}
-            onPick={(id) => onOutfitField("exposure", id)}
-          />
-          <OutfitLevelRow
-            icon="✨"
-            label="派手さ"
-            value={outfitDecoration}
-            steps={OUTFIT_FLASHY_STEPS}
-            currentLabel={labelOf(OUTFIT_DECORATIONS, outfitDecoration)}
-            disabled={!outfitScopeOn}
-            onPick={(id) => onOutfitField("decoration", id)}
-          />
+        {/* ── 小区切り＋小ラベル：手動調整（自動トレンドと値系を分節）── */}
+        <div className="mt-1.5 pt-1.5 border-t border-sky-400/15">
+          <span className="block mb-1 text-[10px] font-semibold text-sky-200/55 leading-none select-none">手動調整（露出・派手さ）</span>
+          {/* 露出（3段）・派手さ（4段）スライダー：details.outfit を単一ソースに（DetailsCard グリッドとミラー）── 中身・サイズ・色 無改変 */}
+          <div className="space-y-1">
+            <OutfitLevelRow
+              icon="👗"
+              label="露出"
+              value={outfitExposure}
+              steps={OUTFIT_EXPOSURE_STEPS}
+              currentLabel={labelOf(OUTFIT_EXPOSURES, outfitExposure)}
+              disabled={!outfitScopeOn}
+              onPick={(id) => onOutfitField("exposure", id)}
+            />
+            <OutfitLevelRow
+              icon="✨"
+              label="派手さ"
+              value={outfitDecoration}
+              steps={OUTFIT_FLASHY_STEPS}
+              currentLabel={labelOf(OUTFIT_DECORATIONS, outfitDecoration)}
+              disabled={!outfitScopeOn}
+              onPick={(id) => onOutfitField("decoration", id)}
+            />
+          </div>
         </div>
       </div>
     </div>
