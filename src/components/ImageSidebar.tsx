@@ -25,8 +25,6 @@ interface Props {
   /** 🖼 Reference Picker履歴（保存した参照画像＋抽出プロンプトの再利用／生成と比較）を開く */
   onShowReferenceHistory: () => void;
   onShowAnalysis: () => void;
-  /** 📅 1ヶ月生成カレンダー（分析センターの plan タブ）を開く＝右上から移設 */
-  onShowPostingCalendar: () => void;
   onToggleExplorer: () => void;
   explorerOpen: boolean;
   /** 「この画像でバズる」一発生成ボタンのコールバック（画像あり時のみ表示） */
@@ -46,7 +44,6 @@ export function ImageSidebar({
   onShowFavorites,
   onShowReferenceHistory,
   onShowAnalysis,
-  onShowPostingCalendar,
   onToggleExplorer,
   explorerOpen,
   onImageViral,
@@ -235,16 +232,6 @@ export function ImageSidebar({
         >
           <span>📊</span>
           <span>分析センター</span>
-        </button>
-        {/* 📅 1ヶ月生成カレンダー（分析センターの plan タブを開く誘導・右上から移設） */}
-        <button
-          type="button"
-          onClick={onShowPostingCalendar}
-          className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold border border-accent/40 bg-accent/8 text-accent/90 hover:bg-accent/15 hover:border-accent/60 transition flex items-center justify-center gap-2"
-          title="分析センター内の「1ヶ月生成カレンダー」タブを開きます"
-        >
-          <span>📅</span>
-          <span>1ヶ月生成カレンダー</span>
         </button>
       </div>
 

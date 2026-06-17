@@ -423,8 +423,8 @@ export default function App() {
   const [arrangeSource, setArrangeSource] = useState<PromptHistoryItem | null>(null);
   /** 「同じ構成で再生成」復元後の確認バナー用 */
   const [restoredItem, setRestoredItem] = useState<PromptHistoryItem | null>(null);
-  /** 📅 分析センターを開く時の初期タブ（誘導導線用：右上「1ヶ月生成カレンダー」→ plan ／ 左メニュー → dup） */
-  const [analysisInitialTab, setAnalysisInitialTab] = useState<"dup" | "plan">("dup");
+  /** 分析センターを開く時の初期タブ（現状 dup のみ）。 */
+  const [analysisInitialTab, setAnalysisInitialTab] = useState<"dup">("dup");
   /** 🤖 AI分析ライブビュー */
   const analysisLive = useAnalysisLive();
   /** runGenerate 内で items の最新値を読むためのリファレンス */
@@ -2186,7 +2186,7 @@ export default function App() {
                   type="button"
                   onClick={() => { setAnalysisInitialTab("dup"); setAnalysisCenterOpen(true); }}
                   className="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition leading-none whitespace-nowrap"
-                  title="分析センターを開く（重複分析・AIっぽさ・色・画像・評価集計・発見・1ヶ月生成カレンダー）"
+                  title="分析センターを開く（重複分析・AIっぽさ・色・画像・評価集計・発見）"
                 >
                   🔎 分析センターで見る
                 </button>
@@ -2270,15 +2270,12 @@ export default function App() {
               }}
               onShowReferenceHistory={() => setCompareOpen(true)}
               onShowAnalysis={() => setAnalysisCenterOpen(true)}
-              onShowPostingCalendar={() => { setAnalysisInitialTab("plan"); setAnalysisCenterOpen(true); }}
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
               onImageViral={imageDataUrl ? handleImageViral : undefined}
             />
 
             <div className="space-y-5 mt-5 lg:mt-0 min-w-0 pb-24">
-
-              {/* 📅 1ヶ月生成カレンダー入口は左メニュー（ImageSidebar・分析センター直後）へ移設。 */}
 
               {/* 🔁 復元確認バナー：「同じ構成で再生成」後に表示 */}
               {restoredItem && (
@@ -2346,13 +2343,6 @@ export default function App() {
                   asModal
                   onCenterClose={() => setAnalysisCenterOpen(false)}
                   initialTab={analysisInitialTab}
-                  onUseCalendarTheme={(hint) => {
-                    // 📅 1ヶ月生成カレンダー：テーマヒントを追加指示に追記するだけ（scope・固定・顔は触らない）
-                    setExtraInstructions((prev) => prev ? `${prev}\n${hint}` : hint);
-                    setAnalysisCenterOpen(false);
-                    setView("main");
-                    showPresetToast("📅 生成テーマを反映しました", "追加指示にヒントを追記。スコープ・固定設定は変更していません。");
-                  }}
                   biasResult={massProductionResult}
                   onRunBiasCheck={handleMassProductionCheck}
                   historyAnalysis={historyAnalysis}
