@@ -999,13 +999,13 @@ export function buildStreetInputs(current: PromptInputs, memory: VariationMemory
     ? [
         "ストリートファッション：ダーク・アーバングランジ方向。",
         "▷ サイバーパンク電脳街・青紫ネオン路地には固定しない。アーバングランジ・ゴシックストリート・重厚なモードストリート等の方向で差別化。",
-        "▷ 背景は路地・廃工場・雨の駅等。ネオン街一択にせず雰囲気を変える。",
+        "▷ 背景はネオン街一択にせず、アーバングランジ・重厚な空気感で雰囲気を変える。",
       ].join("\n")
     : [
         "ストリートファッション：ファッション誌・モデルスナップ・アーバンカジュアルが基本。",
         "▷ サイバーパンク・黒基調・ネオン電脳街は使わない。",
         "▷ 衣装は明るめの色・カラフルな差し色・ポップなデザインを優先。",
-        "▷ 背景は都市の自然光・屋上・ギャラリー・スタジオ・屋内等を使う。",
+        "▷ 背景は都市の自然光・クリーンな空間など明るい雰囲気を使う。",
         "▷ 雰囲気はクール・スタイリッシュ・SNS映え・ファッション誌的に。",
       ].join("\n");
 
@@ -1786,13 +1786,13 @@ interface WaFuuDirection {
 
 const WAFUU_DIRECTIONS: WaFuuDirection[] = [
   {
-    label:          "京都神社",
+    label:          "雅な和",
     moods:          ["japanese", "mystic", "cinematic"] as Mood[],
     outfitStyle:    "wa_modern",
     outfitColor:    "inherit",
     outfitMaterial: "chiffon",
     bgPlace:        "japanese_room",
-    extraHint:      "鳥居・石畳・燈籠・朱塗りの欄干など神社建築を背景に、凛とした空気感",
+    extraHint:      "朱色を効かせた和の意匠・凛とした厳かな空気感",
   },
   {
     label:          "桜夜桜",
@@ -1801,25 +1801,25 @@ const WAFUU_DIRECTIONS: WaFuuDirection[] = [
     outfitColor:    "pink",
     outfitMaterial: "organza",
     bgPlace:        "garden",
-    extraHint:      "夜桜・ぼんぼりの光・舞い散る花びら・幻想的な夜空・柔らかい桃色の光",
+    extraHint:      "舞い散る花びら・幻想的な夜空・柔らかい桃色の光・夜桜のしっとりした空気感",
   },
   {
-    label:          "竹林霧",
+    label:          "幽玄の霧",
     moods:          ["japanese", "mystic", "art"] as Mood[],
     outfitStyle:    "wa_modern",
     outfitColor:    "inherit",
     outfitMaterial: "chiffon",
     bgPlace:        "forest",
-    extraHint:      "青竹の林・白い霧・薄い朝日・静謐で幻想的な空気感・水墨画的な奥行き",
+    extraHint:      "白い霧・薄い朝日・静謐で幻想的な空気感・水墨画的な奥行き",
   },
   {
-    label:          "和モダン都市",
+    label:          "和モダン",
     moods:          ["japanese", "cool", "contemporary"] as Mood[],
     outfitStyle:    "wa_modern",
     outfitColor:    "black",
     outfitMaterial: "cloth",
     bgPlace:        "indoor",
-    extraHint:      "現代建築×和のテクスチャ・格子・障子パターン・モダンジャパン・都会的な洗練さ",
+    extraHint:      "和のテクスチャ・モダンジャパンの質感・都会的な洗練さ",
   },
   {
     label:          "和ゴシック",
@@ -1828,7 +1828,7 @@ const WAFUU_DIRECTIONS: WaFuuDirection[] = [
     outfitColor:    "black",
     outfitMaterial: "velvet",
     bgPlace:        "library",
-    extraHint:      "和風建築×ゴシック融合・暗い書院造・古い和書・燭台・闇と美の融合",
+    extraHint:      "和×ゴシックの融合・薄暗い陰影・闇と美の調和",
   },
   {
     label:          "秋紅葉",
@@ -1846,7 +1846,7 @@ const WAFUU_DIRECTIONS: WaFuuDirection[] = [
     outfitColor:    "inherit",
     outfitMaterial: "organza",
     bgPlace:        "abstract",
-    extraHint:      "幻想的な和の世界・月明かり・浮遊する灯籠・神隠し的な空気感・夢と現の境界",
+    extraHint:      "幻想的な和の世界・月明かり・神隠し的な空気感・夢と現の境界",
   },
 ];
 
@@ -1921,40 +1921,40 @@ interface GothicDirection {
 
 const GOTHIC_DIRECTIONS: GothicDirection[] = [
   {
-    label:          "ゴシック図書館",
+    label:          "重厚ゴシック",
     moods:          ["gothic", "dark", "art"] as Mood[],
     outfitStyle:    "gothic",
     outfitColor:    "black",
     outfitMaterial: "velvet",
     bgPlace:        "library",
-    extraHint:      "天井まで届く古い本棚・燭台の光・石造りのアーチ・深い影・知識と闇の殿堂",
+    extraHint:      "重厚な陰影・燭光のような揺れる光・深い影・知識と闇の荘厳さ",
   },
   {
-    label:          "廃墟ゴシック",
+    label:          "退廃ゴシック",
     moods:          ["gothic", "cinematic", "dark"] as Mood[],
     outfitStyle:    "gothic",
     outfitColor:    "black",
     outfitMaterial: "lace",
     bgPlace:        "industrial",
-    extraHint:      "廃墟・崩れた石壁・割れたステンドグラス・薄暗い光・朽ちた美の空間",
+    extraHint:      "朽ちた美・薄暗い光・陰影の強い退廃的な空気感",
   },
   {
-    label:          "ゴシック美術館",
+    label:          "古典ゴシック",
     moods:          ["gothic", "art", "decadent"] as Mood[],
     outfitStyle:    "gothic",
     outfitColor:    "purple",
     outfitMaterial: "velvet",
     bgPlace:        "museum",
-    extraHint:      "古典絵画・重厚な額縁・暗い石床・美術館の静寂・退廃的な美の鑑賞",
+    extraHint:      "古典絵画のような重厚さ・静寂・退廃的な美の余韻",
   },
   {
-    label:          "夜の遊園地ゴシック",
+    label:          "夜想ゴシック",
     moods:          ["gothic", "dark", "vivid"] as Mood[],
     outfitStyle:    "gothic",
     outfitColor:    "black",
     outfitMaterial: "pvc",
     bgPlace:        "night_amusement",
-    extraHint:      "廃遊園地・錆びた観覧車・ネオン残光・夜空・朽ちた遊具と現代の対比",
+    extraHint:      "夜の闇・残光のような淡い光・朽ちた美と現代の対比",
   },
   {
     label:          "ゴシックモード",
@@ -1963,7 +1963,7 @@ const GOTHIC_DIRECTIONS: GothicDirection[] = [
     outfitColor:    "black",
     outfitMaterial: "leather",
     bgPlace:        "gallery",
-    extraHint:      "ハイファッション×ゴシック・モード的解釈・建築的ゴシックシルエット・現代美術館の空間",
+    extraHint:      "ハイファッション×ゴシック・モード的解釈・洗練されたダークシルエット",
   },
 ];
 
@@ -2068,7 +2068,7 @@ const AD_VISUAL_DIRECTIONS: AdVisualDirection[] = [
     outfitColor:    "white",
     outfitMaterial: "chiffon",
     bgPlace:        "frosted_room",
-    extraHint:      "高級美容ブランド・純白空間・ガラスの質感・柔らかい光・ミニマルで清潔な世界観",
+    extraHint:      "高級美容ブランド・ガラスの質感・柔らかい光・ミニマルで清潔な世界観",
   },
   {
     label:          "コンセプトショット",
@@ -2080,13 +2080,13 @@ const AD_VISUAL_DIRECTIONS: AdVisualDirection[] = [
     extraHint:      "コンセプチュアルな広告ショット・アートと商業の融合・強いビジュアルインパクト・記憶に残る一枚",
   },
   {
-    label:          "都市ファッション広告",
+    label:          "スタイリッシュ広告",
     moods:          ["contemporary", "cool", "ad_visual"] as Mood[],
     outfitStyle:    "street",
     outfitColor:    "inherit",
     outfitMaterial: "cloth",
     bgPlace:        "rooftop",
-    extraHint:      "都市景観×ファッション・屋上・ビルの間・スタイリッシュな自然光構図",
+    extraHint:      "都会的なファッション・スタイリッシュな自然光構図・洗練された空気感",
   },
 ];
 
@@ -2161,12 +2161,12 @@ interface FantasyDirection {
 
 const FANTASY_DIRECTIONS: FantasyDirection[] = [
   {
-    label:       "光の森",
+    label:       "光の幻想",
     moods:       ["fantasy_world", "translucent", "art"] as Mood[],
     outfitStyle: "wa_modern",
     outfitColor: "inherit",
     bgPlace:     "forest",
-    extraHint:   "光が差し込む神秘的な森・浮遊する光の粒・苔・薄霧・精霊が宿るような静寂",
+    extraHint:   "光が差し込む神秘的な空間・浮遊する光の粒・薄霧・精霊が宿るような静寂",
   },
   {
     label:       "月夜幻想",
@@ -2182,15 +2182,15 @@ const FANTASY_DIRECTIONS: FantasyDirection[] = [
     outfitStyle: "runway",
     outfitColor: "gradient",
     bgPlace:     "garden",
-    extraHint:   "花びらの嵐・色とりどりの花が舞う・光と色彩の洪水・幻想的な庭園空間",
+    extraHint:   "花びらの嵐・色とりどりの花が舞う・光と色彩の洪水・幻想的な空気感",
   },
   {
-    label:       "幻想図書館",
+    label:       "魔導の幻想",
     moods:       ["mystic", "fantasy_world", "dark"] as Mood[],
     outfitStyle: "gothic",
     outfitColor: "purple",
     bgPlace:     "library",
-    extraHint:   "魔法の図書館・本が浮遊する・魔法の光・古い知識の空間・神秘的な照明演出",
+    extraHint:   "本が浮遊する魔法の空間・魔法の光・古い知識の気配・神秘的な照明演出",
   },
   {
     label:       "夢空間",
@@ -2289,13 +2289,13 @@ interface RetroDirection {
 
 const RETRO_DIRECTIONS: RetroDirection[] = [
   {
-    label:          "昭和映画館",
+    label:          "昭和フィルム",
     moods:          ["retro", "cinematic", "emo"] as Mood[],
     outfitStyle:    "mode",
     outfitColor:    "inherit",
     outfitMaterial: "cloth",
     bgPlace:        "old_cinema",
-    extraHint:      "昭和の映画館・フィルムグレイン・赤いシート・暖かいノスタルジア・昭和スターの雰囲気",
+    extraHint:      "昭和のフィルムグレイン・暖かいノスタルジア・昭和スターの雰囲気",
   },
   {
     label:          "フィルムカメラ風",
@@ -2304,7 +2304,7 @@ const RETRO_DIRECTIONS: RetroDirection[] = [
     outfitColor:    "inherit",
     outfitMaterial: "cloth",
     bgPlace:        "alley",
-    extraHint:      "フィルムカメラの粒子感・色褪せ・光漏れ・スナップ写真的な自然な構図・路地の空気感",
+    extraHint:      "フィルムカメラの粒子感・色褪せ・光漏れ・スナップ写真的な自然な構図",
   },
   {
     label:          "80年代ポップ",
@@ -2316,13 +2316,13 @@ const RETRO_DIRECTIONS: RetroDirection[] = [
     extraHint:      "1980年代ポップカルチャー・ネオンカラー・大胆なパターン・活気あるエネルギー・MTV感",
   },
   {
-    label:          "レトロカフェ",
+    label:          "ヴィンテージレトロ",
     moods:          ["retro", "emo", "art"] as Mood[],
     outfitStyle:    "mode",
     outfitColor:    "inherit",
     outfitMaterial: "cloth",
     bgPlace:        "indoor",
-    extraHint:      "ヴィンテージカフェ・大理石テーブル・暖かい光・時代の記憶・静かなノスタルジア",
+    extraHint:      "ヴィンテージな雰囲気・暖かい光・時代の記憶・静かなノスタルジア",
   },
   {
     label:          "夜のドライブ",
@@ -2331,7 +2331,7 @@ const RETRO_DIRECTIONS: RetroDirection[] = [
     outfitColor:    "black",
     outfitMaterial: "leather",
     bgPlace:        "rooftop",
-    extraHint:      "レトロな夜の都市・ネオンサイン・昭和の街灯・フィルムノワール・深夜の空気感",
+    extraHint:      "レトロな夜の光・ネオンサインの色・フィルムノワール・深夜の空気感",
   },
 ];
 
@@ -2660,7 +2660,7 @@ const JIRAI_DIRECTIONS: JiraiDirection[] = [
     outfitMaterial: "denim",
     hairStyle:      "street",
     bgPlace:        "alley",
-    extraHint:      "都市ストリートの文脈で地雷系を表現。アーバン×病みかわいい。レイヤードグランジ。",
+    extraHint:      "アーバンな空気の中で地雷系を表現。アーバン×病みかわいい。レイヤードグランジ。",
   },
   {
     label:          "広告地雷",
@@ -2777,52 +2777,52 @@ interface SeikimatsuDirection {
 
 const SEIKIMATSU_DIRECTIONS: SeikimatsuDirection[] = [
   {
-    label:       "砂埃の荒廃都市",
+    label:       "砂塵の終末",
     moods:       ["dark", "cinematic", "decadent"] as Mood[],
     outfitStyle: "street",
     bgPlace:     "industrial",
     lightTemp:   "warm",
-    extraHint:   "砂埃の舞う荒廃した都市。遠景に崩れたビル群。錆と砂と風の空気感。ロードムービー的光。",
+    extraHint:   "砂埃の舞う終末的な空気感。錆と砂と風の質感。ロードムービー的な光。",
   },
   {
-    label:       "廃工場・工業廃墟",
+    label:       "錆びた終末",
     moods:       ["dark", "monochrome", "emo"] as Mood[],
     outfitStyle: "mode",
     bgPlace:     "industrial",
     lightTemp:   "cool",
-    extraHint:   "打ち捨てられた巨大工場。錆びた鉄骨・割れた窓・廃墟の光。重厚な空間の孤独感。",
+    extraHint:   "錆びた金属の重厚な質感・冷たい光・孤独な静けさ。",
   },
   {
-    label:       "錆びた看板の廃市街",
+    label:       "風化の終末",
     moods:       ["dark", "cinematic", "noisy"] as Mood[],
     outfitStyle: "street",
     bgPlace:     "alley",
     lightTemp:   "warm",
-    extraHint:   "古い看板が倒れかけた廃市街。色あせた文字・剥がれたポスター・風化した建物の質感。",
+    extraHint:   "色あせた文字の質感・剥がれた質感・風化したざらつき・荒廃した空気感。",
   },
   {
-    label:       "改造服×荒野の地平線",
+    label:       "改造服の終末",
     moods:       ["dark", "contemporary", "cinematic"] as Mood[],
     outfitStyle: "techwear",
     bgPlace:     "nature",
     lightTemp:   "sunset",
-    extraHint:   "荒野の地平線。布と金属パーツを組み合わせた改造服。風に揺れる砂と空の広さ。終末感。",
+    extraHint:   "布と金属パーツを組み合わせた改造服。風に揺れる砂・空の広さ。終末感。",
   },
   {
-    label:       "廃墟×巨大構造物",
+    label:       "崩落の終末",
     moods:       ["dark", "art", "decadent"] as Mood[],
     outfitStyle: "mode",
     bgPlace:     "museum",
     lightTemp:   "cool",
-    extraHint:   "巨大な崩れかけた構造物。コンクリートと錆の空間。朽ちた美・廃墟の孤独な荘厳さ。",
+    extraHint:   "錆と崩落の質感・朽ちた美・孤独な荘厳さ。",
   },
   {
-    label:       "終末後の静寂な廃都市",
+    label:       "静寂の終末",
     moods:       ["dark", "monochrome", "art"] as Mood[],
     outfitStyle: "military",
     bgPlace:     "rooftop",
     lightTemp:   "blue_tone",
-    extraHint:   "誰もいない廃都市の屋上。静寂と朽ちた建物。終末後の静けさとかすかな光。",
+    extraHint:   "終末後の静寂・朽ちた質感・かすかな光・誰もいない静けさ。",
   },
 ];
 
