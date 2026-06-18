@@ -12,7 +12,7 @@
  */
 
 import { useState } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
 import type { WorldPreset } from "../lib/quickActions";
 
 export type { WorldPreset };
@@ -27,8 +27,8 @@ interface QuickActionsProps {
   disabled?:          boolean;
   activeWorldPresets?: WorldPreset[];
   onUndo:             () => void;
-  // 世界観 トグル（マルチセレクト）
-  onWorldPresetToggle: (preset: WorldPreset) => void;
+  // 世界観 トグル（通常クリック=単一選択・Shift+クリック=コンボ累積）
+  onWorldPresetToggle: (preset: WorldPreset, additive?: boolean) => void;
   /** 量産回避（avoidCliche・サーバ側 cliche 回避ブロック。既定ON） */
   avoidCliche?:        boolean;
   onAvoidClicheChange?: (v: boolean) => void;
@@ -54,7 +54,7 @@ function TagBtn({
 }: {
   label:     string;
   title?:    string;
-  onClick:   () => void;
+  onClick:   (e: ReactMouseEvent) => void;
   disabled?: boolean;
   active?:   boolean;
   variant?:  BtnVariant;
@@ -190,17 +190,17 @@ export function QuickActions({
       {/* ══════ 世界観 / ジャンル ══════ */}
       <CategoryRow label="世界観">
         <span className="w-full text-[10px] text-text-desc leading-snug mb-0.5">最初の方向性（既成ジャンル）を選ぶ</span>
-        <TagBtn label="👗 Y2K"       title="2000年代ファッション：ポップ・メタリック・ラインストーン（最大3選択）"                                    onClick={() => onWorldPresetToggle("y2k")}        active={activeWorldPresets.includes("y2k")}        variant="pink"       disabled={disabled} />
-        <TagBtn label="🚀 Y3K"       title="近未来ハイファッション：透明素材・シルバー・sci-fi感（最大3選択）"                                         onClick={() => onWorldPresetToggle("y3k")}        active={activeWorldPresets.includes("y3k")}        variant="indigo"     disabled={disabled} />
-        <TagBtn label="🏙️ ストリート" title="都会・アーバン・ファッション誌風（最大3選択）"                                                              onClick={() => onWorldPresetToggle("street")}     active={activeWorldPresets.includes("street")}     variant="stone"      disabled={disabled} />
-        <TagBtn label="🎬 映画"      title="映画ポスター風。SF・ノワール・アート映画などジャンルを毎回変化させる（最大3選択）"                           onClick={() => onWorldPresetToggle("cinema")}     active={activeWorldPresets.includes("cinema")}     variant="violet"     disabled={disabled} />
-        <TagBtn label="🌸 和風"      title="和のテイストを軸にした多彩な世界観。京都・桜・竹林・和ゴシック等（最大3選択）"                              onClick={() => onWorldPresetToggle("wafuu")}      active={activeWorldPresets.includes("wafuu")}      variant="amber"      disabled={disabled} />
-        <TagBtn label="🖤 ゴシック"  title="ダーク・退廃美・建築的ゴシック。図書館・廃墟・美術館等（最大3選択）"                                        onClick={() => onWorldPresetToggle("gothic")}     active={activeWorldPresets.includes("gothic")}     variant="stone"      disabled={disabled} />
-        <TagBtn label="📢 広告"      title="ハイエンド広告・ファッション誌・ブランドビジュアル風（最大3選択）"                                           onClick={() => onWorldPresetToggle("ad")}         active={activeWorldPresets.includes("ad")}         variant="sky"        disabled={disabled} />
-        <TagBtn label="✨ 幻想"      title="神秘的・夢幻的な幻想世界観。光の森・月夜・花の嵐等（最大3選択・量産ファンタジードレス禁止）"                 onClick={() => onWorldPresetToggle("fantasy")}   active={activeWorldPresets.includes("fantasy")}   variant="teal"       disabled={disabled} />
-        <TagBtn label="📺 レトロ"    title="昭和・フィルム・80年代ポップ・ヴィンテージの世界観（最大3選択）"                                             onClick={() => onWorldPresetToggle("retro")}      active={activeWorldPresets.includes("retro")}      variant="gold"       disabled={disabled} />
-        <TagBtn label="🖤 地雷系"   title="かわいい×ダークの病みかわいい世界観。黒/白/ピンク/赤系・リボン・厚底（最大3選択）"                            onClick={() => onWorldPresetToggle("jirai")}      active={activeWorldPresets.includes("jirai")}      variant="jirai"      disabled={disabled} />
-        <TagBtn label="☠️ 世紀末系" title="荒廃都市・廃墟・錆・砂埃・終末ロードムービー感（最大3選択）"                                                  onClick={() => onWorldPresetToggle("seikimatsu")} active={activeWorldPresets.includes("seikimatsu")} variant="seikimatsu" disabled={disabled} />
+        <TagBtn label="👗 Y2K"       title="2000年代ファッション：ポップ・メタリック・ラインストーン（最大3選択）"                                    onClick={(e) => onWorldPresetToggle("y2k", e.shiftKey)}        active={activeWorldPresets.includes("y2k")}        variant="pink"       disabled={disabled} />
+        <TagBtn label="🚀 Y3K"       title="近未来ハイファッション：透明素材・シルバー・sci-fi感（最大3選択）"                                         onClick={(e) => onWorldPresetToggle("y3k", e.shiftKey)}        active={activeWorldPresets.includes("y3k")}        variant="indigo"     disabled={disabled} />
+        <TagBtn label="🏙️ ストリート" title="都会・アーバン・ファッション誌風（最大3選択）"                                                              onClick={(e) => onWorldPresetToggle("street", e.shiftKey)}     active={activeWorldPresets.includes("street")}     variant="stone"      disabled={disabled} />
+        <TagBtn label="🎬 映画"      title="映画ポスター風。SF・ノワール・アート映画などジャンルを毎回変化させる（最大3選択）"                           onClick={(e) => onWorldPresetToggle("cinema", e.shiftKey)}     active={activeWorldPresets.includes("cinema")}     variant="violet"     disabled={disabled} />
+        <TagBtn label="🌸 和風"      title="和のテイストを軸にした多彩な世界観。京都・桜・竹林・和ゴシック等（最大3選択）"                              onClick={(e) => onWorldPresetToggle("wafuu", e.shiftKey)}      active={activeWorldPresets.includes("wafuu")}      variant="amber"      disabled={disabled} />
+        <TagBtn label="🖤 ゴシック"  title="ダーク・退廃美・建築的ゴシック。図書館・廃墟・美術館等（最大3選択）"                                        onClick={(e) => onWorldPresetToggle("gothic", e.shiftKey)}     active={activeWorldPresets.includes("gothic")}     variant="stone"      disabled={disabled} />
+        <TagBtn label="📢 広告"      title="ハイエンド広告・ファッション誌・ブランドビジュアル風（最大3選択）"                                           onClick={(e) => onWorldPresetToggle("ad", e.shiftKey)}         active={activeWorldPresets.includes("ad")}         variant="sky"        disabled={disabled} />
+        <TagBtn label="✨ 幻想"      title="神秘的・夢幻的な幻想世界観。光の森・月夜・花の嵐等（最大3選択・量産ファンタジードレス禁止）"                 onClick={(e) => onWorldPresetToggle("fantasy", e.shiftKey)}   active={activeWorldPresets.includes("fantasy")}   variant="teal"       disabled={disabled} />
+        <TagBtn label="📺 レトロ"    title="昭和・フィルム・80年代ポップ・ヴィンテージの世界観（最大3選択）"                                             onClick={(e) => onWorldPresetToggle("retro", e.shiftKey)}      active={activeWorldPresets.includes("retro")}      variant="gold"       disabled={disabled} />
+        <TagBtn label="🖤 地雷系"   title="かわいい×ダークの病みかわいい世界観。黒/白/ピンク/赤系・リボン・厚底（最大3選択）"                            onClick={(e) => onWorldPresetToggle("jirai", e.shiftKey)}      active={activeWorldPresets.includes("jirai")}      variant="jirai"      disabled={disabled} />
+        <TagBtn label="☠️ 世紀末系" title="荒廃都市・廃墟・錆・砂埃・終末ロードムービー感（最大3選択）"                                                  onClick={(e) => onWorldPresetToggle("seikimatsu", e.shiftKey)} active={activeWorldPresets.includes("seikimatsu")} variant="seikimatsu" disabled={disabled} />
         {activeWorldPresets.length > 1 && (
           <span className="text-[11px] text-indigo-300/70 font-semibold self-center ml-1">
             {activeWorldPresets.length}選択中

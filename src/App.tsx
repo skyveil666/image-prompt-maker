@@ -1634,17 +1634,24 @@ export default function App() {
 
   // ─── 世界観プリセット：トグル選択（最大3コンボ）────────────────────────────────
 
-  const handleWorldPresetToggle = useCallback((preset: WorldPreset) => {
+  const handleWorldPresetToggle = useCallback((preset: WorldPreset, additive = false) => {
     const prev = activeWorldPresets;
     let next: WorldPreset[];
-    if (prev.includes(preset)) {
-      // 選択済み → 解除
-      next = prev.filter((p) => p !== preset);
-    } else if (prev.length >= 3) {
-      // 最大3件：最古を落として追加
-      next = [...prev.slice(1), preset];
+    if (additive) {
+      // Shift+クリック＝コンボ追加（従来の累積動作・最大3件 FIFO）
+      if (prev.includes(preset)) {
+        // 選択済み → 解除
+        next = prev.filter((p) => p !== preset);
+      } else if (prev.length >= 3) {
+        // 最大3件：最古を落として追加
+        next = [...prev.slice(1), preset];
+      } else {
+        next = [...prev, preset];
+      }
     } else {
-      next = [...prev, preset];
+      // 通常クリック＝単一トグル：このプリセットだけ選択（既存はクリア）。
+      // 同じプリセットが単独で選択中なら解除（→空）。
+      next = prev.length === 1 && prev[0] === preset ? [] : [preset];
     }
     setActiveWorldPresets(next);
 
