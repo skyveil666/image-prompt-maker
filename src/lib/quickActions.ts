@@ -810,10 +810,6 @@ export function buildY2kInputs(current: PromptInputs, memory: VariationMemory): 
         category: "fashion",
         vibe:     dir.propsVibe,
       },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place: dir.bgPlace,
-      },
     },
   };
 }
@@ -842,10 +838,6 @@ const Y3K_OUTFIT_COLORS: OutfitColor[] = [
 ];
 const Y3K_OUTFIT_MATERIALS: OutfitMaterial[] = [
   "transparent", "pvc", "metal", "nylon", "leather", "enamel", "velvet",
-];
-const Y3K_BG_PLACES: BackgroundPlace[] = [
-  "futuristic", "rooftop", "gallery", "indoor", "abstract",
-  "museum", "atelier", "industrial", "greenhouse",
 ];
 const Y3K_GLOW_COLORS: CyberGlowColor[] = [
   "cyan", "purple", "pink", "white", "gold", "green", "rainbow", "blue",
@@ -879,9 +871,6 @@ export function buildY3kInputs(current: PromptInputs, memory: VariationMemory): 
   const outfitStyle    = pickAvoidingRecent(Y3K_OUTFIT_STYLES,    memory.recentOutfits);
   const outfitColor    = Y3K_OUTFIT_COLORS[Math.floor(Math.random() * Y3K_OUTFIT_COLORS.length)];
   const outfitMaterial = Y3K_OUTFIT_MATERIALS[Math.floor(Math.random() * Y3K_OUTFIT_MATERIALS.length)];
-
-  // ── 背景（直近を避ける）
-  const bgPlace = pickAvoidingRecent(Y3K_BG_PLACES, memory.recentBgPlaces);
 
   // ── サイバー発光色（青連発を避ける）
   const glowColor    = pickAvoidingRecent(Y3K_GLOW_COLORS,        memory.recentMoods) as CyberGlowColor;
@@ -945,10 +934,6 @@ export function buildY3kInputs(current: PromptInputs, memory: VariationMemory): 
         glow:     "edge_glow",
         vibe:     "cool",
       },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place: bgPlace,
-      },
       cyber: {
         part:      "auto",
         type:      "auto",
@@ -985,10 +970,6 @@ const STREET_BRIGHT_COLORS: OutfitColor[] = [
 const STREET_BRIGHT_MATERIALS: OutfitMaterial[] = [
   "denim", "nylon", "cloth", "chiffon", "knit",
 ];
-const STREET_BRIGHT_BG: BackgroundPlace[] = [
-  "rooftop", "indoor", "museum", "gallery", "atelier",
-  "garden", "studio", "library", "frosted_room", "greenhouse",
-];
 
 /** 20%使用 — アーバングランジ・ゴシックストリート（サイバーパンク固定は避ける） */
 const STREET_DARK_MOODS: Mood[] = [
@@ -996,9 +977,6 @@ const STREET_DARK_MOODS: Mood[] = [
 ];
 const STREET_DARK_COLORS: OutfitColor[] = ["black", "silver", "inherit"];
 const STREET_DARK_MATERIALS: OutfitMaterial[] = ["denim", "leather", "nylon"];
-const STREET_DARK_BG: BackgroundPlace[] = [
-  "alley", "industrial", "night_amusement", "rainy_station", "rooftop",
-];
 
 /**
  * 🏙️ ストリート：ファッション誌・モデルスナップ・アーバンカジュアルが基本。
@@ -1012,12 +990,10 @@ export function buildStreetInputs(current: PromptInputs, memory: VariationMemory
   const moodPool   = isDark ? STREET_DARK_MOODS     : STREET_BRIGHT_MOODS;
   const colorPool  = isDark ? STREET_DARK_COLORS    : STREET_BRIGHT_COLORS;
   const matPool    = isDark ? STREET_DARK_MATERIALS : STREET_BRIGHT_MATERIALS;
-  const bgPool     = isDark ? STREET_DARK_BG        : STREET_BRIGHT_BG;
 
   const moods       = pickNAvoidingRecent(moodPool, memory.recentMoods, 3) as Mood[];
   const outfitColor = colorPool[Math.floor(Math.random() * colorPool.length)] as OutfitColor;
   const outfitMat   = matPool[Math.floor(Math.random() * matPool.length)] as OutfitMaterial;
-  const bgPlace     = pickAvoidingRecent(bgPool, memory.recentBgPlaces) as BackgroundPlace;
 
   const streetNote = isDark
     ? [
@@ -1061,10 +1037,6 @@ export function buildStreetInputs(current: PromptInputs, memory: VariationMemory
         ...DEFAULT_DETAILS.props,
         category: "fashion",
         vibe:     "cool",
-      },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place: bgPlace,
       },
     },
   };
@@ -1266,7 +1238,6 @@ export function buildCinematicInputs(current: PromptInputs, memory: VariationMem
     extraInstructions:  note,
     details: {
       ...current.details,
-      background: { ...current.details.background, place: genre.bgPlace, depth: "shallow" },
       camera:     { ...current.details.camera, composition: "rule_of_thirds", lens: "cinema" },
       lighting:   { ...current.details.lighting, intensity: "dramatic" },
     },
@@ -1927,10 +1898,6 @@ export function buildWaFuuInputs(current: PromptInputs, memory: VariationMemory)
         material:   dir.outfitMaterial,
         season:     "skip",
       },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place: dir.bgPlace,
-      },
       props: {
         ...DEFAULT_DETAILS.props,
         category: "japanese",
@@ -2047,10 +2014,6 @@ export function buildGothicInputs(current: PromptInputs, memory: VariationMemory
         exposure:   "skip",
         material:   dir.outfitMaterial,
         season:     "skip",
-      },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place: dir.bgPlace,
       },
       props: {
         ...DEFAULT_DETAILS.props,
@@ -2175,15 +2138,6 @@ export function buildAdVisualInputs(current: PromptInputs, memory: VariationMemo
         material:   dir.outfitMaterial,
         season:     "skip",
       },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place:   dir.bgPlace,
-        density: "minimal",
-      },
-      camera: {
-        ...current.details.camera,
-        composition: "magazine",
-      },
       lighting: {
         ...current.details.lighting,
         intensity:   "dramatic",
@@ -2297,11 +2251,6 @@ export function buildFantasyInputs(current: PromptInputs, memory: VariationMemor
         exposure:   "skip",
         material:   "auto",
         season:     "skip",
-      },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place:   dir.bgPlace,
-        density: "dense",
       },
       foreground: {
         preset:      "skip",
@@ -2433,15 +2382,6 @@ export function buildRetroInputs(current: PromptInputs, memory: VariationMemory)
         exposure:   "skip",
         material:   dir.outfitMaterial,
         season:     "skip",
-      },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place: dir.bgPlace,
-      },
-      camera: {
-        ...current.details.camera,
-        composition: "rule_of_thirds",
-        lens:        "cinema",
       },
       lighting: {
         ...current.details.lighting,
@@ -2814,10 +2754,6 @@ export function buildJiraiInputs(current: PromptInputs, memory: VariationMemory)
         category: "fashion",
         vibe:     "cute",
       },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place: dir.bgPlace,
-      },
       lighting: {
         ...current.details.lighting,
         intensity:   "dramatic",
@@ -2939,10 +2875,6 @@ export function buildSeikimatsuInputs(current: PromptInputs, memory: VariationMe
         exposure:   "skip",
         material:   "leather",
         season:     "skip",
-      },
-      background: {
-        ...DEFAULT_DETAILS.background,
-        place: dir.bgPlace,
       },
       lighting: {
         ...current.details.lighting,
