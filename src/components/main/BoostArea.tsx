@@ -2,7 +2,6 @@ import { SkyveilBar } from "../SkyveilBar";
 import { BoostControls } from "../BoostControls";
 import { MIN_SAMPLES } from "../../lib/preferenceProfile";
 import { STRENGTH_TO_FAVORITE, type SkyveilStrength, type SkyveilProfile } from "../../lib/skyveilProfile";
-import type { SuccessPromptPattern } from "../../lib/successPatterns";
 import type { ZozoTrend } from "../../lib/zozoTrend";
 import type { Scope, DetailSettings } from "../../types";
 import type { WorldPreset } from "../QuickActions";
@@ -17,14 +16,12 @@ interface BoostAreaProps {
   skyveilOneShot: boolean;
   profileError: string | null;
   autoLearnEnabled: boolean;
-  successPatterns: SuccessPromptPattern[];
   setFavoriteLearnEnabled: (v: boolean) => void;
   setSkyveilOneShot: (v: boolean) => void;
   setFavoriteStrength: (n: number) => void;
   onUpdateAnalysis: () => void;
   onToggleAutoLearn: (enabled: boolean) => void;
   onClearProfile: () => void;
-  onApplyPattern: (pattern: SuccessPromptPattern) => void;
   // 👗 ZOZO / 🌬 風（BoostControls）
   scopes: Scope[];
   activeGodModes: string[];
@@ -54,14 +51,12 @@ export function BoostArea({
   skyveilOneShot,
   profileError,
   autoLearnEnabled,
-  successPatterns,
   setFavoriteLearnEnabled,
   setSkyveilOneShot,
   setFavoriteStrength,
   onUpdateAnalysis,
   onToggleAutoLearn,
   onClearProfile,
-  onApplyPattern,
   scopes,
   activeGodModes,
   activeWorldPresets,
@@ -105,8 +100,6 @@ export function BoostArea({
         autoLearnEnabled={autoLearnEnabled}
         onToggleAutoLearn={onToggleAutoLearn}
         onClearProfile={onClearProfile}
-        successPatterns={successPatterns}
-        onApplyPattern={onApplyPattern}
       />
       <BoostControls
         outfitScopeOn={scopes.includes("outfit")}

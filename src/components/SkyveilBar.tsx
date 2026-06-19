@@ -11,7 +11,6 @@
  */
 
 import type { SkyveilProfile, SkyveilStrength } from "../lib/skyveilProfile";
-import type { SuccessPromptPattern } from "../lib/successPatterns";
 
 interface Props {
   enabled: boolean;
@@ -40,10 +39,6 @@ interface Props {
   onToggleAutoLearn?: (enabled: boolean) => void;
   /** 好み分析プロファイルの削除（学習データ削除＝反映リセットとは別物） */
   onClearProfile?: () => void;
-
-  /** 成功プロンプト抽出（#9） */
-  successPatterns?: SuccessPromptPattern[];
-  onApplyPattern?: (pattern: SuccessPromptPattern) => void;
 }
 
 /**

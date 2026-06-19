@@ -7,7 +7,6 @@ import { QuickActions } from "./components/QuickActions";
 import { ControlPanel } from "./components/ControlPanel";
 import { HistoryView } from "./components/HistoryView";
 import { RestoredItemBanner } from "./components/main/RestoredItemBanner";
-import { PatternPreviewBanner } from "./components/main/PatternPreviewBanner";
 import { ArrangeSourceBanner } from "./components/main/ArrangeSourceBanner";
 import { GenerationSummary } from "./components/main/GenerationSummary";
 import { GenerationProgress } from "./components/GenerationProgress";
@@ -98,12 +97,6 @@ import { useAnalysisLive } from "./lib/useAnalysisLive";
 import { useLatestRef } from "./lib/useLatestRef";
 import { buildReferenceNoteText } from "./lib/referenceNote";
 import { AnalysisLiveView } from "./components/AnalysisLiveView";
-import {
-  extractSuccessPromptPatterns, type SuccessPromptPattern,
-} from "./lib/successPatterns";
-import {
-  previewSuccessPattern, applyPreviewedScopes, type LearningApplyPreviewResult,
-} from "./lib/learningPreview";
 import {
   loadPreferenceProfile, savePreferenceProfile, clearPreferenceProfile,
   loadAutoLearn, saveAutoLearn,
@@ -1010,36 +1003,6 @@ export default function App() {
     return () => clearTimeout(id);
   }, [analysisDetailOpen]);
 
-  // 🏆 成功プロンプト抽出（お気に入り・高評価・失敗少なめから型を抽出）
-  const successPatterns = useMemo(
-    () => extractSuccessPromptPatterns(historyItemsForColor),
-    [historyItemsForColor],
-  );
-  /** 学習反映差分プレビュー（成功パターン）。反映ボタンを押すまで state は変えない。 */
-  const [patternPreview, setPatternPreview] = useState<{
-    pattern: SuccessPromptPattern;
-    preview: LearningApplyPreviewResult;
-  } | null>(null);
-
-  /** 成功パターン反映：まず差分プレビューを出す（即適用しない） */
-  const handleApplyPattern = useCallback((pattern: SuccessPromptPattern) => {
-    const preview = previewSuccessPattern({ currentScopes: scopes, pattern, lock: currentLock });
-    setPatternPreview({ pattern, preview });
-  }, [scopes, currentLock]);
-
-  /** プレビュー確定：ここで初めてスコープを更新（ブロック分は除外） */
-  const handleConfirmPattern = useCallback(() => {
-    if (!patternPreview) return;
-    const next = applyPreviewedScopes(scopes, patternPreview.preview);
-    setScopes(next);
-    setScopeFlashKey((k) => k + 1);
-    showPresetToast(
-      `🏆「${patternPreview.pattern.title}」を反映しました`,
-      "顔・同一性は保護。背景固定/衣装OFFのブロック分は反映していません。",
-    );
-    setPatternPreview(null);
-  }, [patternPreview, scopes, showPresetToast]);
-
   /**
    * 実 Gemini 呼び出しで好みプロファイルを更新。
    * @param auto true=自動学習からの呼び出し（トーストを控えめに・クールダウン記録）
@@ -1376,7 +1339,6 @@ export default function App() {
     setWindLevel(0);
     // ── 一時プレビュー ─────────────────────────────────────────────────────────
     setRestoredItem(null);
-    setPatternPreview(null);
     setScopeFlashKey((k) => k + 1); // スコープボタンをフラッシュ
     void logOperation("reset");
     showPresetToast("↺ 全リセット完了", "変更対象・設定・プレビューをすべて初期化しました。履歴・学習データは保持。");
@@ -1896,16 +1858,6 @@ export default function App() {
                 />
               )}
 
-              {/* 🏆 学習反映差分プレビュー（成功パターン）：反映前に必ず差分確認 */}
-              {patternPreview && (
-                <PatternPreviewBanner
-                  pattern={patternPreview.pattern}
-                  preview={patternPreview.preview}
-                  onConfirm={handleConfirmPattern}
-                  onCancel={() => setPatternPreview(null)}
-                />
-              )}
-
               {/* 📡 現在の反映状態バー：今プロンプトに効く設定を一目で（読み取り専用） */}
               <ReflectionStatusBar
                 scopes={scopes}
@@ -1969,14 +1921,12 @@ export default function App() {
                     skyveilOneShot={skyveilOneShot}
                     profileError={profileError}
                     autoLearnEnabled={autoLearnEnabled}
-                    successPatterns={successPatterns}
                     setFavoriteLearnEnabled={setFavoriteLearnEnabled}
                     setSkyveilOneShot={setSkyveilOneShot}
                     setFavoriteStrength={setFavoriteStrength}
                     onUpdateAnalysis={() => { void handleRunPreferenceAnalysis(false); }}
                     onToggleAutoLearn={handleToggleAutoLearn}
                     onClearProfile={handleClearPreferenceProfile}
-                    onApplyPattern={handleApplyPattern}
                     scopes={scopes}
                     activeGodModes={activeGodModes}
                     activeWorldPresets={activeWorldPresets}
