@@ -90,7 +90,7 @@ import {
   type ImageAnalysisResult, type ImageFeature,
 } from "./lib/imageAnalyzer";
 import {
-  analyzeRatings, buildRatingBiasPayload, analyzeRatingTrends, analyzeSuccessRankings,
+  analyzeRatings, analyzeRatingTrends, analyzeSuccessRankings,
   type RatingAnalysis, type RatingTrends, type SuccessRankings,
 } from "./lib/ratingAnalyzer";
 import { SkyveilBar } from "./components/SkyveilBar";
@@ -544,13 +544,7 @@ export default function App() {
   const ratingAnalysisRef = useRef<RatingAnalysis | null>(null);
   const imageAnalysisRef = useRef<ImageAnalysisResult | null>(null);
 
-  /** Phase D: 好みAIへ送る方向性タグ＝お気に入り傾向 ＋ Compare評価 likes（限定重み slice(0,4)・後置）。
-   *  コピーではなく方向性。多様性は既存機構（未開拓提案・被り回避・avoidCliche 等）が優先する。 */
-  const skyveilFavoriteTraits = useMemo(() => {
-    const base = favoriteProfile?.traitPhrases ?? [];
-    const extra = (referenceLearning?.likes ?? []).slice(0, 4);
-    return Array.from(new Set([...base, ...extra])).slice(0, 12);
-  }, [favoriteProfile, referenceLearning]);
+  // 🧬 skyveil「あなたの好み」撤去（A・Tier-1c）：方向性タグ skyveilFavoriteTraits は廃止（生成へ送らない）。
 
   const buildInputs = useCallback(
     (override?: Partial<PromptInputs>): PromptInputs => ({
@@ -594,18 +588,10 @@ export default function App() {
         const ctrl = getColorWeightControls(colorWeights);
         return ctrl.length > 0 ? ctrl : undefined;
       })(),
-      // 好みプロファイル（実 Gemini 分析）：skyveil好みAI が ON（または今回だけ反映）の時のみ送信
-      // BUG-1: ref 経由で最新値を参照（buildInputs の依存に入れられないため）
-      preferenceProfile: (favoriteLearnEnabled || skyveilOneShot) ? (preferenceProfileRef.current ?? undefined) : undefined,
-      // ユーザー画像評価バイアス（👍/👎）：これも「学習結果」なので skyveil好みAI が
-      // ON（または今回だけ反映）の時のみ送る（分析結果を自動反映しないルール）。scope ON の軸のみ。
-      ratingBias: (() => {
-        if (!(favoriteLearnEnabled || skyveilOneShot)) return undefined;
-        const ra = ratingAnalysisRef.current;
-        if (!ra) return undefined;
-        const activeScopes = new Set<string>(scopes);
-        return buildRatingBiasPayload(ra, activeScopes) ?? undefined;
-      })(),
+      // 🧬 skyveil「あなたの好み」撤去（A・Tier-1c）：生成への反映を恒久停止（undefined＝サーバ無注入）。
+      preferenceProfile: undefined,
+      // 🧬 skyveil撤去（A・Tier-1c）：評価バイアス（👍/👎 学習）の反映も恒久停止。
+      ratingBias: undefined,
       // 画像分析バイアス：頻出/未使用カテゴリと視覚的重複数をサーバへ送信。
       // 「提案を反映」(policyApplied) を押した時のみ生成に効かせる（勝手に反映しない）。
       imageBias: (() => {
@@ -636,16 +622,9 @@ export default function App() {
       avoidRealBackground,
       colorStrategy: colorStrategy ?? undefined,
       artStyle: artStyle ?? undefined,
-      // skyveil好みAI：ON（または今回だけ反映）かつ傾向がある場合のみ反映（コピーではなく方向性）。
-      // Phase D: お気に入り傾向 ＋ Compare評価likes（限定重み）を統合した skyveilFavoriteTraits を送る。
-      favoriteTraits:
-        (favoriteLearnEnabled || skyveilOneShot) && skyveilFavoriteTraits.length > 0
-          ? skyveilFavoriteTraits
-          : undefined,
-      favoriteStrength:
-        (favoriteLearnEnabled || skyveilOneShot) && skyveilFavoriteTraits.length > 0
-          ? favoriteStrength
-          : undefined,
+      // 🧬 skyveil撤去（A・Tier-1c）：お気に入り傾向の方向性注入も恒久停止。
+      favoriteTraits: undefined,
+      favoriteStrength: undefined,
       // ZOZOトレンド：衣装スコープON かつ 反映中の場合のみ送信（最重要：衣装ON時のみ）
       zozoTrend:
         zozoApplied && zozoApplied.traits.length > 0 && scopes.includes("outfit")
@@ -693,7 +672,6 @@ export default function App() {
       favoriteLearnEnabled,
       favoriteProfile,
       favoriteStrength,
-      skyveilFavoriteTraits,
       skyveilOneShot,
       zozoApplied,
       activeBoosts,
