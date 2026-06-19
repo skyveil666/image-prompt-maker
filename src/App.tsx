@@ -1860,7 +1860,6 @@ export default function App() {
                 setView("history");
               }}
               onShowReferenceHistory={() => setCompareOpen(true)}
-              onShowAnalysis={() => {}}  /* 🧹 分析センター撤去（タスクB・案X）：入口は no-op（ボタンは §4 レイアウト保護で残置） */
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
             />

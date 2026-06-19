@@ -24,7 +24,6 @@ interface Props {
   onShowFavorites: () => void;
   /** 🖼 Reference Picker履歴（保存した参照画像＋抽出プロンプトの再利用／生成と比較）を開く */
   onShowReferenceHistory: () => void;
-  onShowAnalysis: () => void;
   onToggleExplorer: () => void;
   explorerOpen: boolean;
 }
@@ -41,7 +40,6 @@ export function ImageSidebar({
   onShowCalendar,
   onShowFavorites,
   onShowReferenceHistory,
-  onShowAnalysis,
   onToggleExplorer,
   explorerOpen,
 }: Props) {
@@ -220,15 +218,6 @@ export function ImageSidebar({
         >
           <span>🖼</span>
           <span>Reference Picker履歴</span>
-        </button>
-        {/* 分析センター（独立画面・全画面） */}
-        <button
-          type="button"
-          onClick={onShowAnalysis}
-          className="w-full rounded-xl px-3 py-2.5 text-sm font-semibold border border-violet-400/50 bg-violet-400/10 text-violet-100 hover:bg-violet-400/20 hover:border-violet-400/80 transition flex items-center justify-center gap-2"
-        >
-          <span>📊</span>
-          <span>分析センター</span>
         </button>
       </div>
 
