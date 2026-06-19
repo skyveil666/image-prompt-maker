@@ -156,6 +156,7 @@ export default function App() {
     zozoApplied, setZozoApplied,
     activeBoosts, setActiveBoosts,
     windLevel, setWindLevel,
+    decorationColorLink, setDecorationColorLink,
   } = usePersistedSettings();
 
   // per-tag NG（タグ個別NG）：タグのダブルクリックで tagNg をトグル（DetailsCard 側）。tagNg は永続。
@@ -479,7 +480,19 @@ export default function App() {
         aspect_ratio: compositionLock,
       },
       safety:   "fictional_ai",
-      details,
+      // ✨派手さ→配色 連動（生成時導出・案2）：outfit が変更対象 ∧ 派手さ(decoration)=elaborate/maximal ∧
+      //   衣装色が未指定(skip/auto/inherit) の時だけ、送信payload上で color をビビッド化する。
+      //   state(details.outfit.color)は不変＝明示選択した色は最優先で上書きしない。decorationColorLink=false で無効。
+      //   maximal→gradient（グラデーション配色）／elaborate→accent_color（差し色）。色は既存経路 promptSystem:1252 で出力。
+      details: (() => {
+        const o = details.outfit;
+        const unset = o.color === "skip" || o.color === "auto" || o.color === "inherit";
+        const linkColor = o.decoration === "maximal" ? "gradient" : o.decoration === "elaborate" ? "accent_color" : null;
+        if (decorationColorLink && scopes.includes("outfit") && unset && linkColor) {
+          return { ...details, outfit: { ...o, color: linkColor } };
+        }
+        return details;
+      })(),
       // worldCombinedNote（世界観プリセット由来）・referenceNote（参照画像から適用）・追加指示
       // ＋ NG肯定誘導（splitNg：否定NG語を肯定方向の誘導文へ変換・GPT Image対策）を結合。出現制御は motifControls で別途。
       extraInstructions: [worldCombinedNote, referenceNoteText, extraInstructions, splitNg(ngList, forbiddenTokens).positiveGuidance].filter(Boolean).join("\n\n"),
@@ -562,6 +575,7 @@ export default function App() {
       colorMoodLock,
       compositionLock,
       details,
+      decorationColorLink,
       worldCombinedNote,
       referenceNoteText,
       extraInstructions,
@@ -1350,6 +1364,7 @@ export default function App() {
     setAvoidRealBackground(true);
     // ── 詳細設定 ───────────────────────────────────────────────────────────────
     setDetails(DEFAULT_DETAILS);
+    setDecorationColorLink(true);  // ✨派手さ→配色 連動を既定ON に戻す
     // ── 好み反映 ───────────────────────────────────────────────────────────────
     setZozoApplied(null);
     setFavoriteLearnEnabled(false);
@@ -1907,6 +1922,10 @@ export default function App() {
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
                 tagNg={tagNg}
                 onClearTagNg={() => setTagNg([])}
+                decorationColorLink={decorationColorLink}
+                outfitDecoration={details.outfit.decoration}
+                outfitColor={details.outfit.color}
+                onClearDecorationColorLink={() => setDecorationColorLink(false)}
               />
 
 

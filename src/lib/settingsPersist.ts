@@ -78,6 +78,9 @@ export interface PersistedSettings {
   activeBoosts:       string[];
   /** 風の強さ 0–5（初期0=無風） */
   windLevel:          number;
+  /** ✨派手さ→配色の自動連動（初期ON）。派手さ高×衣装色未指定で buildInputs が色をビビッド化する。
+   *  ×解除した状態をセッション跨ぎで保持する（非永続だとリロードで連動が勝手に復活する不具合の防止）。 */
+  decorationColorLink: boolean;
 }
 
 export const SETTINGS_DEFAULTS: PersistedSettings = {
@@ -113,6 +116,7 @@ export const SETTINGS_DEFAULTS: PersistedSettings = {
   zozoApplied:        null,
   activeBoosts:       [],
   windLevel:          0,
+  decorationColorLink: true,
 };
 
 // ─── ヘルパー ─────────────────────────────────────────────────────────────────

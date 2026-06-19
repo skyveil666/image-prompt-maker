@@ -62,6 +62,14 @@ interface Props {
   tagNg: string[];
   /** タグ個別NGの一括解除（setTagNg([])）。 */
   onClearTagNg: () => void;
+  /** ✨派手さ→配色 連動が有効か（既定ON・×で切る）。buildInputs と同条件で導出表示する。 */
+  decorationColorLink: boolean;
+  /** 現在の派手さ(decoration)値（elaborate/maximal で連動条件）。 */
+  outfitDecoration: string;
+  /** 現在の衣装color値（skip/auto/inherit の未指定時のみ連動）。 */
+  outfitColor: string;
+  /** 連動の解除（decorationColorLink を false に）。 */
+  onClearDecorationColorLink: () => void;
 }
 
 // ── チップ ───────────────────────────────────────────────────────────────────
@@ -114,7 +122,11 @@ export function ReflectionStatusBar(p: Props) {
   const bgStylizeActive = p.avoidRealBackground && p.scopes.includes("background");
   // 🚫 タグ個別NG（per-tag NG）：折りたたみ時に赤タグが見えなくなるため、ここで常時可視化＋解除（§5）。
   const tagNgLabels = tagNgToLabels(p.tagNg);
-  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive || p.tagNg.length > 0;
+  // ✨派手さ→配色 連動（buildInputs と同条件で導出）：outfit が変更対象 ∧ 派手さ高(elaborate/maximal) ∧ color未指定 ∧ 連動ON
+  const colorUnset = p.outfitColor === "skip" || p.outfitColor === "auto" || p.outfitColor === "inherit";
+  const decoLinkColor = p.outfitDecoration === "maximal" ? "gradient" : p.outfitDecoration === "elaborate" ? "accent_color" : null;
+  const colorLinkActive = p.decorationColorLink && p.scopes.includes("outfit") && colorUnset && decoLinkColor !== null;
+  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive || p.tagNg.length > 0 || colorLinkActive;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
 
   return (
@@ -157,6 +169,15 @@ export function ReflectionStatusBar(p: Props) {
               summaryTitle={`NG指定したタグ（候補からの除外を準備中・現在は生成に未反映）：${tagNgLabels.join("、")}`}
               onClear={p.onClearTagNg}
               clearTitle="タグNGを全解除（値の選択は保持）"
+            />
+          )}
+          {colorLinkActive && (
+            <DominatorBadge
+              label="✨ 派手さ→配色"
+              summary={decoLinkColor === "gradient" ? "ビビッドな多色配色（グラデーション）に自動連動" : "差し色を効かせた配色に自動連動"}
+              summaryTitle="「派手さ」が高く衣装色が未指定のため、生成時に配色を自動でビビッド化します（色を明示選択すると自動解除）。衣装色の state は変更しません。"
+              onClear={p.onClearDecorationColorLink}
+              clearTitle="派手さ→配色の自動連動をオフにする（衣装色は未指定のまま）"
             />
           )}
         </div>
