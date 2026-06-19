@@ -25,26 +25,21 @@ import { usePersistedSettings } from "./lib/usePersistedSettings";
 import { getNotifSettings } from "./lib/notificationSettings";
 import { playCompletionSound } from "./lib/completionSound";
 import {
-  buildAntiTemplateInputs,
   buildArrangeInputs,
   buildCombinedWorldInputs,
   WORLD_PRESET_DISPLAY,
 } from "./lib/quickActions";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
-import { analyzeFullHistory, filterRecentWindow, WINDOW_DAYS, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
-import { DuplicateAnalysisPanel } from "./components/DuplicateAnalysisPanel";
+import { analyzeFullHistory, filterRecentWindow, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
 import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
 import { CompareModeView } from "./components/CompareModeView";
-import { detectCandidateMotifs, addIgnoredTerm, loadIgnoredTerms } from "./lib/discoveryMotifs";
 import {
-  loadLevels, saveLevels, setLevel as setLevelFn, resetAllLevels, bulkSetLevels, clearNgLevels,
-  isApplied, setAppliedStorage,
+  loadLevels,
+  isApplied,
   getMotifControls,
-  computeAutoAdjust,
-  loadComboPolicies, saveComboPolicies, setComboPolicy as setComboPolicyFn,
-  resetComboPolicies, getComboControls,
-  type LevelMap, type MotifLevel,
-  type ComboPolicy, type ComboPolicyMap,
+  loadComboPolicies, getComboControls,
+  type LevelMap,
+  type ComboPolicyMap,
 } from "./lib/motifPolicy";
 import {
   loadForbiddenTokens,
@@ -62,8 +57,8 @@ import {
   updateItem as updateItemDb,
   buildResultImagesPatch,
 } from "./lib/history";
-import { getRecentGenres, pushRecentGenres, clearRecentGenres } from "./lib/genreHistory";
-import { getRecentSubStyles, pushRecentSubStyles, clearRecentSubStyles } from "./lib/subStyleHistory";
+import { getRecentGenres, pushRecentGenres } from "./lib/genreHistory";
+import { getRecentSubStyles, pushRecentSubStyles } from "./lib/subStyleHistory";
 import { runAutoCleanup, getAutoCleanupEnabled } from "./lib/cleanup";
 import { makeThumbnail } from "./lib/imageThumb";
 import { saveReferenceRecord, type ReferenceRecord } from "./lib/referenceRecords";
@@ -82,18 +77,13 @@ import { DEFAULT_DETAILS } from "./types";
 import { computeChangedAxes, arrangeCandidateScopes, buildElementFilterInstruction } from "./lib/arrange";
 import { ALL_SCOPE_LABELS } from "./lib/scopeLabels";
 import { buildFavoriteProfile, type FavoriteProfile } from "./lib/favoriteProfile";
-import { analyzeAgent, type AgentActionId } from "./lib/aiAgent";
-import { analyzeColors, analyzeColorSuccess, type ColorAnalysis, type ColorSuccessAnalysis } from "./lib/colorAnalyzer";
+import { analyzeColors, type ColorAnalysis } from "./lib/colorAnalyzer";
 import {
   loadAllFeatures, buildAnalysis as buildImageAnalysis,
   runProgressiveAnalysis, primaryResultImage,
   type ImageAnalysisResult, type ImageFeature,
 } from "./lib/imageAnalyzer";
-import {
-  analyzeRatings, analyzeRatingTrends, analyzeSuccessRankings,
-  type RatingAnalysis, type RatingTrends, type SuccessRankings,
-} from "./lib/ratingAnalyzer";
-import { SkyveilBar } from "./components/SkyveilBar";
+import { analyzeRatings, type RatingAnalysis } from "./lib/ratingAnalyzer";
 import {
   buildSkyveilProfile, favoriteToStrength,
   type SkyveilStrength, type SkyveilProfile,
@@ -123,10 +113,8 @@ import {
   type PreferenceProfile,
 } from "./lib/preferenceProfile";
 import {
-  loadColorWeights, saveColorWeights, setColorWeight as setColorWeightFn,
-  resetColorWeights, getColorWeightControls,
-  autoAdjustColorWeights,
-  type ColorWeight, type ColorWeightMap, type ColorAxisCtrl,
+  loadColorWeights, getColorWeightControls,
+  type ColorWeightMap,
 } from "./lib/colorPolicy";
 
 // ── 代表ボタン用ランダムピック定数（モジュールレベル） ────────────────────────
@@ -254,10 +242,7 @@ export default function App() {
   /** ♻ ピッカーが seed を流し込み終えたら null に戻す（再マウント時の二重注入防止）。 */
   const handleReuseConsumed = useCallback(() => setReferenceReuseSeed(null), []);
   // 分析ラボ（孤立入口）は撤去（#4）。詳細探索は分析センターの重複分析/🔭発見タブに集約。
-  /** 📊 分析センター（全画面モーダル・docs/32）。左メニューから開く。 */
-  const [analysisCenterOpen, setAnalysisCenterOpen] = useState(false);
-  /** P3 発見層：無視した候補語（localStorage 同期）。 */
-  const [ignoredTerms, setIgnoredTerms] = useState<string[]>(() => loadIgnoredTerms());
+  // 🧹 分析センター（DuplicateAnalysisPanel）撤去（タスクB・案X）：開閉 state・無視候補語 state は廃止。
   /** Phase D: Compare評価(referenceRecords)を集計した好み素材。マウント＋Compareクローズ（評価後）に再読込。 */
   const [referenceLearning, setReferenceLearning] = useState<ReferenceLearning | null>(null);
   useEffect(() => {
@@ -282,7 +267,8 @@ export default function App() {
   // boost の state 操作は分析センター handleAgentAction が直接 setActiveBoosts で行うため state/setter は温存。
   // SNS/カルチャー state は撤去（重複整理。mood ID は VIRAL_MOOD_POOL 等で存続）。
   /** 量産AI / 偏り分析結果（バナー表示用） */
-  const [massProductionResult, setMassProductionResult] = useState<BiasAnalysisResult | null>(null);
+  // 🧹 偏り分析結果は runBiasAnalysis（生成後 自動実行）が更新するが、表示は分析センター撤去で廃止。setter のみ温存。
+  const [, setMassProductionResult] = useState<BiasAnalysisResult | null>(null);
   /** 全履歴分析結果（重複分析センター用） */
   const [historyAnalysis, setHistoryAnalysis] = useState<FullHistoryAnalysis | null>(null);
   /** 履歴の生アイテム（色分析の入力）。historyAnalysis と同期して更新される */
@@ -290,91 +276,24 @@ export default function App() {
   /** 画像特徴キャッシュ（itemId → ImageFeature） */
   const [imageFeatureMap, setImageFeatureMap] = useState<Map<string, ImageFeature>>(new Map());
   /** 画像分析の進捗 */
-  const [imageAnalyzeProgress, setImageAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
+  // 🧹 進捗表示は分析センター撤去で廃止。setter は自動画像解析（startImageAnalysis）が使うため温存。
+  const [, setImageAnalyzeProgress] = useState<{ done: number; total: number } | null>(null);
   const imageAnalyzeAbortRef = useRef<AbortController | null>(null);
   /** モチーフ出現制御レベル（行ごとの 0〜5。永続化） */
-  const [levels, setLevels] = useState<LevelMap>(() => loadLevels());
+  const [levels] = useState<LevelMap>(() => loadLevels());
   /** 頻出構成（コンボ）ポリシー：comboKey → block/alt/allow。永続化 */
-  const [comboPolicies, setComboPolicies] = useState<ComboPolicyMap>(() => loadComboPolicies());
-  const handleComboPolicyChange = useCallback((comboKey: string, p: ComboPolicy) => {
-    setComboPolicies((prev) => {
-      const next = setComboPolicyFn(prev, comboKey, p);
-      saveComboPolicies(next);
-      return next;
-    });
-  }, []);
+  const [comboPolicies] = useState<ComboPolicyMap>(() => loadComboPolicies());
   /** 色×軸 重み：colorId → { hair, outfit, background }（各 0-5）。永続化 */
-  const [colorWeights, setColorWeights] = useState<ColorWeightMap>(() => loadColorWeights());
-  const handleColorWeightChange = useCallback((colorId: string, axis: ColorAxisCtrl, w: ColorWeight) => {
-    setColorWeights((prev) => {
-      const next = setColorWeightFn(prev, colorId, axis, w);
-      saveColorWeights(next);
-      return next;
-    });
-  }, []);
-  const handleColorWeightsReset = useCallback(() => {
-    setColorWeights(() => {
-      const next = resetColorWeights();
-      saveColorWeights(next);
-      return next;
-    });
-  }, []);
-  /** 色重み自動調整の Undo スタック */
-  const [colorWeightsUndoStack, setColorWeightsUndoStack] = useState<ColorWeightMap[]>([]);
-  /** 直近で自動調整された (colorId,axis) ペアの集合（行ハイライト用） */
-  const [colorChangedKeys, setColorChangedKeys] = useState<ReadonlySet<string>>(new Set());
-  const colorChangedClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** 色分析の対象ウィンドウ（50件 or 100件） */
-  const [colorWindowSize, setColorWindowSize] = useState<50 | 100>(50);
+  const [colorWeights] = useState<ColorWeightMap>(() => loadColorWeights());
+  // 🧹 色重みのエディタ系（変更/リセット/自動調整Undo/ハイライト）は分析センター撤去で廃止。colorWeights 本体は温存。
+  /** 色分析の対象ウィンドウ（50件・colorAnalysis が使用） */
+  const [colorWindowSize] = useState<50 | 100>(50);
   /** 反映状態（true = 生成ロジックへ実際に流す）。永続化 */
-  const [policyApplied, setPolicyAppliedState] = useState<boolean>(() => isApplied());
+  // 🧹 反映状態（policyApplied）は永続値を読むのみ（トグル UI は分析センター撤去で廃止）。buildInputs では引き続き使用。
+  const [policyApplied] = useState<boolean>(() => isApplied());
 
-  // ── 出現制御ハンドラ ──
-  const handleLevelChange = useCallback((motifId: string, level: MotifLevel) => {
-    setLevels((prev) => {
-      const next = setLevelFn(prev, motifId, level);
-      saveLevels(next);
-      return next;
-    });
-  }, []);
-  const handleBulkLevel = useCallback((motifIds: string[], level: MotifLevel) => {
-    setLevels((prev) => {
-      const next = bulkSetLevels(prev, motifIds, level);
-      saveLevels(next);
-      return next;
-    });
-  }, []);
-  const handleClearNg = useCallback(() => {
-    setLevels((prev) => {
-      const next = clearNgLevels(prev);
-      saveLevels(next);
-      return next;
-    });
-  }, []);
-  // 自動調整 state（実体ハンドラは showPresetToast 定義後に登録）
-  const [levelsUndoStack, setLevelsUndoStack] = useState<LevelMap[]>([]);
-  const [changedIds,      setChangedIds]      = useState<ReadonlySet<string>>(new Set());
-  const changedClearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const handleApplyPolicies = useCallback(() => {
-    setPolicyAppliedState(true);
-    setAppliedStorage(true);
-    void logOperation("policy_apply");
-  }, []);
-  const handleUnapplyPolicies = useCallback(() => {
-    setPolicyAppliedState(false);
-    setAppliedStorage(false);
-  }, []);
-  const handleResetPolicies = useCallback(() => {
-    const empty = resetAllLevels();
-    setLevels(empty);
-    saveLevels(empty);
-    const emptyCombo = resetComboPolicies();
-    setComboPolicies(emptyCombo);
-    saveComboPolicies(emptyCombo);
-    setPolicyAppliedState(false);
-    setAppliedStorage(false);
-  }, []);
+  // 🧹 出現制御／反映トグル／全リセット等のエディタ系ハンドラは分析センター撤去（タスクB・案X）で廃止。
+  //    levels / comboPolicies の永続値と buildInputs での使用は温存（既存設定は引き続き生成に効く）。
   /** ファッションプリセット適用トースト */
   const [presetToastTrigger, setPresetToastTrigger] = useState(0);
   const [presetToastMsg,     setPresetToastMsg]     = useState("");
@@ -422,8 +341,6 @@ export default function App() {
   const [arrangeSource, setArrangeSource] = useState<PromptHistoryItem | null>(null);
   /** 「同じ構成で再生成」復元後の確認バナー用 */
   const [restoredItem, setRestoredItem] = useState<PromptHistoryItem | null>(null);
-  /** 分析センターを開く時の初期タブ（現状 dup のみ）。 */
-  const [analysisInitialTab, setAnalysisInitialTab] = useState<"dup">("dup");
   /** 🤖 AI分析ライブビュー */
   const analysisLive = useAnalysisLive();
   /** runGenerate 内で items の最新値を読むためのリファレンス */
@@ -948,25 +865,7 @@ export default function App() {
     return analyzeColors(recentItems, colorWindowSize);
   }, [recentItems, colorWindowSize]);
 
-  // ── 🎨 色 成功率分析（A2-3b）：色×評価×時系列（成功率/推移/急上昇・急下降）──
-  const colorSuccess: ColorSuccessAnalysis | null = useMemo(() => {
-    if (historyItemsForColor.length === 0) return null;
-    return analyzeColorSuccess(historyItemsForColor, Date.now());
-  }, [historyItemsForColor]);
-
-  // ── ⭐ 評価集計 強化（②）：期間別/軸別👍👎/カテゴリ別成功率/月別/推移（表示専用） ──
-  const ratingTrends: RatingTrends | null = useMemo(() => {
-    if (historyItemsForColor.length === 0) return null;
-    const t = analyzeRatingTrends(historyItemsForColor, Date.now());
-    return t.totalRated > 0 ? t : null;
-  }, [historyItemsForColor]);
-
-  // ── 🏆 成功/失敗ランキング（③）：構成/要素横断/案単位（表示専用・勝ちパターン発見） ──
-  const successRankings: SuccessRankings | null = useMemo(() => {
-    if (historyItemsForColor.length === 0) return null;
-    const r = analyzeSuccessRankings(historyItemsForColor);
-    return r.totalRated > 0 ? r : null;
-  }, [historyItemsForColor]);
+  // 🧹 色成功率分析・評価集計強化・成功/失敗ランキングは分析センター撤去（タスクB・案X）で廃止（表示専用だった）。
 
   // ── 📸 画像分析：直近90日×特徴キャッシュから集計 ──
   const imageAnalysis: ImageAnalysisResult | null = useMemo(() => {
@@ -981,35 +880,7 @@ export default function App() {
     return r.totalRatedImages > 0 ? r : null;
   }, [historyItemsForColor]);
 
-  // ── 🔭 発見層（P3a）：監視外の頻出新語を候補抽出（好み非依存・無視リストで減衰） ──
-  const discoveryCandidates = useMemo(
-    () => detectCandidateMotifs(
-      historyItemsForColor.map((i) => ({ promptText: i.promptText, createdAt: i.createdAt })),
-      { ignored: ignoredTerms },
-    ),
-    [historyItemsForColor, ignoredTerms],
-  );
-  const handleIgnoreTerm = useCallback((term: string) => {
-    setIgnoredTerms(addIgnoredTerm(term));
-  }, []);
-
-  // ── 📊 分析対象サマリ（パネル見出しの「直近90日/N件」表示用） ──
-  const analysisStats = useMemo(() => {
-    const promptCount = recentItems.length;
-    // 画像解析済み＝直近90日のうち結果画像があり特徴キャッシュに載っている件数
-    let imageAnalyzedCount = 0;
-    for (const it of recentItems) {
-      if (imageFeatureMap.has(it.id)) imageAnalyzedCount++;
-    }
-    const ratedCount = ratingAnalysis?.totalRatedImages ?? 0;
-    return {
-      windowDays: WINDOW_DAYS,
-      totalItems: historyItemsForColor.length,
-      promptCount,
-      imageAnalyzedCount,
-      ratedCount,
-    };
-  }, [recentItems, imageFeatureMap, ratingAnalysis, historyItemsForColor.length]);
+  // 🧹 発見層（候補語抽出/無視）・分析対象サマリは分析センター撤去（タスクB・案X）で廃止。
 
   // ── 💡 好みプロファイル：Gemini で実分析した結果（localStorage 永続化） ──
   // ↑ preferenceProfile はこの直後に宣言。skyveilProfile はさらに後で組み立てる。
@@ -1320,14 +1191,6 @@ export default function App() {
     })();
   }, [historyItemsForColor, imageFeatureMap, analysisLive]);
 
-  /** F4: ユーザーが「キャンセル」を押した時に進行中の画像分析を中断する */
-  const cancelImageAnalysis = useCallback(() => {
-    if (imageAnalyzeAbortRef.current) {
-      imageAnalyzeAbortRef.current.abort();
-      imageAnalyzeAbortRef.current = null;
-    }
-    setImageAnalyzeProgress(null);
-  }, []);
 
   // ── 📸 自動画像解析：結果画像を貼ったら（タブを開かなくても）自動で解析する ──
   // 直近90日に「結果画像はあるが未解析」のアイテムがあれば、デバウンス後に解析を走らせる。
@@ -1355,120 +1218,10 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- startImageAnalysis は ref 経由（thrash防止のため意図的に除外）
   }, [recentItems, imageFeatureMap]);
 
-  // ── 🤖 AI分析エージェント：useMemoで現状から提案を再計算 ──
-  const agentAnalysis = useMemo(() => analyzeAgent({
-    scopes, locks: {
-      body_shape: bodyPoseLock,
-      color: colorMoodLock, camera: compositionLock, aspect_ratio: compositionLock,
-    },
-    faceLock,
-    activeWorldPresets, activeGodModes, activeBoosts, viralMode,
-    favoriteProfile, favoriteEnabled: favoriteLearnEnabled,
-    historyAnalysis, colorAnalysis, imageAnalysis, ratingAnalysis, policyApplied,
-    windLevel,
-    hasImage: !!imageDataUrl,
-    discoveryCandidates,
-  }), [
-    scopes, bodyPoseLock, colorMoodLock, compositionLock, faceLock,
-    activeWorldPresets, activeGodModes, activeBoosts, viralMode,
-    favoriteProfile, favoriteLearnEnabled, historyAnalysis, colorAnalysis, imageAnalysis, ratingAnalysis, policyApplied,
-    windLevel, imageDataUrl, discoveryCandidates,
-  ]);
+  // 🧹 AI分析エージェント（agentAnalysis）と提案アクションは分析センター撤去（タスクB・案X）で廃止。
 
-  // ── 重複分析：自動調整ハンドラ（showPresetToast に依存するためここに配置） ──
-  const handleAutoAdjust = useCallback((preserveManual: boolean) => {
-    if (!historyAnalysis) return;
-    const topMotifs = historyAnalysis.topMotifs.map((mc) => ({
-      id: mc.motif.id, count: mc.totalCount,
-    }));
-    const windowSize = historyAnalysis.windowSize;
-    // 未開拓ジャンルラベルから推奨IDを引く（推奨対象→積極許可(5)）
-    const labelToId = new Map(
-      historyAnalysis.motifCounts.map((mc) => [mc.motif.label, mc.motif.id])
-    );
-    const preferIds = (historyAnalysis.untappedGenres ?? [])
-      .filter((g) => g.untappedScore >= 80)
-      .map((g) => labelToId.get(g.label))
-      .filter((v): v is string => !!v);
-
-    const snapshot = { ...loadLevels() };
-    const result = computeAutoAdjust(
-      snapshot, { topMotifs, windowSize, preferIds }, preserveManual
-    );
-    if (result.changedIds.length === 0) {
-      showPresetToast("変更点はありませんでした", "");
-      return;
-    }
-    setLevelsUndoStack((s) => [snapshot, ...s].slice(0, 5));
-    setLevels(result.next);
-    saveLevels(result.next);
-
-    // 変更行ハイライト：1.4秒で自然消去
-    setChangedIds(new Set(result.changedIds));
-    if (changedClearTimer.current) clearTimeout(changedClearTimer.current);
-    changedClearTimer.current = setTimeout(() => setChangedIds(new Set()), 1400);
-
-    const protectedNote = result.preservedIds.length > 0
-      ? `（手動 ${result.preservedIds.length} 件は保護）`
-      : "";
-    showPresetToast(
-      `✨ 重複分析から ${result.changedIds.length} 件を自動調整しました`,
-      `${protectedNote}「提案を反映」で生成に効きます。`
-    );
-  }, [historyAnalysis, showPresetToast]);
-
-  const handleUndoAutoAdjust = useCallback(() => {
-    setLevelsUndoStack((stack) => {
-      if (stack.length === 0) return stack;
-      const [restored, ...rest] = stack;
-      setLevels(restored);
-      saveLevels(restored);
-      setChangedIds(new Set());
-      showPresetToast("↶ 自動調整を元に戻しました", "");
-      return rest;
-    });
-  }, [showPresetToast]);
-
-  // F2: DuplicateAnalysisPanel へのコールバック props を安定化（memo との組み合わせ効果）。
-  // JSX でインラインラムダを渡すと毎レンダー新規生成になり memo を無効化するため、
-  // useCallback でここに移す（分析/生成/保護ロジックは不変・トーストのみ追加）。
-  const handleDupBulkLevel = useCallback((ids: string[], lv: MotifLevel) => {
-    handleBulkLevel(ids, lv);
-    showPresetToast("🎯 出現制御を一括設定しました", "「提案を反映」で生成に効きます。");
-  }, [handleBulkLevel, showPresetToast]);
-
-  const handleDupClearNg = useCallback(() => {
-    handleClearNg();
-    showPresetToast("完全NGを解除しました", "");
-  }, [handleClearNg, showPresetToast]);
-
-  const handleDupApplyPolicies = useCallback(() => {
-    handleApplyPolicies();
-    showPresetToast("✓ 出現制御を反映しました", "次回の生成から効きます。");
-  }, [handleApplyPolicies, showPresetToast]);
-
-  const handleDupUnapplyPolicies = useCallback(() => {
-    handleUnapplyPolicies();
-    showPresetToast("反映を解除しました", "");
-  }, [handleUnapplyPolicies, showPresetToast]);
-
-  const handleDupResetPolicies = useCallback(() => {
-    handleResetPolicies();
-    showPresetToast("🗑️ 出現制御を全リセット", "全モチーフを許可(4)に戻しました。");
-  }, [handleResetPolicies, showPresetToast]);
-
-  const handleDupDismiss = useCallback(() => {
-    setMassProductionResult(null);
-    setHistoryAnalysis(null);
-  }, []);
-
-  const handleDupResetBias = useCallback(() => {
-    clearRecentGenres();
-    clearRecentSubStyles();
-    setHistoryAnalysis(null);
-    setMassProductionResult(null);
-    showPresetToast("🧹 偏り履歴をクリア", "ジャンル＋サブジャンルの履歴をリセットしました。");
-  }, [showPresetToast]);
+  // 🧹 出現制御の自動調整・一括設定・反映/解除・偏り履歴クリア等の分析センター用ハンドラは
+  //    タスクB・案X で廃止（UI 撤去）。levels/comboPolicies/policyApplied の永続値と buildInputs 使用は温存。
 
   // ── 🖼 参照画像：要素を「適用」（保護ゲート内蔵・docs/23） ──────────────────
   // [適用] = その軸の scope を ON + 軸タグ付き自由文を referenceNote へ。enum詳細は触らない。
@@ -1494,116 +1247,8 @@ export default function App() {
     setReferenceNote({});
   }, []);
 
-  // ── 🎨 色重み：自動調整（偏り減点・未使用加点）──
-  const handleColorAutoAdjust = useCallback((preserveManual: boolean) => {
-    if (!colorAnalysis) {
-      showPresetToast("色分析データが不足しています", "数回生成すると自動調整が使えます。");
-      return;
-    }
-    const snapshot: ColorWeightMap = JSON.parse(JSON.stringify(colorWeights));
-    const result = autoAdjustColorWeights(snapshot, colorAnalysis, preserveManual);
-    if (result.changes.length === 0) {
-      showPresetToast("変更点はありませんでした", "");
-      return;
-    }
-    setColorWeightsUndoStack((s) => [snapshot, ...s].slice(0, 5));
-    setColorWeights(result.next);
-    saveColorWeights(result.next);
-
-    // 変更ハイライト：colorId:axis のキーで管理、1.6 秒で自然消去
-    const keys = new Set(result.changes.map((c) => `${c.colorId}:${c.axis}`));
-    setColorChangedKeys(keys);
-    if (colorChangedClearTimer.current) clearTimeout(colorChangedClearTimer.current);
-    colorChangedClearTimer.current = setTimeout(() => setColorChangedKeys(new Set()), 1600);
-
-    const biasCount = result.changes.filter((c) => c.reason === "bias" || c.reason === "axis_bias").length;
-    const upCount   = result.changes.filter((c) => c.reason === "untapped").length;
-    showPresetToast(
-      `✨ 色重みを自動調整しました（${result.changes.length}件）`,
-      `偏り減点 ${biasCount} 件・未使用加点 ${upCount} 件。次回の生成から反映されます。`,
-    );
-  }, [colorWeights, colorAnalysis, showPresetToast]);
-
-  const handleColorUndoAdjust = useCallback(() => {
-    setColorWeightsUndoStack((stack) => {
-      if (stack.length === 0) return stack;
-      const [restored, ...rest] = stack;
-      setColorWeights(restored);
-      saveColorWeights(restored);
-      setColorChangedKeys(new Set());
-      showPresetToast("↶ 色重みの自動調整を元に戻しました", "");
-      return rest;
-    });
-  }, [showPresetToast]);
-
-  // ── 🤖 AI分析エージェント：提案アクションの実行 ──
-  const handleAgentAction = useCallback((id: AgentActionId) => {
-    switch (id) {
-      case "apply": {
-        // 自動調整（手動を保護）→ ユーザーが「提案を反映」を別途押すと生成に効く
-        handleAutoAdjust(true);
-        break;
-      }
-      case "see_alternative": {
-        // 既存の「別ジャンル化」をトリガー（DuplicateAnalysisPanelの onAutoFix と同じ動作）
-        const antiInputs = buildAntiTemplateInputs(buildInputs(), variationMemory);
-        setScopes(antiInputs.scopes);
-        setMoods(antiInputs.moods);
-        setAutoMoodCategories(antiInputs.autoMoodCategories ?? []);
-        setDetails(antiInputs.details);
-        setViralMode(antiInputs.viralMode);
-        setExtraInstructions(antiInputs.extraInstructions);
-        setActiveWorldPresets([]);
-        setWorldCombinedNote("");
-        setScopeFlashKey((k) => k + 1);
-        setVariationMemory((prev) => updateMemory(prev, {
-          moods: antiInputs.moods, scopes: antiInputs.scopes,
-        }));
-        showPresetToast("🎭 別ジャンルへ変換しました", "プロンプトを生成してください。");
-        break;
-      }
-      case "avoid_overlap": {
-        // 神引き補助「被り回避」を ON
-        if (!activeBoosts.includes("avoid_overlap")) {
-          setActiveBoosts((prev) => [...prev, "avoid_overlap"]);
-        }
-        showPresetToast("🔁 重複を避けるをONにしました", "次の生成から直近と似た方向を回避します。");
-        break;
-      }
-      case "favorite_bias": {
-        // お気に入り学習を ON
-        setFavoriteLearnEnabled(true);
-        showPresetToast("⭐ お気に入り傾向ONにしました", "好みの方向に少し寄せた案を生成します。");
-        break;
-      }
-      case "simplify": {
-        // 変更範囲を上位2軸に絞り、神引き・補助を整理
-        const priority: Scope[] = ["outfit", "hair", "lighting", "background", "camera", "foreground"];
-        const keep = scopes.filter((s) => priority.includes(s)).slice(0, 2);
-        if (keep.length > 0) setScopes(keep);
-        setActiveGodModes([]);
-        setActiveBoosts([]);
-        setChaosLabel(null);
-        setScopeFlashKey((k) => k + 1);
-        showPresetToast("🧹 シンプル化しました", "変更範囲を絞り、神引き・補助を解除しました。");
-        break;
-      }
-      case "go_bold": {
-        // 神引きカオス + バズ寄せ
-        if (!activeGodModes.includes("chaos")) {
-          setActiveGodModes(["chaos"]);
-        }
-        if (!activeBoosts.includes("buzz")) {
-          setActiveBoosts((prev) => [...prev, "buzz"]);
-        }
-        showPresetToast("⚡ 攻めるモードを適用しました", "意外性の高い構成で生成されます。");
-        break;
-      }
-    }
-  }, [
-    handleAutoAdjust, buildInputs, variationMemory, activeBoosts, scopes,
-    activeGodModes, showPresetToast,
-  ]);
+  // 🧹 色重みの自動調整／Undo、AI分析エージェントの提案アクション（handleAgentAction）は
+  //    分析センター撤去（タスクB・案X）で廃止。colorWeights 本体と buildInputs 使用は温存。
 
   // handleRandom（🎲おまかせ）・handleVariant（🔄別案）の UI トグルは撤去。
 
@@ -1725,21 +1370,8 @@ export default function App() {
   // handleResetGod / handleResetAssist は SelectionSummary（撤去済み）専用だったため削除。
   // 必要なリセットは onResetAll（全リセット）から行われる。
 
-  /** 🔎 AIっぽさチェック：生成済みプロンプトを偏り分析し結果を表示する。 */
-  const handleMassProductionCheck = useCallback(() => {
-    const texts = items
-      .map((item) => item.promptText)
-      .filter((t) => t.length > 0);
-
-    if (texts.length === 0) {
-      showPresetToast("⚠️ プロンプトを先に生成してください", "");
-      return;
-    }
-
-    // 現在のバッチIDを除外して履歴と比較
-    const currentBatchId = items[0]?.batchId;
-    void runBiasAnalysis(texts, currentBatchId);
-  }, [items, runBiasAnalysis, showPresetToast]);
+  // 🧹 AIっぽさチェック（手動 runBiasAnalysis トリガー）は分析センター撤去（タスクB・案X）で廃止。
+  //    runBiasAnalysis は生成後に自動実行され続ける（historyAnalysis 等の更新は維持）。
 
   useEffect(() => {
     if (pendingRunRef.current) {
@@ -2148,14 +1780,7 @@ export default function App() {
                   live={analysisLive.state}
                   categories={analysisCategories}
                 />
-                <button
-                  type="button"
-                  onClick={() => { setAnalysisInitialTab("dup"); setAnalysisCenterOpen(true); }}
-                  className="text-[11px] font-semibold px-2 py-0.5 rounded-md border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition leading-none whitespace-nowrap"
-                  title="分析センターを開く（重複分析・AIっぽさ・色・画像・評価集計・発見）"
-                >
-                  🔎 分析センターで見る
-                </button>
+                {/* 🧹 分析センター（DuplicateAnalysisPanel）は撤去（タスクB・案X）。入口ボタンも撤去。 */}
                 {/* 🟢 Gemini 接続状態（health ポーリング・8b7bfa2 で落ちた最終配線を復旧） */}
                 <BackendStatus prominent />
               </div>
@@ -2235,7 +1860,7 @@ export default function App() {
                 setView("history");
               }}
               onShowReferenceHistory={() => setCompareOpen(true)}
-              onShowAnalysis={() => setAnalysisCenterOpen(true)}
+              onShowAnalysis={() => {}}  /* 🧹 分析センター撤去（タスクB・案X）：入口は no-op（ボタンは §4 レイアウト保護で残置） */
               onToggleExplorer={() => setExplorerOpen((v) => !v)}
               explorerOpen={explorerOpen}
             />
@@ -2300,98 +1925,10 @@ export default function App() {
                 onAvoidRealBackgroundChange={setAvoidRealBackground}
               />
 
-              {/* 📊 分析センター（全画面モーダル 95vw×92vh・docs/32 A1）。左メニューから開く。 */}
-              {analysisCenterOpen && (
-                <div className="fixed inset-0 z-40 bg-black/70 p-2 sm:p-4 grid place-items-center" onClick={() => setAnalysisCenterOpen(false)}>
-                  <div className="w-[95vw] h-[92vh] rounded-xl border border-bg-border bg-bg-panel shadow-2xl overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
-                  <DuplicateAnalysisPanel
-                  asModal
-                  onCenterClose={() => setAnalysisCenterOpen(false)}
-                  initialTab={analysisInitialTab}
-                  biasResult={massProductionResult}
-                  onRunBiasCheck={handleMassProductionCheck}
-                  historyAnalysis={historyAnalysis}
-                  levels={levels}
-                  policyApplied={policyApplied}
-                  onLevelChange={handleLevelChange}
-                  onBulkLevel={handleDupBulkLevel}
-                  onClearNg={handleDupClearNg}
-                  onAutoAdjust={handleAutoAdjust}
-                  onUndoAutoAdjust={handleUndoAutoAdjust}
-                  canUndoAuto={levelsUndoStack.length > 0}
-                  changedIds={changedIds}
-                  comboPolicies={comboPolicies}
-                  onComboPolicyChange={handleComboPolicyChange}
-                  colorAnalysis={colorAnalysis}
-                  colorSuccess={colorSuccess}
-                  candidates={discoveryCandidates}
-                  onIgnoreTerm={handleIgnoreTerm}
-                  skyveilSlot={(
-                    /* 分析センターは確認専用（読み取り専用）。操作の主入口は生成画面の「あなたの好み（skyveil）」。 */
-                    <SkyveilBar
-                      readOnly
-                      enabled={favoriteLearnEnabled}
-                      strength={skyveilStrength}
-                      profile={skyveilProfile}
-                      oneShotArmed={skyveilOneShot}
-                      successPatterns={successPatterns}
-                    />
-                  )}
-                  colorWeights={colorWeights}
-                  onColorWeightChange={handleColorWeightChange}
-                  onColorWeightsReset={handleColorWeightsReset}
-                  onColorAutoAdjust={handleColorAutoAdjust}
-                  onColorUndoAdjust={handleColorUndoAdjust}
-                  canColorUndo={colorWeightsUndoStack.length > 0}
-                  colorChangedKeys={colorChangedKeys}
-                  colorWindowSize={colorWindowSize}
-                  onColorWindowSizeChange={setColorWindowSize}
-                  imageAnalysis={imageAnalysis}
-                  onStartImageAnalysis={startImageAnalysis}
-                  imageAnalyzeProgress={imageAnalyzeProgress}
-                  onCancelImageAnalysis={cancelImageAnalysis}
-                  ratingAnalysis={ratingAnalysis}
-                  ratingTrends={ratingTrends}
-                  successRankings={successRankings}
-                  preferenceProfile={preferenceProfile}
-                  profileSampleCount={profileSampleCount}
-                  agent={agentAnalysis}
-                  onAgentAction={handleAgentAction}
-                  onApplyPolicies={handleDupApplyPolicies}
-                  onUnapplyPolicies={handleDupUnapplyPolicies}
-                  onResetPolicies={handleDupResetPolicies}
-                  onAutoFix={() => {
-                    const antiInputs = buildAntiTemplateInputs(buildInputs(), variationMemory);
-                    setScopes(antiInputs.scopes);
-                    setMoods(antiInputs.moods);
-                    setAutoMoodCategories(antiInputs.autoMoodCategories ?? []);
-                    setDetails(antiInputs.details);
-                    setViralMode(antiInputs.viralMode);
-                    setExtraInstructions(antiInputs.extraInstructions);
-                    setActiveWorldPresets([]);
-                    setWorldCombinedNote("");
-                    setScopeFlashKey((k) => k + 1);
-                    setVariationMemory((prev) => updateMemory(prev, {
-                      moods:  antiInputs.moods,
-                      scopes: antiInputs.scopes,
-                    }));
-                    setMassProductionResult(null);
-                    showPresetToast("🎭 別ジャンルへ変換しました", "プロンプトを生成してください。");
-                  }}
-                  onReroll={() => {
-                    setMassProductionResult(null);
-                    void runGenerate(buildInputs());
-                  }}
-                  onResetBias={handleDupResetBias}
-                  onDismiss={handleDupDismiss}
-                  analysisStats={analysisStats}
-                  activeScopes={scopes}
-                  favoriteProfile={favoriteProfile}
-                  favoriteLearnEnabled={favoriteLearnEnabled}
-                />
-                  </div>
-                </div>
-              )}
+              {/* 🧹 分析センター（DuplicateAnalysisPanel）は撤去（タスクB・案X）。
+                  UI のみ撤去で buildInputs は無改変＝生成は完全に不変（motif/combo/color/image/rating の
+                  反映ゲートと localStorage の levels/comboPolicies/colorWeights/policyApplied は温存）。
+                  お気に入り・履歴・学習データには一切触れない。 */}
 
               <ControlPanel
                 scopes={scopes}
