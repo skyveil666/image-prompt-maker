@@ -1582,14 +1582,6 @@ export default function App() {
         .some((k) => Object.prototype.hasOwnProperty.call(patch, k))) {
         void logOperation("rate", { id });
       }
-      // 失敗理由メモ（skyveil学習材料・自動反映はしない）
-      if (Object.prototype.hasOwnProperty.call(patch, "failureMemo") && patch.failureMemo) {
-        void logOperation("fail_memo", {
-          id,
-          reasons: patch.failureMemo.selectedReasons,
-          severity: patch.failureMemo.severity,
-        });
-      }
     },
     [refreshFavoriteProfile]
   );
@@ -2014,7 +2006,6 @@ export default function App() {
                     onUpdate={handleItemUpdate}
                     onArrange={handleArrange}
                     lock={currentLock}
-                    skyveilProfile={skyveilProfile}
                   />
                 </section>
               )}

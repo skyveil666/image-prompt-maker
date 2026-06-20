@@ -1,111 +1,51 @@
 /**
- * PromptGuardSection — 各プロンプト案カードに表示する「ガードパネル」。
+ * PromptGuardSection — 各プロンプト案カードに表示する「ガードパネル（安全チェック）」。
  *
- * 4機能を1つの折りたたみセクションに統合：
+ * 安全チェックを1つの折りたたみセクションに表示：
+ *   ・サーバ側スコープフィルタ / Identity Shield（生成時の保護結果）
  *   ① 変更対象ロック一覧（何を変える / 変えない / 固定ルール）
  *   ② 変更禁止チェック（保護対象への干渉警告 ＋ 禁止ワード除去）
- *   ③ skyveil好みスコア（参考表示のみ ＋ 改善案作成/反映）
- *   ④ 失敗理由メモ（ワンタップ理由＋自由入力＋深刻度・保存）
+ *   ⑦ 同一性リスク表示
  *
- * 重要：分析やスコアは自動でプロンプトを変えない。すべてボタンを押した時だけ適用。
+ * 重要：表示のみ。🧹禁止ワード除去を押した時だけ promptText を上書きする（自動反映なし）。
  */
 
 import { useMemo, useState } from "react";
-import type { FailureMemo, ServerScopeFilterSummary, IdentityShieldSummary } from "../types";
-import { FAILURE_REASONS } from "../types";
+import type { ServerScopeFilterSummary, IdentityShieldSummary } from "../types";
 import type { LockState } from "../lib/promptLockCheck";
 import { cleanForbidden } from "../lib/promptLockCheck";
-import { scoreBand, buildImprovedPrompt } from "../lib/skyveilScore";
-import type { SkyveilProfile } from "../lib/skyveilProfile";
 import { analyzeProposal } from "../lib/analyzeProposal";
-import { massAILevelLabel, biasStrengthLabel } from "../lib/massAIBias";
 import { identityLevelLabel } from "../lib/identityRisk";
-import { diffPrompts, type PromptVersion } from "../lib/promptDiff";
-import { generateReversePrompt } from "../lib/reversePrompt";
 
 interface Props {
   promptText: string;
   lock: LockState;
-  profile?: SkyveilProfile | null;
-  existingMemo?: FailureMemo;
   /** サーバ側スコープフィルタ結果（生成時に削除した項目） */
   serverScopeFilter?: ServerScopeFilterSummary;
   /** Identity Shield 結果（生成時に追加した同一性保護文） */
   serverIdentityShield?: IdentityShieldSummary;
-  /** 版履歴（差分・この版に戻す用） */
-  versions?: PromptVersion[];
-  /** 禁止ワード除去/改善案反映/版復元で promptText を上書きする */
+  /** 🧹禁止ワード除去で promptText を上書きする */
   onApplyCleanedPrompt: (next: string) => void;
-  /** 失敗理由メモを保存する */
-  onSaveFailureMemo: (memo: FailureMemo) => void;
 }
 
-const MASS_TONE: Record<string, string> = {
-  low: "text-emerald-300", medium: "text-amber-300", high: "text-orange-300", danger: "text-rose-300",
-};
 const RISK_TONE: Record<string, string> = {
   low: "text-emerald-300", medium: "text-amber-300", high: "text-orange-300", danger: "text-rose-300",
 };
 
-const TONE: Record<string, { ring: string; text: string; bar: string }> = {
-  green:  { ring: "border-emerald-400/50", text: "text-emerald-300", bar: "bg-emerald-400" },
-  lime:   { ring: "border-lime-400/50",    text: "text-lime-300",    bar: "bg-lime-400" },
-  amber:  { ring: "border-amber-400/50",   text: "text-amber-300",   bar: "bg-amber-400" },
-  orange: { ring: "border-orange-400/50",  text: "text-orange-300",  bar: "bg-orange-400" },
-  red:    { ring: "border-rose-400/55",    text: "text-rose-300",    bar: "bg-rose-400" },
-};
-
 export function PromptGuardSection({
-  promptText, lock, profile, existingMemo, serverScopeFilter, serverIdentityShield,
-  versions, onApplyCleanedPrompt, onSaveFailureMemo,
+  promptText, lock, serverScopeFilter, serverIdentityShield, onApplyCleanedPrompt,
 }: Props) {
   const [open, setOpen] = useState(false);
-  const [improved, setImproved] = useState<string | null>(null);
-  const [showDiff, setShowDiff] = useState(false);
-  const [reverse, setReverse] = useState<ReturnType<typeof generateReversePrompt> | null>(null);
-
-  // 失敗理由メモのローカル編集状態
-  const [reasons, setReasons] = useState<string[]>(existingMemo?.selectedReasons ?? []);
-  const [customMemo, setCustomMemo] = useState<string>(existingMemo?.customMemo ?? "");
-  const [severity, setSeverity] = useState<1 | 2 | 3 | 4 | 5>(existingMemo?.severity ?? 3);
-  const [memoSaved, setMemoSaved] = useState(false);
 
   // ── 全チェックを1関数に集約（analyzeProposal）。promptText / lock が変わるたび再計算 ──
   const analysis = useMemo(
-    () => analyzeProposal(promptText, lock, profile),
-    [promptText, lock, profile],
+    () => analyzeProposal(promptText, lock),
+    [promptText, lock],
   );
-  const { validation, identityRisk: identity, massAI, skyveilScore: score } = analysis;
-  const band = scoreBand(score.total);
-  const tone = TONE[band.tone];
-
-  // ── #8 前回（最新の版）との差分 ──
-  const lastVersion = versions && versions.length > 0 ? versions[versions.length - 1] : null;
-  const diff = useMemo(
-    () => lastVersion ? diffPrompts(lastVersion.prompt, promptText) : null,
-    [lastVersion, promptText],
-  );
+  const { validation, identityRisk: identity } = analysis;
 
   const changed = analysis.lockSummary.changed;
   const locked  = analysis.lockSummary.locked;
-
-  const toggleReason = (r: string) =>
-    setReasons((prev) => prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]);
-
-  const saveFailureMemo = () => {
-    if (reasons.length === 0 && !customMemo.trim()) return;
-    const memo: FailureMemo = {
-      id: existingMemo?.id ?? `fm-${Date.now()}`,
-      createdAt: Date.now(),
-      promptId: "",  // 親で item.id を補完
-      selectedReasons: reasons,
-      customMemo: customMemo.trim(),
-      severity,
-    };
-    onSaveFailureMemo(memo);
-    setMemoSaved(true);
-    setTimeout(() => setMemoSaved(false), 1800);
-  };
 
   return (
     <div className="rounded-xl border border-bg-border/70 bg-bg-base/30 overflow-hidden">
@@ -262,17 +202,6 @@ export function PromptGuardSection({
   );
 }
 
-function BiasChip({ label, score }: { label: string; score: number }) {
-  const s = biasStrengthLabel(score);
-  const cls = s === "強" ? "text-rose-300" : s === "中" ? "text-amber-300" : s === "弱" ? "text-text-muted/70" : "text-emerald-300/70";
-  return (
-    <span className="text-[10px] leading-none">
-      <span className="text-text-muted/70">{label}偏り：</span>
-      <span className={["font-bold", cls].join(" ")}>{s}</span>
-    </span>
-  );
-}
-
 function GroupHeader({ icon, label, sub }: { icon: string; label: string; sub: string }) {
   return (
     <div className="flex items-baseline gap-2 pt-1.5 first:pt-0">
@@ -280,28 +209,6 @@ function GroupHeader({ icon, label, sub }: { icon: string; label: string; sub: s
       <span className="text-[12px] font-bold text-text-base">{label}</span>
       <span className="text-[10px] text-text-muted/55">{sub}</span>
       <span className="flex-1 h-px bg-bg-border/60 self-center" />
-    </div>
-  );
-}
-
-// P4: サブスコアの意味を tooltip で補足（表示のみ・スコア計算は不変）
-const SUBSCORE_TIPS: Record<string, string> = {
-  "同一性安全度": "顔・人物の同一性が崩れにくいか（保護が効いているほど高い）",
-  "ロック遵守度": "変更対象外の軸に触れていないか（守るものを守れているほど高い）",
-  "AIっぽさ回避度": "ありがちなAIっぽい表現を避けられているか",
-  "オリジナリティ": "独自性・新規性の高さ",
-  "トレンドバランス": "流行を取り入れつつ偏りすぎていないか",
-  "バズり余地": "SNSで伸びる余地・インパクト",
-};
-function SubScore({ label, value }: { label: string; value: number }) {
-  const color = value >= 75 ? "bg-emerald-400" : value >= 55 ? "bg-amber-400" : "bg-rose-400";
-  return (
-    <div className="flex items-center gap-1.5 cursor-help" title={`${label}：${value}/100\n${SUBSCORE_TIPS[label] ?? ""}`}>
-      <span className="text-[10px] text-text-muted/80 w-24 shrink-0 leading-none">{label}</span>
-      <div className="flex-1 h-1.5 rounded-full bg-white/8 overflow-hidden">
-        <div className={["h-full rounded-full", color].join(" ")} style={{ width: `${value}%` }} />
-      </div>
-      <span className="text-[10px] tabular-nums text-text-muted/80 w-6 text-right leading-none">{value}</span>
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import type { PromptHistoryItem } from "../types";
 import { PromptCard } from "./PromptCard";
 import type { LockState } from "../lib/promptLockCheck";
-import type { SkyveilProfile } from "../lib/skyveilProfile";
 
 interface Props {
   title: string;
@@ -10,13 +9,12 @@ interface Props {
   items: PromptHistoryItem[];
   onUpdate: (id: string, patch: Partial<PromptHistoryItem>) => void;
   onArrange?: (item: PromptHistoryItem) => void;
-  /** ガードパネル用：変更禁止チェック・スコアのロック状態 */
+  /** ガードパネル用：変更禁止チェックのロック状態 */
   lock?: LockState;
-  skyveilProfile?: SkyveilProfile | null;
 }
 
 /** PromptCard へ渡すガード関連 props をまとめた型（prop-drilling 簡略化） */
-type GuardProps = { lock?: LockState; skyveilProfile?: SkyveilProfile | null };
+type GuardProps = { lock?: LockState };
 
 type ViewMode = "normal" | "tab" | "split";
 
@@ -228,9 +226,9 @@ function TabView({
 /** localStorage キー：全案コピー済み（batchId ごと） */
 const allCopiedKey = (batchId: string) => `all_copied_${batchId}`;
 
-export function PromptList({ title, subtitle, items, onUpdate, onArrange, lock, skyveilProfile }: Props) {
+export function PromptList({ title, subtitle, items, onUpdate, onArrange, lock }: Props) {
   const batchId = items[0]?.batchId ?? "";
-  const guard: GuardProps = { lock, skyveilProfile };
+  const guard: GuardProps = { lock };
 
   /** 全案コピー済み：localStorage に永続保存 */
   const [copiedAll, setCopiedAll] = useState(() => {

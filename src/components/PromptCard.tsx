@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PromptHistoryItem, FailureMemo, ResultAnalysis } from "../types";
+import type { PromptHistoryItem, ResultAnalysis } from "../types";
 import { fileToThumbnail } from "../lib/imageFile";
 import { analyzeResultViaBackend } from "../lib/backendClient";
 import { FavoriteButton } from "./FavoriteButton";
@@ -11,16 +11,13 @@ import {
 import { PromptGuardSection } from "./PromptGuardSection";
 import type { LockState } from "../lib/promptLockCheck";
 import { buildLockHeader } from "../lib/promptLockCheck";
-import type { SkyveilProfile } from "../lib/skyveilProfile";
 
 interface Props {
   item: PromptHistoryItem;
   onUpdate: (id: string, patch: Partial<PromptHistoryItem>) => void;
   onArrange?: (item: PromptHistoryItem) => void;
-  /** 変更禁止チェック・スコア用のロック状態（メイン生成画面でのみ渡る） */
+  /** 変更禁止チェック用のロック状態（メイン生成画面でのみ渡る） */
   lock?: LockState;
-  /** skyveil好みスコア用プロファイル */
-  skyveilProfile?: SkyveilProfile | null;
 }
 
 // ─── Per-proposal accent palette (index 0 = 案1) ─────────────────────────────
@@ -557,7 +554,7 @@ function GeneratedResultSlot({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: Props) {
+export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
   const [expanded, setExpanded] = useState(false);
   /** ロック一覧をコピーに含めるか */
   const [includeLockHeader, setIncludeLockHeader] = useState(false);
@@ -602,11 +599,6 @@ export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: 
     const versions = [...prevVersions, newVersion].slice(-20);
     onUpdate(item.id, { promptText: next, versions });
   }, [item.id, item.promptText, item.versions, onUpdate]);
-
-  /** 失敗理由メモを保存（promptId を補完） */
-  const saveFailureMemo = useCallback((memo: FailureMemo) => {
-    onUpdate(item.id, { failureMemo: { ...memo, promptId: item.id } });
-  }, [item.id, onUpdate]);
 
   const isLong =
     item.promptText.split(/\n/).length > LONG_THRESHOLD_LINES ||
@@ -844,19 +836,15 @@ export function PromptCard({ item, onUpdate, onArrange, lock, skyveilProfile }: 
         analyzeError={analyzeError}
       />
 
-      {/* ── 🛡 ガードパネル（変更禁止チェック / ロック一覧 / スコア / 失敗メモ） ── */}
+      {/* ── 🛡 ガードパネル（安全チェック：ロック一覧 / 変更禁止チェック / 同一性リスク） ── */}
       {lock && (
         <div className="px-5 pb-1">
           <PromptGuardSection
             promptText={item.promptText}
             lock={lock}
-            profile={skyveilProfile}
-            existingMemo={item.failureMemo}
             serverScopeFilter={item.serverScopeFilter}
             serverIdentityShield={item.identityShield}
-            versions={item.versions}
             onApplyCleanedPrompt={applyCleanedPrompt}
-            onSaveFailureMemo={saveFailureMemo}
           />
         </div>
       )}
