@@ -91,12 +91,11 @@ import { logOperation } from "./lib/operationLog";
 import { deriveLockState } from "./lib/promptLockCheck";
 import { analyzeIdentityRisk } from "./lib/identityRisk";
 import { GlobalProtectionBar } from "./components/GlobalProtectionBar";
-import { AnalysisStatusStrip, type AnalysisCategoryView } from "./components/AnalysisStatusStrip";
+import { type AnalysisCategoryView } from "./components/AnalysisStatusStrip";
 import { RecoveryPanel } from "./components/RecoveryPanel";
 import { useAnalysisLive } from "./lib/useAnalysisLive";
 import { useLatestRef } from "./lib/useLatestRef";
 import { buildReferenceNoteText } from "./lib/referenceNote";
-import { AnalysisLiveView } from "./components/AnalysisLiveView";
 import {
   loadPreferenceProfile, savePreferenceProfile, clearPreferenceProfile,
   loadAutoLearn, saveAutoLearn,
@@ -1744,24 +1743,9 @@ export default function App() {
             risk={liveIdentityRisk}
             analysisSummary={
               <div className="flex items-center gap-2 flex-wrap">
-                <AnalysisStatusStrip
-                  variant="summary"
-                  live={analysisLive.state}
-                  categories={analysisCategories}
-                />
-                {/* 🧹 分析センター（DuplicateAnalysisPanel）は撤去（タスクB・案X）。入口ボタンも撤去。 */}
                 {/* 🟢 Gemini 接続状態（health ポーリング・8b7bfa2 で落ちた最終配線を復旧） */}
                 <BackendStatus prominent />
               </div>
-            }
-            analysisDetail={
-              <AnalysisStatusStrip
-                variant="detail"
-                live={analysisLive.state}
-                categories={analysisCategories}
-                detailOpen={analysisDetailOpen}
-                onDetail={toggleAnalysisDetail}
-              />
             }
             actions={
               <>
@@ -1787,15 +1771,6 @@ export default function App() {
               />
             }
           />
-          {/* 🤖 AI分析ライブビュー：GPB 展開内の[ライブビュー]で開く（M-2 統合） */}
-          {analysisDetailOpen && (
-            <div ref={analysisLiveRef} className="mb-3">
-              <AnalysisLiveView
-                state={analysisLive.state}
-                onRetry={() => void refreshFavoriteProfile()}
-              />
-            </div>
-          )}
           <div
             className="lg:grid lg:gap-6"
             style={{
