@@ -127,56 +127,6 @@ function ratingFrameClass(rating: number | null): string {
   }
 }
 
-// 🤖 AI仮評価パネル（Gemini Vision の ResultAnalysis を表示。ユーザー評価とは分離・確定しない）
-function AiAnalysisPanel({ a }: { a: ResultAnalysis }) {
-  const tone = (t: string) =>
-    ["good", "ok", "strong", "low"].includes(t) ? "text-emerald-200"
-    : ["bad", "risk", "monotone", "high", "no"].includes(t) ? "text-rose-200"
-    : ["caution", "weak", "mid", "complex", "yes"].includes(t) ? "text-amber-200"
-    : "text-sky-200";
-  const row = (label: string, jp: string, t: string) => (
-    <div className="flex items-center gap-1.5">
-      <span className="text-text-muted/65 w-[68px] shrink-0">{label}</span>
-      <span className={`font-semibold ${tone(t)}`}>{jp}</span>
-    </div>
-  );
-  const J = {
-    q: { good: "良い", normal: "普通", bad: "悪い" },
-    safe: { ok: "OK", caution: "注意", risk: "危険" },
-    sch: { monotone: "単調", good: "良い", complex: "複雑すぎ" },
-    sep: { yes: "あり", weak: "弱い", no: "なし" },
-    lv: { low: "低", mid: "中", high: "高" },
-    st: { strong: "強い", normal: "普通", weak: "弱い" },
-    yn: { yes: "あり", no: "なし" },
-    pr: { high: "高", normal: "普通", low: "低" },
-  } as const;
-  return (
-    <div className="ml-7 mt-1 rounded-xl border border-violet-400/30 bg-violet-500/8 px-3 py-2 text-[11px] leading-relaxed">
-      <div className="text-[11px] font-bold text-violet-200/90 mb-1">🤖 AI仮評価（参考・ユーザー評価とは別。確定は上の評価ボタンで）</div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
-        {row("顔一致", J.q[a.faceMatch], a.faceMatch)}
-        {row("同一性", J.safe[a.identitySafety], a.identitySafety)}
-        {row("衣装配色", J.sch[a.outfitColorScheme], a.outfitColorScheme)}
-        {row("上下別色", J.sep[a.topBottomSeparation], a.topBottomSeparation)}
-        {row("外内別色", J.sep[a.outerInnerSeparation], a.outerInnerSeparation)}
-        {row("単色化", J.lv[a.monotone], a.monotone)}
-        {row("背景実写", J.st[a.backgroundRealism], a.backgroundRealism === "strong" ? "high" : a.backgroundRealism === "weak" ? "low" : "mid")}
-        {row("2D/2.5D", J.st[a.stylization], a.stylization === "strong" ? "good" : a.stylization === "weak" ? "bad" : "normal")}
-        {row("色偏り", J.yn[a.colorBias], a.colorBias)}
-        {row("前景", J.lv[a.foregroundIntensity], a.foregroundIntensity)}
-        {row("主役性", J.pr[a.subjectPriority], a.subjectPriority === "high" ? "good" : a.subjectPriority === "low" ? "bad" : "normal")}
-        {row("テンプレ", J.pr[a.templateRisk], a.templateRisk)}
-        {row("skyveil好み", J.st[a.skyveilPreference], a.skyveilPreference === "strong" ? "good" : a.skyveilPreference === "weak" ? "bad" : "normal")}
-      </div>
-      {a.backgroundType && <div className="mt-1 text-text-muted/80">背景：{a.backgroundType}</div>}
-      {a.outfitStructure && <div className="text-text-muted/80">衣装：{a.outfitStructure}</div>}
-      {a.colorBias === "yes" && a.colorBiasNote && <div className="text-amber-200/85">色偏り：{a.colorBiasNote}</div>}
-      {a.improvement && <div className="mt-1 text-violet-100/90">💡 提案：{a.improvement}</div>}
-      <div className="mt-1 text-[10px] text-text-muted/45">※ AI仮評価です。次回プロンプトへは自動反映しません。</div>
-    </div>
-  );
-}
-
 function GeneratedResultSlot({
   resultImages, resultRatings, resultMemos,
   sourceImageUrl,
@@ -433,66 +383,6 @@ function GeneratedResultSlot({
                         <span>{memo ? "メモ" : "メモ"}</span>
                       </button>
                     </div>
-                    {/* 軸別評価（背景/衣装/ポーズ）— 30件以上で内部分析が走る */}
-                    <div className="flex items-center gap-2 pl-7 flex-wrap">
-                      {(["bg", "outfit", "pose"] as RatingAxisKey[]).map((axis) => {
-                        const meta = AXIS_RATING_META[axis];
-                        const v = axisRatings[axis][i] ?? null;
-                        // 軸別は3段階（良い/普通/悪い）。腕マーク系（👍👎）は廃止し短いラベルに統一。
-                        const mkBtn = (val: 5 | 3 | 1, lbl: string, onCls: string) => {
-                          const on = v === val;
-                          return (
-                            <button
-                              key={val}
-                              type="button"
-                              onClick={() => onSetAxisRating(axis, i, on ? null : val)}
-                              title={`${meta.jp}：${lbl}${on ? "（クリックで解除）" : ""}`}
-                              className={[
-                                "inline-flex items-center px-2.5 py-1.5 rounded-lg border text-[12px] font-semibold leading-none transition select-none",
-                                on
-                                  ? onCls
-                                  : "border-bg-border/50 bg-bg-base/40 text-text-muted/70 hover:text-text-base hover:border-white/35",
-                              ].join(" ")}
-                            >
-                              {lbl}
-                            </button>
-                          );
-                        };
-                        return (
-                          <span key={axis} className="inline-flex items-center gap-1 rounded-xl border border-bg-border/35 bg-bg-panel/40 px-2 py-1">
-                            <span className="text-[12px] font-semibold text-text-muted/85 leading-none shrink-0 select-none">
-                              {meta.emoji}{meta.jp}
-                            </span>
-                            {mkBtn(5, "良い", "border-emerald-400/75 bg-emerald-500/22 text-emerald-100")}
-                            {mkBtn(3, "普通", "border-sky-400/70     bg-sky-500/20     text-sky-100")}
-                            {mkBtn(1, "悪い", "border-rose-400/75    bg-rose-500/22    text-rose-100")}
-                          </span>
-                        );
-                      })}
-                    </div>
-                    {/* 🔍 AI分析（Gemini Vision・押した時だけ実行・AI仮評価） */}
-                    <div className="pl-7 flex items-center gap-2 flex-wrap">
-                      <button
-                        type="button"
-                        onClick={() => onAnalyze(i)}
-                        disabled={analyzingIdx !== null}
-                        title="この画像を Gemini Vision で分析（衣装/背景/色/構図/主役性などのAI仮評価）。押した時だけ実行・次回プロンプトへは自動反映しません。"
-                        className={[
-                          "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-[12px] font-semibold leading-none transition select-none",
-                          analyzingIdx === i
-                            ? "border-violet-400/70 bg-violet-500/20 text-violet-100 cursor-wait"
-                            : "border-violet-400/45 bg-violet-500/10 text-violet-100 hover:bg-violet-500/20 hover:border-violet-400/70 disabled:opacity-40",
-                        ].join(" ")}
-                      >
-                        {analyzingIdx === i
-                          ? <><span className="inline-block animate-spin leading-none">⟳</span>AI分析中…</>
-                          : <>🔍 AI分析{resultAiAnalysis[i] ? "（再分析）" : ""}</>}
-                      </button>
-                      {analyzeError && analyzingIdx === null && (
-                        <span className="text-[11px] text-rose-300/85">{analyzeError}</span>
-                      )}
-                    </div>
-                    {resultAiAnalysis[i] && <AiAnalysisPanel a={resultAiAnalysis[i]!} />}
                     {isMemoOpen && (
                       <input
                         type="text"
