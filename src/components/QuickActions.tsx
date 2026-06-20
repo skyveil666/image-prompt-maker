@@ -17,9 +17,6 @@ import type { WorldPreset } from "../lib/quickActions";
 
 export type { WorldPreset };
 
-/** 旧型名エイリアス（外部コードとの互換性維持） */
-export type FashionPreset = WorldPreset;
-
 // ── Props ──────────────────────────────────────────────────────────────────────
 
 interface QuickActionsProps {
@@ -40,7 +37,7 @@ interface QuickActionsProps {
 // ── ヘルパー ──────────────────────────────────────────────────────────────────
 
 type BtnVariant =
-  | "rose" | "violet" | "cyan" | "amber" | "sky" | "gold"
+  | "violet" | "amber" | "sky" | "gold"
   | "pink" | "indigo" | "stone" | "teal" | "default"
   | "jirai" | "seikimatsu";
 
@@ -63,15 +60,9 @@ function TagBtn({
     "rounded-lg px-3 py-1.5 text-[13px] font-semibold border transition leading-none whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
 
   const styles: Record<BtnVariant, string> = {
-    rose: active
-      ? "border-rose-500/70 bg-gradient-to-r from-rose-500 to-fuchsia-500 text-white shadow-[0_0_14px_rgba(244,63,94,0.4)]"
-      : "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20 hover:border-rose-500/70",
     violet: active
       ? "border-violet-400/80 bg-violet-400/20 text-violet-100 shadow-[0_0_10px_rgba(139,92,246,0.3)]"
       : "border-violet-400/50 bg-violet-400/10 text-violet-200 hover:bg-violet-400/20 hover:border-violet-400/80",
-    cyan: active
-      ? "border-cyan-400/80 bg-cyan-400/20 text-cyan-100 shadow-[0_0_10px_rgba(34,211,238,0.3)]"
-      : "border-cyan-400/50 bg-cyan-400/10 text-cyan-200 hover:bg-cyan-400/20 hover:border-cyan-400/80",
     amber: active
       ? "border-amber-400/80 bg-amber-400/20 text-amber-100 shadow-[0_0_10px_rgba(251,191,36,0.3)]"
       : "border-amber-400/40 bg-amber-400/8 text-amber-200 hover:bg-amber-400/15 hover:border-amber-400/70",
