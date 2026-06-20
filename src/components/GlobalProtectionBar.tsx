@@ -53,15 +53,13 @@ interface Props {
   connection?: ReactNode;
   /** P4: 上部1段統合。ヘッダ行に内包する AI分析の要約（🤖 分析 N件・最新 等） */
   analysisSummary?: ReactNode;
-  /** P4: 展開時に表示する AI分析の詳細（5分析チップ＋ライブビュー誘導） */
-  analysisDetail?: ReactNode;
   /** ヘッダー右側に固定表示する操作群（出力先/案数/✨生成）。UI配置のみ・生成ロジックには無関係。 */
   actions?: ReactNode;
   /** 本体行の直下に全幅表示する生成プログレス（生成中のみ・表示専用）。UI配置のみ・進捗ロジック非関与。 */
   progressSlot?: ReactNode;
 }
 
-export function GlobalProtectionBar({ faceLock, risk, brand, connection, analysisSummary, analysisDetail, actions, progressSlot }: Props) {
+export function GlobalProtectionBar({ faceLock, risk, brand, connection, analysisSummary, actions, progressSlot }: Props) {
   const [open, setOpen] = useState(false);
   const lvl = LEVEL_STYLE[risk.level];
 
@@ -116,16 +114,9 @@ export function GlobalProtectionBar({ faceLock, risk, brand, connection, analysi
         {/* 生成プログレス（本体行直下・全幅・生成中のみ／表示専用・進捗ロジック非関与） */}
         {progressSlot}
 
-        {/* ── 展開時のみ：AI分析詳細 + 顔・同一性 + Identity Shield の詳細 ─────────── */}
+        {/* ── 展開時のみ：顔・同一性 + Identity Shield の詳細 ─────────── */}
         {open && (
           <div className="border-t border-bg-border/30 px-3 py-2.5 space-y-2.5">
-
-            {/* AI分析の詳細（P4：詳細クリック時のみ5分析を表示） */}
-            {analysisDetail && (
-              <div className="pb-2 border-b border-bg-border/30">
-                {analysisDetail}
-              </div>
-            )}
 
             {/* 顔・同一性 / Identity Shield バッジ（生成バー常時行から移設） */}
             <div className="flex items-center gap-2 flex-wrap">

@@ -76,7 +76,6 @@ import { DEFAULT_DETAILS } from "./types";
 import { computeChangedAxes, arrangeCandidateScopes, buildElementFilterInstruction } from "./lib/arrange";
 import { ALL_SCOPE_LABELS } from "./lib/scopeLabels";
 import { buildFavoriteProfile, type FavoriteProfile } from "./lib/favoriteProfile";
-import { analyzeColors, type ColorAnalysis } from "./lib/colorAnalyzer";
 import {
   loadAllFeatures, buildAnalysis as buildImageAnalysis,
   runProgressiveAnalysis, primaryResultImage,
@@ -91,7 +90,6 @@ import { logOperation } from "./lib/operationLog";
 import { deriveLockState } from "./lib/promptLockCheck";
 import { analyzeIdentityRisk } from "./lib/identityRisk";
 import { GlobalProtectionBar } from "./components/GlobalProtectionBar";
-import { type AnalysisCategoryView } from "./components/AnalysisStatusStrip";
 import { RecoveryPanel } from "./components/RecoveryPanel";
 import { useAnalysisLive } from "./lib/useAnalysisLive";
 import { useLatestRef } from "./lib/useLatestRef";
@@ -279,8 +277,6 @@ export default function App() {
   /** 色×軸 重み：colorId → { hair, outfit, background }（各 0-5）。永続化 */
   const [colorWeights] = useState<ColorWeightMap>(() => loadColorWeights());
   // 🧹 色重みのエディタ系（変更/リセット/自動調整Undo/ハイライト）は分析センター撤去で廃止。colorWeights 本体は温存。
-  /** 色分析の対象ウィンドウ（50件・colorAnalysis が使用） */
-  const [colorWindowSize] = useState<50 | 100>(50);
   /** 反映状態（true = 生成ロジックへ実際に流す）。永続化 */
   // 🧹 反映状態（policyApplied）は永続値を読むのみ（トグル UI は分析センター撤去で廃止）。buildInputs では引き続き使用。
   const [policyApplied] = useState<boolean>(() => isApplied());
@@ -865,12 +861,6 @@ export default function App() {
     [historyItemsForColor],
   );
 
-  // ── 🎨 色分析：直近90日×ウィンドウサイズで集計 ──
-  const colorAnalysis: ColorAnalysis | null = useMemo(() => {
-    if (recentItems.length === 0) return null;
-    return analyzeColors(recentItems, colorWindowSize);
-  }, [recentItems, colorWindowSize]);
-
   // 🧹 色成功率分析・評価集計強化・成功/失敗ランキングは分析センター撤去（タスクB・案X）で廃止（表示専用だった）。
 
   // ── 📸 画像分析：直近90日×特徴キャッシュから集計 ──
@@ -937,70 +927,6 @@ export default function App() {
     () => analyzeIdentityRisk("", currentLock),
     [currentLock],
   );
-
-  // 🤖 AnalysisStatusStrip 用：5分析の鮮度（最終実行時刻）。
-  // 重複(historyAnalysis.analyzedAt) / 画像(ImageFeature.analyzedAt) / skyveil(preferenceProfile.generatedAt)
-  // は既存データに実タイムスタンプがある。色・お気に入りはタイムスタンプを持たないため、
-  // 再計算（useMemo 更新）を検知して App 側でスタンプする（分析ロジックは無変更）。
-  const [analysisStamps, setAnalysisStamps] = useState<{ color: number | null; favorite: number | null }>({
-    color: null, favorite: null,
-  });
-  useEffect(() => {
-    if (colorAnalysis) setAnalysisStamps((s) => ({ ...s, color: Date.now() }));
-  }, [colorAnalysis]);
-  useEffect(() => {
-    if (favoriteProfile) setAnalysisStamps((s) => ({ ...s, favorite: Date.now() }));
-  }, [favoriteProfile]);
-  /** 画像分析の最終実行時刻 = 特徴キャッシュ内 analyzedAt の最大値（永続・既存フィールド） */
-  const imageAnalyzedAt = useMemo(() => {
-    let mx: number | null = null;
-    for (const f of imageFeatureMap.values()) {
-      if (f.analyzedAt != null && (mx === null || f.analyzedAt > mx)) mx = f.analyzedAt;
-    }
-    return mx;
-  }, [imageFeatureMap]);
-  /** 5分析サマリ（件数 + 鮮度）。すべて既存 state から算出（ロジック非変更）。 */
-  const analysisCategories = useMemo<AnalysisCategoryView[]>(() => [
-    {
-      key: "duplicate", icon: "📘", label: "重複分析",
-      count: historyAnalysis ? `${historyAnalysis.windowSize}` : null,
-      at: historyAnalysis?.analyzedAt ?? null,
-    },
-    {
-      key: "color", icon: "🎨", label: "色分析",
-      count: colorAnalysis ? `${colorAnalysis.windowSize}` : null,
-      at: analysisStamps.color,
-    },
-    {
-      key: "image", icon: "🖼", label: "画像分析",
-      count: imageAnalysis && imageAnalysis.totalEligible > 0
-        ? `${imageAnalysis.totalAnalyzed}/${imageAnalysis.totalEligible}` : null,
-      at: imageAnalyzedAt,
-    },
-    {
-      key: "favorite", icon: "⭐", label: "お気に入り",
-      count: favoriteProfile && favoriteProfile.favoriteCount > 0 ? `${favoriteProfile.favoriteCount}` : null,
-      at: favoriteProfile && favoriteProfile.favoriteCount > 0 ? analysisStamps.favorite : null,
-    },
-    {
-      key: "skyveil", icon: "🧬", label: "skyveil好み",
-      count: preferenceProfile ? `${preferenceProfile.sampleSize}` : null,
-      at: preferenceProfile?.generatedAt ?? null,
-    },
-  ], [historyAnalysis, colorAnalysis, imageAnalysis, imageAnalyzedAt, favoriteProfile, preferenceProfile, analysisStamps]);
-  /** AI分析詳細（AnalysisLiveView）の開閉。AnalysisStatusStrip の [詳細] で制御（M-2 統合）。 */
-  const analysisLiveRef = useRef<HTMLDivElement>(null);
-  const [analysisDetailOpen, setAnalysisDetailOpen] = useState(false);
-  const toggleAnalysisDetail = useCallback(() => setAnalysisDetailOpen((v) => !v), []);
-  // 詳細を開いた時、パネルを視界へスクロール（上部 sticky の直下に展開されるため）
-  useEffect(() => {
-    if (!analysisDetailOpen) return;
-    const id = setTimeout(
-      () => analysisLiveRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }),
-      50,
-    );
-    return () => clearTimeout(id);
-  }, [analysisDetailOpen]);
 
   /**
    * 実 Gemini 呼び出しで好みプロファイルを更新。
