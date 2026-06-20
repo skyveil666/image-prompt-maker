@@ -1,9 +1,7 @@
 /**
  * クイック操作用の状態ビルダー：
- *  - 🔥 一発バズり（buildViralInputs）
- *  - 🎲 全自動おまかせ（buildRandomInputs）
- *  - 🔄 この画像で別案（buildVariantInputs）
- *  - 👗 Y2K / 🚀 Y3K / 🏙️ ストリート（ファッションプリセット）
+ *  - ✨ アレンジ（buildArrangeInputs）
+ *  - 👗 Y2K / 🚀 Y3K / 🏙️ ストリート ほか世界観プリセット（buildCombinedWorldInputs）
  * いずれも現在の inputs をベースに、必要なフィールドだけ差し替えて返す純粋関数。
  */
 import {
@@ -45,35 +43,6 @@ function pickN<T>(arr: T[], n: number): T[] {
   return shuffled(arr).slice(0, Math.min(n, arr.length));
 }
 
-const VIRAL_MOOD_POOL: Mood[] = [
-  "sns_pop",
-  "fantasy",
-  "cool",
-  "dark",
-  "japanese",
-  "gothic",
-  "mystic",
-  "translucent",
-  "art",
-  "vivid",
-  // SNS最適化（Task D で追加）
-  "portrait",
-  "instagram",
-  "tiktok",
-  "x_buzz",
-];
-
-const ALL_SCOPES: Scope[] = [
-  "background",
-  "pose",
-  "hair",
-  "outfit",
-  "camera",
-  "props",
-  "lighting",
-  "aspect_ratio",
-];
-
 const ALL_MOODS: Mood[] = [
   "cool",
   "digital",
@@ -114,8 +83,6 @@ const ALL_MOODS: Mood[] = [
   "x_buzz",
   "trend_2026",
 ];
-
-const COUNTS: Count[] = [3, 4, 5, 6];
 
 // ─── 重み付きスコープ抽選（プリセット・生成ツール共通） ───────────────────────────
 //
@@ -242,49 +209,6 @@ function scopeOrDefault(current: PromptInputs, fallback: Scope[]): Scope[] {
   return current.scopes.length > 0 ? current.scopes : fallback;
 }
 
-/**
- * 🔥 一発バズり：SNS で目を引く強プロンプトを一発生成する設定を作る。
- */
-export function buildViralInputs(current: PromptInputs, _memory: VariationMemory = createEmptyMemory()): PromptInputs {
-  const moods  = pickN(VIRAL_MOOD_POOL, 2 + Math.floor(Math.random() * 2));
-
-  return {
-    ...current,
-    scopes: scopeOrDefault(current, pickScopesWeighted(PW.viral, moods, _memory.lastScopes)),
-    moods,
-    count: 4 as Count,
-    details: DEFAULT_DETAILS,
-    faceLock: true,
-    viralMode: true,
-    autoMoodCategories: [],
-  };
-}
-
-/**
- * 🎲 全自動おまかせ：scope / mood / 案数 を全部ランダムに決める。
- * 詳細は auto のまま（サーバ側で案ごとに散らせる）。
- */
-export function buildRandomInputs(current: PromptInputs): PromptInputs {
-  // scopes: 2〜4 個、ただし pose 単独より組み合わせを優先
-  const scopes = pickN(ALL_SCOPES, 2 + Math.floor(Math.random() * 3));
-
-  // moods: 2〜4 個
-  const moods = pickN(ALL_MOODS, 2 + Math.floor(Math.random() * 3));
-
-  // 案数: 3/4/5/6
-  const count = COUNTS[Math.floor(Math.random() * COUNTS.length)];
-
-  return {
-    ...current,
-    scopes,
-    moods,
-    count,
-    details: DEFAULT_DETAILS,
-    faceLock: true,
-    viralMode: false,
-    autoMoodCategories: [],
-  };
-}
 
 /**
  * ✨ アレンジ：過去プロンプトの雰囲気・世界観を継承しつつ、別案を生成する。
@@ -421,68 +345,6 @@ export function buildGodInputs(current: PromptInputs, _memory: VariationMemory =
   };
 }
 
-// ─── 小物ガチャ ────────────────────────────────────────────────────────────────
-
-/** 小物ガチャのプール。category は PropsCategory にマッピング済み。 */
-export const GACHA_POOL: ReadonlyArray<{
-  label: string;
-  category: PropsCategory;
-}> = [
-  { label: "刀",             category: "weapon"    },
-  { label: "透明傘",         category: "sns"       },
-  { label: "蝶",             category: "cute"      },
-  { label: "ネオン剣",       category: "weapon"    },
-  { label: "花束",           category: "cute"      },
-  { label: "猫",             category: "cute"      },
-  { label: "ヘッドフォン",   category: "daily"     },
-  { label: "王冠",           category: "sns"       },
-  { label: "羽",             category: "cute"      },
-  { label: "仮面",           category: "gothic"    },
-  { label: "発光スマホ",     category: "futuristic"},
-  { label: "ぬいぐるみ",     category: "cute"      },
-  { label: "本",             category: "daily"     },
-  { label: "カメラ",         category: "daily"     },
-  { label: "鎖",             category: "gothic"    },
-  { label: "扇子",           category: "japanese"  },
-  { label: "和傘",           category: "japanese"  },
-  { label: "狐面",           category: "japanese"  },
-  { label: "ホログラム端末", category: "futuristic"},
-  { label: "巨大リボン",     category: "sns"       },
-] as const;
-
-/** 小物ガチャを1回まわして結果を返す（DetailSettings は呼び出し側で反映）。 */
-export function rollPropsGacha(): { label: string; category: PropsCategory } {
-  const item = GACHA_POOL[Math.floor(Math.random() * GACHA_POOL.length)];
-  return { label: item.label, category: item.category };
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * 🔄 この画像で別案：現在の画像と主要設定を残しつつ、
- * mood を 1 つだけ入れ替えて詳細を auto に戻す（少しだけ揺らす）。
- * scopes / count / locks / safety / NG / faceLock / extraInstructions は維持。
- */
-export function buildVariantInputs(current: PromptInputs): PromptInputs {
-  const others = ALL_MOODS.filter((m) => !current.moods.includes(m));
-  const newMoods = [...current.moods];
-  if (newMoods.length > 0 && others.length > 0) {
-    const dropIdx = Math.floor(Math.random() * newMoods.length);
-    newMoods.splice(dropIdx, 1);
-    newMoods.push(others[Math.floor(Math.random() * others.length)]);
-  } else if (others.length > 0) {
-    // mood 未選択時：何か 1 個足す
-    newMoods.push(others[Math.floor(Math.random() * others.length)]);
-  }
-
-  return {
-    ...current,
-    moods: newMoods,
-    details: DEFAULT_DETAILS,
-    viralMode: false,
-    autoMoodCategories: [],
-  };
-}
 
 // ─── ファッションプリセット ────────────────────────────────────────────────────
 // 設定のみ適用（自動生成はしない）。ユーザーが内容を確認してから手動で生成できる。
@@ -1046,149 +908,7 @@ export function buildStreetInputs(current: PromptInputs, memory: VariationMemory
 // 各ビルダーはランダムプール + VariationMemory で毎回異なる組み合わせを選ぶ。
 // いずれも設定のみ適用（自動生成なし）。
 
-// ── 🎭 ギャップ化 ─────────────────────────────────────────────────────────────
 
-/** 現在の雰囲気方向と "映えるギャップ" になる逆方向 */
-const GAP_DIRECTIONS: Array<{
-  fromMoods: Mood[];
-  toMoods:   Mood[];
-  toOutfit:  OutfitStyle;
-  label:     string;
-}> = [
-  {
-    fromMoods: ["cute", "pop", "pastel", "bright", "sns_pop"],
-    toMoods:   ["dark", "luxe", "cinematic", "decadent", "monochrome"] as Mood[],
-    toOutfit:  "mode",
-    label:     "かわいい→ダーク高級",
-  },
-  {
-    fromMoods: ["dark", "gothic", "decadent", "monochrome"],
-    toMoods:   ["sns_pop", "pop", "bright", "fantasy", "vivid", "pastel"] as Mood[],
-    toOutfit:  "y2k",
-    label:     "ダーク→ポップ幻想",
-  },
-  {
-    fromMoods: ["street", "cool", "digital", "cyberpunk"],
-    toMoods:   ["luxe", "cinematic", "art", "minimal"] as Mood[],
-    toOutfit:  "runway",
-    label:     "ストリート→クラシカル高級",
-  },
-  {
-    fromMoods: ["near_future", "cyberpunk", "glitch"],
-    toMoods:   ["retro", "cinematic", "emo", "noisy"] as Mood[],
-    toOutfit:  "dress",
-    label:     "未来系→レトロ映画風",
-  },
-  {
-    fromMoods: ["japanese", "wa_fantasy", "mystic", "fantasy_world"],
-    toMoods:   ["cool", "cinematic", "luxe", "monochrome"] as Mood[],
-    toOutfit:  "mode",
-    label:     "和風→クールモダン",
-  },
-  {
-    fromMoods: ["translucent", "minimal", "pastel"],
-    toMoods:   ["dark", "gothic", "decadent", "art"] as Mood[],
-    toOutfit:  "gothic",
-    label:     "透明感→ゴシックアート",
-  },
-  {
-    fromMoods: ["luxe", "art", "cinematic"],
-    toMoods:   ["street", "pop", "vivid", "sns_pop"] as Mood[],
-    toOutfit:  "street",
-    label:     "高級感→カラフルストリート",
-  },
-];
-
-/**
- * 🎭 ギャップ化：現在の雰囲気と逆方向の "映えるギャップ" を設定する。
- * 毎回異なるギャップ方向を選ぶ（VariationMemory でムード連発を避ける）。
- */
-export function buildGapInputs(current: PromptInputs, memory: VariationMemory): PromptInputs {
-  const matched = GAP_DIRECTIONS.filter((d) =>
-    d.fromMoods.some((m) => current.moods.includes(m))
-  );
-  const pool = matched.length > 0 ? matched : GAP_DIRECTIONS;
-  const direction = pool[Math.floor(Math.random() * pool.length)];
-  const newMoods = pickNAvoidingRecent(direction.toMoods, memory.recentMoods, 3);
-
-  const note = [
-    "【🎭 ギャップ化】",
-    `現在の雰囲気とは逆方向への変換：${direction.label}`,
-    "単純な反転ではなく「映えるギャップ」になるよう衣装・背景・色・演出を全体的にコーディネートする。",
-    "各案でギャップの方向性は共有しつつ、具体的な衣装・背景・演出は差別化する。",
-    "顔・人物同一性は完全固定。",
-  ].join("\n");
-
-  return {
-    ...current,
-    scopes: scopeOrDefault(current, pickScopesWeighted(PW.gap, newMoods, memory.lastScopes)),
-    moods:              newMoods,
-    faceLock:           true,
-    viralMode:          false,
-    autoMoodCategories: [],
-    extraInstructions:  note,
-    details: {
-      ...current.details,
-      outfit: {
-        ...current.details.outfit,
-        style:    direction.toOutfit,
-        color:    "auto",
-        luxury:   "auto",
-        material: "auto",
-      },
-    },
-  };
-}
-
-// ── 🧪 量産回避 ────────────────────────────────────────────────────────────────
-
-const ANTI_BG_POOL: BackgroundPlace[] = [
-  "old_cinema", "greenhouse", "library", "night_amusement", "frosted_room",
-  "museum", "gallery", "atelier", "industrial",
-];
-
-const ANTI_MOOD_POOL: Mood[] = [
-  "art", "monochrome", "cinematic", "emo", "noisy", "portrait", "pinterest", "minimal", "retro",
-];
-
-/**
- * 🧪 量産回避：AI量産テンプレを避け、珍しい場所・意外な色・映画的構図を優先する。
- * 毎回異なる背景・ムードを選ぶ。
- */
-export function buildAntiTemplateInputs(current: PromptInputs, memory: VariationMemory): PromptInputs {
-  const bgPlace = pickAvoidingRecent(ANTI_BG_POOL, memory.recentBgPlaces);
-  const moods   = pickNAvoidingRecent(ANTI_MOOD_POOL, memory.recentMoods, 2 + Math.floor(Math.random() * 2));
-
-  const note = [
-    "【🧪 量産回避モード】",
-    "「AI量産画像」に見えないよう、以下のパターンを積極的に避ける：",
-    "  ✗ 黒バラ・ステンドグラス・白ワンピース・透明羽・神社・教会・魔法陣乱用・青紫ネオン街・雨のサイバー路地・HUDだけの演出・量産アニメ構図",
-    "",
-    "代わりに以下を優先する：",
-    "  ✓ 珍しい場所（美術館・アトリエ・廃工場・大温室・地下図書館）",
-    "  ✓ 意外な色組み合わせ（くすみグリーン×ゴールド・テラコッタ×シルバーなど）",
-    "  ✓ 広告・ファッション誌・映画スチル風の構図",
-    "  ✓ 現代美術・インスタレーション感のある背景",
-    "  ✓ 素材感の主張（テクスチャ・光沢・透明感の意外な組み合わせ）",
-    "  ✓ 余白を生かした雑誌風構図",
-    "各案を生成する前に「よく見るAI画像と同じでないか」を必ず確認すること。",
-  ].join("\n");
-
-  return {
-    ...current,
-    scopes: scopeOrDefault(current, pickScopesWeighted(PW.gap, moods, memory.lastScopes)),
-    moods,
-    faceLock:           true,
-    viralMode:          false,
-    autoMoodCategories: [],
-    extraInstructions:  note,
-    details: {
-      ...current.details,
-      background: { ...current.details.background, place: bgPlace },
-      camera:     { ...current.details.camera, composition: "magazine" },
-    },
-  };
-}
 
 // ── 🎬 映画化 ──────────────────────────────────────────────────────────────────
 
@@ -1244,118 +964,7 @@ export function buildCinematicInputs(current: PromptInputs, memory: VariationMem
   };
 }
 
-// ── 🧊 清潔感 ──────────────────────────────────────────────────────────────────
 
-const CLEAN_BG_POOL: BackgroundPlace[] = [
-  "studio", "frosted_room", "gallery", "paper_backdrop", "fabric_backdrop", "empty_space",
-];
-
-const CLEAN_OUTFIT_STYLES: OutfitStyle[]    = ["mode", "dress", "runway", "future_dress"];
-const CLEAN_OUTFIT_COLORS: OutfitColor[]    = ["white", "silver", "light_blue", "inherit"];
-const CLEAN_OUTFIT_MATERIALS: OutfitMaterial[] = ["chiffon", "organza", "lace", "transparent"];
-
-/**
- * 🧊 清潔感：上品・クリーン・高級広告風。白・シルバー・透明感を中心に。
- */
-export function buildCleanInputs(current: PromptInputs, memory: VariationMemory): PromptInputs {
-  const bgPlace      = pickAvoidingRecent(CLEAN_BG_POOL,       memory.recentBgPlaces);
-  const outfitStyle  = pickAvoidingRecent(CLEAN_OUTFIT_STYLES, memory.recentOutfits);
-  const outfitColor  = pickAvoidingRecent(CLEAN_OUTFIT_COLORS, memory.recentMoods) as OutfitColor;
-  const outfitMat    = CLEAN_OUTFIT_MATERIALS[Math.floor(Math.random() * CLEAN_OUTFIT_MATERIALS.length)];
-
-  const note = [
-    "【🧊 清潔感モード】",
-    "上品でクリーンな高級感を演出する。広告・美容誌・Appleプロモーション風の完成度。",
-    "▼ 強化：清潔な明るいトーン・余白を活かしたミニマル構図・柔らかく透明感のある光",
-    "▼ 禁止：過剰ネオン・汚れた背景・暗すぎる演出",
-  ].join("\n");
-
-  const cleanMoods: Mood[] = ["luxe", "translucent", "minimal", "instagram"];
-
-  return {
-    ...current,
-    scopes: scopeOrDefault(current, pickScopesWeighted(PW.clean, cleanMoods, memory.lastScopes)),
-    moods:              cleanMoods,
-    faceLock:           true,
-    viralMode:          false,
-    autoMoodCategories: [],
-    extraInstructions:  note,
-    details: {
-      ...current.details,
-      outfit: {
-        ...current.details.outfit,
-        style:      outfitStyle,
-        color:      outfitColor,
-        material:   outfitMat,
-        luxury:     "luxe" as OutfitLuxury,
-        decoration: "minimal" as OutfitDecoration,
-      },
-      background: {
-        ...current.details.background,
-        place:   bgPlace,
-        color:   "white",
-        density: "minimal",
-      },
-      lighting: {
-        ...current.details.lighting,
-        intensity:   "pale_glow",
-        temperature: "white_light",
-        atmosphere:  "clear",
-      },
-    },
-  };
-}
-
-// ── 🌀 前景盛り ─────────────────────────────────────────────────────────────────
-
-const FG_EFFECT_POOL = [
-  "petals", "sakura", "rose", "camellia",
-  "butterfly", "feather", "light_particle", "stardust",
-  "bubble", "snow", "glass", "confetti",
-  "transparent_ribbon", "fabric_strip", "smoke_puff",
-  "foxfire", "spirit_fire", "light_feather",
-] as const;
-type FgEffect = typeof FG_EFFECT_POOL[number];
-
-const FG_MOTION_POOL = [
-  "gentle_flow", "falling", "rising", "rotate", "wave", "surround",
-] as const;
-
-/**
- * 🌀 前景盛り：人物の手前にエフェクトを追加。毎回異なる種類・動きを選ぶ。
- */
-export function buildForegroundRichInputs(current: PromptInputs, memory: VariationMemory): PromptInputs {
-  const effect = pickAvoidingRecent(
-    FG_EFFECT_POOL as unknown as FgEffect[],
-    memory.recentFgEffects,
-  );
-  const motion  = FG_MOTION_POOL[Math.floor(Math.random() * FG_MOTION_POOL.length)];
-  const density = Math.random() < 0.6 ? "rich" : "normal" as const;
-
-  return {
-    ...current,
-    scopes:             scopeOrDefault(current, ["foreground"] as Scope[]),
-    faceLock:           true,
-    viralMode:          false,
-    autoMoodCategories: current.autoMoodCategories,
-    details: {
-      ...current.details,
-      foreground: {
-        preset:      "skip",
-        effectType:  effect,
-        swirlType:   "skip",
-        digitalType: "skip",
-        artType:     "skip",
-        position:    "full_body",
-        density,
-        motion,
-        color:       "inherit",
-        depth:       "front_back_overlap",
-        visibility:  "face_protected",
-      },
-    },
-  };
-}
 
 // ── 🧥 衣装だけ神引き ────────────────────────────────────────────────────────────
 
@@ -1721,56 +1330,6 @@ export type WorldPreset =
   | "ad" | "fantasy" | "retro"
   | "jirai" | "seikimatsu";
 
-export type EffectPreset = "fgrich" | "microcyber" | "clean";
-
-// ── 🧬 微機械化 ─────────────────────────────────────────────────────────────────
-
-const MICRO_PARTS = [
-  "eye", "cheek", "neck", "shoulder", "hand", "finger", "hair_part", "outfit_part",
-] as const;
-const MICRO_TYPES = [
-  "glow_circuit", "transparent_body", "hologram", "glass_mech", "nanomachine",
-] as const;
-const MICRO_GLOW_COLORS = [
-  "blue", "cyan", "purple", "pink", "white", "gold",
-] as const;
-
-/**
- * 🧬 微機械化：戦闘系禁止。アクセサリー感ある上品な未来感を一部に追加。
- * 毎回異なる部位・タイプ・発光色を選ぶ。
- */
-export function buildMicroCyberInputs(current: PromptInputs, _memory: VariationMemory): PromptInputs {
-  const part      = MICRO_PARTS[Math.floor(Math.random() * MICRO_PARTS.length)];
-  const type      = MICRO_TYPES[Math.floor(Math.random() * MICRO_TYPES.length)];
-  const glowColor = MICRO_GLOW_COLORS[Math.floor(Math.random() * MICRO_GLOW_COLORS.length)];
-
-  const note = [
-    "【🧬 微機械化】",
-    "ガチサイボーグではなく「未来的アクセサリー感」の上品な機械化。",
-    "▼ 変化は一部分だけ（アクセサリーとして自然に存在する・主張しすぎない）",
-    "▼ 透明感・発光感を上品に演出（高級ジュエリーのような質感）",
-    "▼ 禁止：戦闘用サイボーグ・大げさな義手義足・血傷破壊表現・全身変化",
-  ].join("\n");
-
-  return {
-    ...current,
-    scopes:             scopeOrDefault(current, ["cyber"] as Scope[]),
-    faceLock:           true,
-    viralMode:          false,
-    autoMoodCategories: current.autoMoodCategories,
-    extraInstructions:  note,
-    details: {
-      ...current.details,
-      cyber: {
-        part,
-        type,
-        texture:   "transparent_glass",
-        glowColor,
-        intensity: "subtle",
-      },
-    },
-  };
-}
 
 // ─── 🌸 和風 ──────────────────────────────────────────────────────────────────
 
@@ -2965,41 +2524,6 @@ export function buildCombinedWorldInputs(
   };
 }
 
-type EffectBuilder = (current: PromptInputs, memory: VariationMemory) => PromptInputs;
-
-const EFFECT_BUILDERS: Record<EffectPreset, EffectBuilder> = {
-  fgrich:     buildForegroundRichInputs,
-  microcyber: buildMicroCyberInputs,
-  clean:      buildCleanInputs,
-};
-
-/**
- * 複数の演出プリセットを合成する。
- * - 1つだけ → 通常ビルダー
- * - 複数 → スコープをユニオン、最後のビルダーの設定をベースに指示文を連結
- */
-export function buildCombinedEffectInputs(
-  current: PromptInputs,
-  effects: EffectPreset[],
-  memory: VariationMemory,
-): PromptInputs {
-  if (effects.length === 0) return current;
-  if (effects.length === 1) return EFFECT_BUILDERS[effects[0]](current, memory);
-
-  const built = effects.map((e) => EFFECT_BUILDERS[e](current, memory));
-  const last  = built[built.length - 1];
-
-  const mergedScopes = [...new Set(built.flatMap((b) => b.scopes))] as Scope[];
-  const mergedMoods  = [...new Set(built.flatMap((b) => b.moods))].slice(0, 6) as Mood[];
-  const notes = built.map((b) => b.extraInstructions ?? "").filter(Boolean).join("\n\n");
-
-  return {
-    ...last,
-    scopes: mergedScopes,
-    moods:  mergedMoods.length > 0 ? mergedMoods : last.moods,
-    extraInstructions: notes || last.extraInstructions,
-  };
-}
 
 // ─── 👑 神引きコンボ ──────────────────────────────────────────────────────────
 
@@ -3062,41 +2586,4 @@ export function buildCombinedGodInputs(
   };
 }
 
-// ─── 生成補助コンボ（ギャップ化 + 量産回避）──────────────────────────────────
-
-/**
- * 複数の生成補助モード（"gap" | "anti"）を融合する。
- * - 1つ → 通常ビルダー
- * - 両方 → スコープ・ムードをマージ、ギャップ化の衣装設定 + 量産回避の背景・カメラ設定を合成
- */
-export function buildCombinedAssistInputs(
-  current: PromptInputs,
-  modes: string[],
-  memory: VariationMemory,
-): PromptInputs {
-  if (modes.length === 0) return current;
-  if (modes.length === 1) {
-    if (modes[0] === "gap")  return buildGapInputs(current, memory);
-    if (modes[0] === "anti") return buildAntiTemplateInputs(current, memory);
-    return current;
-  }
-
-  const gapBuilt  = buildGapInputs(current, memory);
-  const antiBuilt = buildAntiTemplateInputs(current, memory);
-  const mergedScopes = [...new Set([...gapBuilt.scopes, ...antiBuilt.scopes])] as Scope[];
-  const mergedMoods  = [...new Set([...gapBuilt.moods,  ...antiBuilt.moods])].slice(0, 5) as Mood[];
-  const notes = [gapBuilt.extraInstructions, antiBuilt.extraInstructions].filter(Boolean).join("\n\n");
-
-  return {
-    ...gapBuilt,
-    scopes:            mergedScopes,
-    moods:             mergedMoods,
-    extraInstructions: `【🎭×🧪 ギャップ化＋量産回避コンボ】\nギャップ方向に振りつつ量産AIパターンを徹底回避する。\n\n${notes}`,
-    details: {
-      ...gapBuilt.details,
-      background: antiBuilt.details.background,
-      camera:     antiBuilt.details.camera,
-    },
-  };
-}
 
