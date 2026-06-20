@@ -5,7 +5,6 @@ import type { GenerateRequest, GenerateResponse } from "./types.ts";
 import { MODEL_NAME, generate, analyzePreferences, BlockedError, type AnalyzePreferenceSample } from "./gemini.ts";
 import { extractReference } from "./referenceExtract.ts";
 import { compareReference } from "./referenceCompare.ts";
-import { analyzeResult } from "./analyzeResult.ts";
 
 const PORT = Number(process.env.PORT || 3001);
 
@@ -395,25 +394,6 @@ app.post("/api/compare-reference", async (req, res) => {
     res.json(out);
   } catch (err) {
     handleEndpointError(res, err, "/api/compare-reference");
-  }
-});
-
-// 生成結果画像の AI 仮評価（Gemini Vision）。ユーザーが「分析」を押した時だけ呼ばれる。
-app.post("/api/analyze-result", async (req, res) => {
-  const raw = req.body as { imageDataUrl?: unknown; prompt?: unknown; scopes?: unknown } | undefined;
-  const url = raw?.imageDataUrl;
-  if (typeof url !== "string" || !url.startsWith("data:image/")) {
-    res.status(400).json({ error: "imageDataUrl (data:image/...;base64) is required" });
-    return;
-  }
-  const prompt = typeof raw?.prompt === "string" ? raw.prompt.slice(0, 4000) : undefined;
-  const scopes = Array.isArray(raw?.scopes) ? (raw!.scopes as unknown[]).filter((s): s is string => typeof s === "string").slice(0, 20) : undefined;
-  console.log("[/api/analyze-result] start");
-  try {
-    const out = await withTimeout(() => analyzeResult(url, { prompt, scopes }));
-    res.json(out);
-  } catch (err) {
-    handleEndpointError(res, err, "/api/analyze-result");
   }
 });
 

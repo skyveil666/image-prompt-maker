@@ -1117,9 +1117,9 @@ export interface GenerationResult {
 export type HistoryStatus = "unused" | "used" | "good" | "bad" | "posted";
 
 /**
- * 生成結果画像の AI 仮評価（Gemini Vision・サーバ /api/analyze-result の戻り値）。
- * ユーザー評価（resultRatings 等）とは分離した「仮評価」。確定はユーザー操作時のみ。
- * server/src/analyzeResult.ts の ResultAnalysis と構造を一致させる。
+ * 生成結果画像の AI 仮評価（旧 Gemini Vision 分析）の構造。
+ * ※ AI分析UI・サーバ /api/analyze-result は撤去済み。本型は既存履歴（IDB の
+ *   resultAiAnalysis フィールド）との互換のために残置（新規には生成されない）。
  */
 export interface ResultAnalysis {
   version: 1;

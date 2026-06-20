@@ -143,28 +143,6 @@ export async function extractReferenceViaBackend(
   return { elements: data.elements ?? {}, missingRequired: data.missingRequired ?? [] };
 }
 
-// ── 生成結果画像の AI 仮評価（Gemini Vision・/api/analyze-result）─────────────
-
-/**
- * 生成結果画像を Gemini Vision で分析し、AI 仮評価（ResultAnalysis）を返す。失敗時は例外。
- * ユーザーが「AI分析」ボタンを押した時だけ呼ぶ（自動実行しない）。
- */
-export async function analyzeResultViaBackend(
-  imageDataUrl: string,
-  context: { prompt?: string; scopes?: string[] } = {},
-): Promise<import("../types").ResultAnalysis> {
-  const res = await fetch("/api/analyze-result", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ imageDataUrl, prompt: context.prompt, scopes: context.scopes }),
-  });
-  if (!res.ok) {
-    const detail = await extractBackendError(res);
-    throw new Error(`AI分析に失敗しました (${res.status}): ${detail || "unknown"}`);
-  }
-  return (await res.json()) as import("../types").ResultAnalysis;
-}
-
 // ── Compare Mode：生成結果×参照の一致率採点（Gemini Vision・案1）─────────────
 
 export interface CompareReferenceResponse {
