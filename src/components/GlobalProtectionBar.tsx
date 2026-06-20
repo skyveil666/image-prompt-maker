@@ -8,7 +8,7 @@ import type { IdentityRiskResult, IdentityRiskLevel } from "../lib/identityRisk"
  * 役割（Phase 3 / docs/18 で「顔・同一性 + Identity Shield」に専念）:
  *   - GlobalProtectionBar = 顔・同一性のロック状態 + Identity Shield のライブリスク
  *   - 変更対象（scopes）・守るもの（体型/色味/構図）の表示は ReflectionStatusBar に一本化（単一ソース）
- *   - 詳細な分析は AnalysisStatusStrip / AnalysisLiveView、生成後の結果は PromptGuardSection が担当
+ *   - 生成後の結果は PromptGuardSection が担当（AI分析の常時表示バーは撤去済み）
  *
  * 折りたたみ時でも以下2項目を常時表示:
  *   🛡 顔・同一性 / ⚠ Identity Shield
