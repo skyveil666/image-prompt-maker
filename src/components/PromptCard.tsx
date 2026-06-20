@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptHistoryItem, ResultAnalysis } from "../types";
 import { fileToThumbnail } from "../lib/imageFile";
-import { analyzeResultViaBackend } from "../lib/backendClient";
 import { FavoriteButton } from "./FavoriteButton";
 import {
   getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES,
   getRatingAt, getMemoAt, buildRatingPatch, buildMemoPatch, RATING_LABELS,
-  getAxisRatingAt, buildAxisRatingPatch, AXIS_RATING_META, type RatingAxisKey,
 } from "../lib/history";
 import { PromptGuardSection } from "./PromptGuardSection";
 import type { LockState } from "../lib/promptLockCheck";
@@ -102,18 +100,6 @@ interface SlotProps {
   onSetRating: (index: number, rating: number | null) => void;
   /** メモを設定 */
   onSetMemo: (index: number, memo: string) => void;
-  /** 軸別評価マップ（背景/衣装/ポーズ） */
-  axisRatings: Record<RatingAxisKey, (number | null)[]>;
-  /** 軸別評価の設定（null=解除） */
-  onSetAxisRating: (axis: RatingAxisKey, index: number, value: number | null) => void;
-  /** AI仮評価（画像ごと・null=未分析） */
-  resultAiAnalysis: (ResultAnalysis | null)[];
-  /** AI分析を実行（その画像を Gemini Vision 分析） */
-  onAnalyze: (index: number) => void;
-  /** 分析中の画像index（ローディング表示用・null=なし） */
-  analyzingIdx: number | null;
-  /** 分析エラー文（あれば表示） */
-  analyzeError: string | null;
 }
 
 // 評価値 → 枠の Tailwind クラス（緑=良い / 青=普通 / 黄=微妙 / 赤=失敗）
@@ -132,8 +118,6 @@ function GeneratedResultSlot({
   sourceImageUrl,
   onAppend, onReplaceAt, onRemoveAt, onRemoveAll,
   onSetRating, onSetMemo,
-  axisRatings, onSetAxisRating,
-  resultAiAnalysis, onAnalyze, analyzingIdx, analyzeError,
 }: SlotProps) {
   const [memoOpenIdx, setMemoOpenIdx] = useState<number | null>(null);
   const slotRef      = useRef<HTMLDivElement>(null);
@@ -448,9 +432,6 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
   const [expanded, setExpanded] = useState(false);
   /** ロック一覧をコピーに含めるか */
   const [includeLockHeader, setIncludeLockHeader] = useState(false);
-  /** 🔍 AI分析（Gemini Vision）の状態：分析中の画像index・エラー */
-  const [analyzingIdx, setAnalyzingIdx] = useState<number | null>(null);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   /** 通常コピー済み：IndexedDB に永続保存（item.copied を直接使用） */
   const isCopied = item.copied === true;
@@ -558,40 +539,9 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
     onUpdate(item.id, buildMemoPatch(item, index, memo));
   }, [item, onUpdate]);
 
-  /** 軸別評価（背景/衣装/ポーズ）を設定 */
-  const handleSetAxisRating = useCallback((axis: RatingAxisKey, index: number, value: number | null) => {
-    onUpdate(item.id, buildAxisRatingPatch(item, axis, index, value));
-  }, [item, onUpdate]);
-
-  // 評価・メモ・軸別評価を画像枚数と揃えて取得
+  // 評価・メモを画像枚数と揃えて取得
   const currentRatings: (number | null)[] = currentImages.map((_, i) => getRatingAt(item, i));
   const currentMemos: (string | null)[]   = currentImages.map((_, i) => getMemoAt(item, i));
-  const axisRatings: Record<RatingAxisKey, (number | null)[]> = {
-    bg:     currentImages.map((_, i) => getAxisRatingAt(item, "bg", i)),
-    outfit: currentImages.map((_, i) => getAxisRatingAt(item, "outfit", i)),
-    pose:   currentImages.map((_, i) => getAxisRatingAt(item, "pose", i)),
-  };
-  // AI仮評価（画像ごと・null=未分析）
-  const aiAnalyses: (ResultAnalysis | null)[] = currentImages.map((_, i) => item.resultAiAnalysis?.[i] ?? null);
-
-  /** 🔍 AI分析（Gemini Vision）：押した画像だけ分析→resultAiAnalysis へ保存。AI仮評価・自動適用/学習なし。 */
-  const handleAnalyzeImage = useCallback(async (index: number) => {
-    const img = currentImages[index];
-    if (!img) return;
-    setAnalyzingIdx(index);
-    setAnalyzeError(null);
-    try {
-      const analysis = await analyzeResultViaBackend(img, { prompt: item.promptText, scopes: item.scopes });
-      const arr = (item.resultAiAnalysis ?? []).slice(0, currentImages.length);
-      while (arr.length < currentImages.length) arr.push(null);
-      arr[index] = analysis;
-      onUpdate(item.id, { resultAiAnalysis: arr });
-    } catch (e) {
-      setAnalyzeError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setAnalyzingIdx(null);
-    }
-  }, [item, onUpdate, currentImages]);
 
   return (
     <article
@@ -718,12 +668,6 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
         onRemoveAll={handleResultRemoveAll}
         onSetRating={handleSetRating}
         onSetMemo={handleSetMemo}
-        axisRatings={axisRatings}
-        onSetAxisRating={handleSetAxisRating}
-        resultAiAnalysis={aiAnalyses}
-        onAnalyze={handleAnalyzeImage}
-        analyzingIdx={analyzingIdx}
-        analyzeError={analyzeError}
       />
 
       {/* ── 🛡 ガードパネル（安全チェック：ロック一覧 / 変更禁止チェック / 同一性リスク） ── */}
