@@ -74,6 +74,10 @@ interface Props {
   onClearAvoidRealBg?:  () => void;
   /** 世界観の解除（App の activeWorldPresets + worldCombinedNote をクリア）。 */
   onClearWorld?:        () => void;
+  /** 🌌 斬新背景プリセット由来の追加指示（背景スコープ時のみ全案へ注入・通常は不可視）。非空かつ背景が変更対象なら支配バッジを出す。 */
+  bgPresetNote?:        string;
+  /** 斬新背景の解除（App の activeBgPresets + bgPresetNote をクリア・soft）。 */
+  onClearBg?:           () => void;
   /** 参照画像適用の解除（App の referenceNote をクリア）。 */
   onClearReference?:    () => void;
   /** タグ個別NG（per-tag NG）の現在値。非空なら「タグNG（候補除外・準備中）」バッジを出す（①でtagNgは【NG】非合流＝現在は生成に未反映・Step2で候補除外を実効化）。 */
@@ -514,6 +518,8 @@ export function ArrangePreviewPanel({
   referenceNoteText = "",
   onClearAvoidRealBg = () => {},
   onClearWorld = () => {},
+  bgPresetNote = "",
+  onClearBg = () => {},
   onClearReference = () => {},
   tagNg = [],
   onClearTagNg = () => {},
@@ -529,9 +535,12 @@ export function ArrangePreviewPanel({
   const worldNote = worldCombinedNote.trim();
   const refNote   = referenceNoteText.trim();
   const bgStylizeActive = avoidRealBackground && selectedScopes.includes("background");
+  // 🌌 斬新背景：bgPresetNote は buildInputs で「背景スコープ時のみ」注入＝発火条件もサーバ効果と厳密一致。
+  const bgNote = bgPresetNote.trim();
+  const bgFires = bgNote.length > 0 && selectedScopes.includes("background");
   // 🚫 タグ個別NG（per-tag NG）：アレンジは {...current} で同設定を継承するため、ここでも常時可視化＋解除（§5）。
   const tagNgLabels = tagNgToLabels(tagNg);
-  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive || tagNg.length > 0;
+  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || tagNg.length > 0;
 
   // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
@@ -678,6 +687,15 @@ export function ArrangePreviewPanel({
                     summaryTitle={worldCombinedNote}
                     onClear={onClearWorld}
                     clearTitle="この世界観を全案から解除する"
+                  />
+                )}
+                {bgFires && (
+                  <DominatorBadge
+                    label="🌌 斬新背景適用中"
+                    summary={summarizeNote(bgNote)}
+                    summaryTitle={bgPresetNote}
+                    onClear={onClearBg}
+                    clearTitle="この斬新背景を全案から解除する"
                   />
                 )}
                 {refNote && (

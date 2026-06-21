@@ -34,6 +34,10 @@ const WORLD_JP: Record<string, string> = {
   retro: "📺 レトロ", jirai: "🖤 地雷系", seikimatsu: "☠️ 世紀末系",
 };
 
+const BG_JP: Record<string, string> = {
+  code_space: "🖥 コード空間", math_world: "🔢 数式世界",
+};
+
 // ── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   scopes: Scope[];
@@ -52,6 +56,12 @@ interface Props {
   referenceNoteText: string;
   /** 世界観の解除（worldCombinedNote + activeWorldPresets をクリア）。 */
   onClearWorld: () => void;
+  /** 🌌 斬新背景プリセットID（code_space 等）。内部でラベル化する */
+  activeBgPresets: string[];
+  /** 斬新背景プリセット由来の追加指示（背景スコープ時のみ全案へ注入・通常は不可視）。非空かつ背景が変更対象なら支配バッジを出す。 */
+  bgPresetNote: string;
+  /** 斬新背景の解除（bgPresetNote + activeBgPresets をクリア・soft：details/scopes は戻さない）。 */
+  onClearBg: () => void;
   /** 参照画像適用の解除（referenceNote をクリア）。 */
   onClearReference: () => void;
   /** 🌆 背景を2D/非写実に（既定ON・非永続）。背景が変更対象の時だけ全案に効くが回避▼に埋もれて気付きにくい。 */
@@ -126,8 +136,13 @@ export function ReflectionStatusBar(p: Props) {
   const colorUnset = p.outfitColor === "skip" || p.outfitColor === "auto" || p.outfitColor === "inherit";
   const decoLinkColor = p.outfitDecoration === "maximal" ? "gradient" : p.outfitDecoration === "elaborate" ? "accent_color" : null;
   const colorLinkActive = p.decorationColorLink && p.scopes.includes("outfit") && colorUnset && decoLinkColor !== null;
-  const hasDominator = worldNote.length > 0 || refNote.length > 0 || bgStylizeActive || p.tagNg.length > 0 || colorLinkActive;
+  // 🌌 斬新背景（背景版プリセット）：bgPresetNote は buildInputs で「背景スコープ時のみ」注入されるため、
+  //   発火条件もサーバ効果と厳密一致させる（bgPresetNote 非空 ∧ scopes.includes("background")）。
+  const bgNote = p.bgPresetNote.trim();
+  const bgFires = bgNote.length > 0 && p.scopes.includes("background");
+  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || p.tagNg.length > 0 || colorLinkActive;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
+  const bgLabel = p.activeBgPresets.map((b) => BG_JP[b] ?? b).join(" × ") || "適用中";
 
   return (
     <section className="rounded-lg border border-violet-400/25 bg-violet-500/5 overflow-hidden">
@@ -142,6 +157,15 @@ export function ReflectionStatusBar(p: Props) {
               summaryTitle={p.worldCombinedNote}
               onClear={p.onClearWorld}
               clearTitle="この世界観を全案から解除する"
+            />
+          )}
+          {bgFires && (
+            <DominatorBadge
+              label={`🌌 斬新背景：${bgLabel}`}
+              summary={summarizeNote(bgNote)}
+              summaryTitle={p.bgPresetNote}
+              onClear={p.onClearBg}
+              clearTitle="この斬新背景を全案から解除する"
             />
           )}
           {refNote && (

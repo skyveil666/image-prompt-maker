@@ -47,6 +47,10 @@ interface Props {
   onClearAvoidRealBg?:  () => void;
   /** 世界観の解除。 */
   onClearWorld?:        () => void;
+  /** 🌌 斬新背景プリセット由来の追加指示（背景スコープ時のみ全案へ注入）。ArrangePreviewPanel へ中継。 */
+  bgPresetNote?:        string;
+  /** 斬新背景の解除（soft）。ArrangePreviewPanel へ中継。 */
+  onClearBg?:           () => void;
   /** 参照画像適用の解除。 */
   onClearReference?:    () => void;
   /** タグ個別NG（per-tag NG）の現在値。ArrangePreviewPanel へ中継（アレンジも全案に効く）。 */
@@ -97,6 +101,7 @@ export function HistoryView({
   favoriteProfile = null, favoriteLearnEnabled = false, recoverySlot,
   avoidRealBackground, worldCombinedNote, referenceNoteText,
   onClearAvoidRealBg, onClearWorld, onClearReference,
+  bgPresetNote, onClearBg,
   tagNg = [], onClearTagNg = () => {},
   onToast,
 }: Props) {
@@ -687,6 +692,8 @@ export function HistoryView({
               referenceNoteText={referenceNoteText}
               onClearAvoidRealBg={onClearAvoidRealBg}
               onClearWorld={onClearWorld}
+              bgPresetNote={bgPresetNote}
+              onClearBg={onClearBg}
               onClearReference={onClearReference}
               tagNg={tagNg}
               onClearTagNg={onClearTagNg}

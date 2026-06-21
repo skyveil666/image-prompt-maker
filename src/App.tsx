@@ -489,7 +489,9 @@ export default function App() {
       })(),
       // worldCombinedNote（世界観プリセット由来）・referenceNote（参照画像から適用）・追加指示
       // ＋ NG肯定誘導（splitNg：否定NG語を肯定方向の誘導文へ変換・GPT Image対策）を結合。出現制御は motifControls で別途。
-      extraInstructions: [worldCombinedNote, bgPresetNote, referenceNoteText, extraInstructions, splitNg(ngList, forbiddenTokens).positiveGuidance].filter(Boolean).join("\n\n"),
+      // 斬新背景ノートは「背景が変更対象の時だけ」注入（§5厳密一致：promptSystem の extra 無条件注入に対し
+      //   バッジ発火条件 bgPresetNote∧scopes.includes("background") と一致させ、見えない支配ホールを作らない）。
+      extraInstructions: [worldCombinedNote, (scopes.includes("background") ? bgPresetNote : ""), referenceNoteText, extraInstructions, splitNg(ngList, forbiddenTokens).positiveGuidance].filter(Boolean).join("\n\n"),
       faceLock,
       expression: faceLock ? undefined : (expression ?? undefined),
       // 出力の【NG】にはユーザー明示NG（NG欄＋禁止モチーフ）のうち「肯定変換できなかった語」のみを載せる。
@@ -1714,6 +1716,8 @@ export default function App() {
             referenceNoteText={referenceNoteText}
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
             onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
+            bgPresetNote={bgPresetNote}
+            onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); }}
             onClearReference={() => setReferenceNote({})}
             tagNg={tagNg}
             onClearTagNg={() => setTagNg([])}
@@ -1820,6 +1824,9 @@ export default function App() {
                 worldCombinedNote={worldCombinedNote}
                 referenceNoteText={referenceNoteText}
                 onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
+                activeBgPresets={activeBgPresets}
+                bgPresetNote={bgPresetNote}
+                onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); }}
                 onClearReference={() => setReferenceNote({})}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
