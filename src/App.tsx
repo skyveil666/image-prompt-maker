@@ -27,6 +27,8 @@ import {
   buildArrangeInputs,
   buildCombinedWorldInputs,
   WORLD_PRESET_DISPLAY,
+  buildCombinedBgInputs,
+  BG_PRESET_DISPLAY,
 } from "./lib/quickActions";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
 import { analyzeFullHistory, filterRecentWindow, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
@@ -46,7 +48,7 @@ import {
 } from "./lib/forbiddenTokens";
 import { splitNg } from "./lib/ngPositive";
 // MassProductionBanner は DuplicateAnalysisPanel に統合されました。
-import type { WorldPreset } from "./components/QuickActions";
+import type { WorldPreset, BgPreset } from "./components/QuickActions";
 import { type VariationMemory, createEmptyMemory, updateMemory } from "./lib/variationEngine";
 import {
   buildHistoryItems,
@@ -175,6 +177,10 @@ export default function App() {
   const [activeWorldPresets, setActiveWorldPresets] = useState<WorldPreset[]>([]);
   /** 世界観プリセット由来の指示文（extraInstructions と分離して管理） */
   const [worldCombinedNote, setWorldCombinedNote] = useState("");
+  /** 🌌 アクティブな斬新背景プリセット（背景版・マルチセレクト、最大3） */
+  const [activeBgPresets, setActiveBgPresets] = useState<BgPreset[]>([]);
+  /** 斬新背景プリセット由来の指示文（worldCombinedNote の兄弟・extraInstructions と分離して管理） */
+  const [bgPresetNote, setBgPresetNote] = useState("");
   /** 参照画像から「適用」した軸タグ付き自由文（catKey → text）。生成時に extraInstructions へ統合。
    *  ※ 詳細 enum には自動反映しない（docs/23）。worldCombinedNote と同じ追加マージ方式。 */
   const [referenceNote, setReferenceNote] = useState<Record<string, string>>({});
@@ -483,7 +489,7 @@ export default function App() {
       })(),
       // worldCombinedNote（世界観プリセット由来）・referenceNote（参照画像から適用）・追加指示
       // ＋ NG肯定誘導（splitNg：否定NG語を肯定方向の誘導文へ変換・GPT Image対策）を結合。出現制御は motifControls で別途。
-      extraInstructions: [worldCombinedNote, referenceNoteText, extraInstructions, splitNg(ngList, forbiddenTokens).positiveGuidance].filter(Boolean).join("\n\n"),
+      extraInstructions: [worldCombinedNote, bgPresetNote, referenceNoteText, extraInstructions, splitNg(ngList, forbiddenTokens).positiveGuidance].filter(Boolean).join("\n\n"),
       faceLock,
       expression: faceLock ? undefined : (expression ?? undefined),
       // 出力の【NG】にはユーザー明示NG（NG欄＋禁止モチーフ）のうち「肯定変換できなかった語」のみを載せる。
@@ -565,6 +571,7 @@ export default function App() {
       details,
       decorationColorLink,
       worldCombinedNote,
+      bgPresetNote,
       referenceNoteText,
       extraInstructions,
       ngList,
@@ -1212,6 +1219,55 @@ export default function App() {
     showPresetToast(msg, hint);
   }, [activeWorldPresets, buildInputs, variationMemory, showPresetToast]);
 
+  // 🌌 斬新背景プリセット（背景版）：handleWorldPresetToggle のクローン。
+  // 背景系スコープ＋details.background＋bgPresetNote だけ更新し、人物・衣装・露出は触らない。
+  const handleBgPresetToggle = useCallback((preset: BgPreset, additive = false) => {
+    const prev = activeBgPresets;
+    let next: BgPreset[];
+    if (additive) {
+      if (prev.includes(preset)) {
+        next = prev.filter((p) => p !== preset);
+      } else if (prev.length >= 3) {
+        next = [...prev.slice(1), preset];
+      } else {
+        next = [...prev, preset];
+      }
+    } else {
+      next = prev.length === 1 && prev[0] === preset ? [] : [preset];
+    }
+    setActiveBgPresets(next);
+
+    if (next.length === 0) {
+      setBgPresetNote("");
+      setScopeFlashKey((k) => k + 1);
+      showPresetToast("斬新背景の設定をリセットしました");
+      return;
+    }
+
+    const combined = buildCombinedBgInputs(buildInputs(), next, variationMemory);
+    setScopes(combined.scopes);
+    setMoods(combined.moods);
+    setAutoMoodCategories(combined.autoMoodCategories ?? []);
+    if (next.length === 1) setDetails(combined.details);
+    setViralMode(false);
+    // 斬新背景ノートは専用 state に格納（extraInstructions・worldCombinedNote は上書きしない）
+    setBgPresetNote(combined.extraInstructions ?? "");
+    setScopeFlashKey((k) => k + 1);
+    setVariationMemory((prev) => updateMemory(prev, {
+      moods:  combined.moods,
+      scopes: combined.scopes,
+    }));
+
+    const labels = next.map((p) => BG_PRESET_DISPLAY[p]);
+    const msg = next.length === 1
+      ? `${labels[0]} 斬新背景を適用しました`
+      : `🌌 背景コンボ：${labels.join(" × ")}`;
+    const hint = next.length > 1
+      ? `${next.length}つの斬新背景を融合します`
+      : APPLY_HINT;
+    showPresetToast(msg, hint);
+  }, [activeBgPresets, buildInputs, variationMemory, showPresetToast]);
+
   // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
   // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
   // assist の state（activeAssistModes）は生成送信・復元のため温存。
@@ -1240,6 +1296,8 @@ export default function App() {
     // ── プリセット・モード ─────────────────────────────────────────────────────
     setActiveWorldPresets([]);
     setWorldCombinedNote("");
+    setActiveBgPresets([]);
+    setBgPresetNote("");
     setActiveGodModes([]);
     setActiveBoosts([]);
     setChaosLabel(null);
@@ -1782,6 +1840,8 @@ export default function App() {
                 activeWorldPresets={activeWorldPresets}
                 onUndo={handleUndo}
                 onWorldPresetToggle={handleWorldPresetToggle}
+                activeBgPresets={activeBgPresets}
+                onBgPresetToggle={handleBgPresetToggle}
                 avoidCliche={avoidCliche}
                 onAvoidClicheChange={setAvoidCliche}
                 avoidRealBackground={avoidRealBackground}

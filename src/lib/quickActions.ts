@@ -8,6 +8,10 @@ import {
   DEFAULT_DETAILS,
   AUTO_DETAILS,
   type BackgroundPlace,
+  type BackgroundStyle,
+  type BackgroundEffect,
+  type BackgroundColor,
+  type BackgroundDensity,
   type CyberGlowColor,
   type HairStyle,
   type LightIntensity,
@@ -197,6 +201,9 @@ export const PW: Record<string, ScopeWeight> = {
   viral:      { background: 5,  foreground: 10, pose: 2, hair: 3, outfit: 4,  camera: 8,  props: 9,   lighting: 7 },
   jirai:      { outfit: 10, hair: 9, props: 8, lighting: 7, background: 6, camera: 5 },
   seikimatsu: { outfit: 9, background: 10, vehicle: 7, big_object: 7, lighting: 8, camera: 6 },
+  // 🌌 斬新背景：背景を最優先、補助は前景・ライティングのみ（人物軸 outfit/pose/hair/camera/cyber は含めない＝人物を触らない）。
+  code_space: { background: 10, lighting: 7, foreground: 6 },
+  math_world: { background: 10, lighting: 6, foreground: 6 },
 };
 
 
@@ -1856,6 +1863,195 @@ export function buildCombinedWorldInputs(
     scopes:             mergedScopes,
     moods:              mergedMoods,
     details:            AUTO_DETAILS,
+    faceLock:           true,
+    viralMode:          false,
+    autoMoodCategories: [],
+    extraInstructions:  comboIntro + combinedNotes,
+  };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🌌 斬新背景プリセット（世界観ボタンの背景版・Stage 1）
+//
+// 設計（Stage 0 で確定）:
+//   - background スコープを forced 強制し、details.background の WIRED フィールド
+//     （style/effect/color/density/place）＋ extraInstructions 文章で「斬新な背景」を作る。
+//   - 文字背景フィールド（textType/textMood/textLayout/textTexture）は DEAD（promptSystem
+//     注入経路ゼロ）＝設定しない（no-op）。文字要素は文章で表現する。
+//   - 人物・衣装・露出・構図は一切触らない：scopes は背景系のみ（outfit/pose/hair/camera/cyber
+//     を含めない）、moods は人物スコープをブーストしない中立ムードのみ、faceLock:true。
+//   - §4（promptSystem/scopeFilter/gemini）不触。details.background は REPLACE-on-apply。
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export type BgPreset = "code_space" | "math_world";
+
+interface NovelBgDirection {
+  label:    string;
+  /** 中立ムードのみ（getMoodScopeBoosts で人物スコープを増やさない＝P8） */
+  moods:    Mood[];
+  /** 背景スタイル候補（WIRED enum のみ・案ごとに1つ抽選） */
+  styles:   BackgroundStyle[];
+  /** 空間効果候補（WIRED enum のみ・案ごとに1つ抽選） */
+  effects:  BackgroundEffect[];
+  /** 背景色候補（WIRED enum のみ・案ごとに1つ抽選。背景にのみ効く＝人物の配色は変えない） */
+  colors:   BackgroundColor[];
+  density:  BackgroundDensity;
+  /** 実在地名を使わない abstract（斬新＝未知の世界を担保） */
+  place:    BackgroundPlace;
+  /** extraInstructions 文章（bgPresetNote へ格納） */
+  note:     string;
+}
+
+const NOVEL_BG_DIRECTIONS: Record<BgPreset, NovelBgDirection> = {
+  code_space: {
+    label:   "🖥 コード空間",
+    moods:   ["cool", "minimal"],
+    styles:  ["cyber", "digital"],
+    effects: ["glitch", "abstract_lines"],
+    colors:  ["monochrome", "high_sat"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🖥 斬新背景：コード空間】",
+      "背景を「流れるソースコード・端末グリフ・抽象的なデータライン」で覆う、未知のデジタル空間にする。",
+      "実在の都市・看板・ロゴは使わず、どこにも存在しないコードの世界として描く。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  ターミナル風コード / 回路基板 / データストリーム / グリッチした画面 / 発光する文字列 / 抽象ライン",
+      "",
+      "▼ 禁止：",
+      "  × 人物の顔・肌・衣服の上に文字やコードを重ねない（文字・コードは背景・空間側のみ）",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景のみ）。",
+    ].join("\n"),
+  },
+  math_world: {
+    label:   "🔢 数式世界",
+    moods:   ["minimal", "clean"],
+    styles:  ["digital", "monochrome"],
+    effects: ["abstract_lines", "geometric"],
+    colors:  ["monochrome"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🔢 斬新背景：数式世界】",
+      "背景を「浮遊する数式・記号・幾何学的なライン」で埋めた、未知の抽象空間にする。",
+      "黒板的な虚空／無限に続く数式空間として描き、実在の場所は使わない。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  浮遊する方程式 / 幾何学グリッド / 発光する記号 / 抽象的な座標空間 / 数式の流れ",
+      "",
+      "▼ 禁止：",
+      "  × 人物の顔・肌・衣服の上に数式を重ねない（数式・記号は背景・空間側のみ）",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景のみ）。",
+    ].join("\n"),
+  },
+};
+
+/** 斬新背景用：背景(background)を必ず含め、残りを weighted で 1〜2 軸足す（総数 2〜3・背景系のみ）。 */
+function pickBgScopes(
+  base:       ScopeWeight,
+  moods:      readonly Mood[],
+  lastScopes: readonly string[],
+): Scope[] {
+  return pickScopesWeighted(base, moods, lastScopes, 2, 3, false, ["background"]);
+}
+
+/**
+ * 斬新背景プリセットを 1 つビルドする（人物・衣装・露出・構図は触らない）。
+ * details.background の WIRED フィールドだけ差し替え（REPLACE-on-apply）。
+ * 文字背景フィールド（textType/textMood/textLayout/textTexture）は設定しない（DEAD・no-op）。
+ */
+function buildNovelBgInputs(
+  current: PromptInputs,
+  memory:  VariationMemory,
+  preset:  BgPreset,
+): PromptInputs {
+  const dir    = NOVEL_BG_DIRECTIONS[preset];
+  const moods  = dir.moods;
+  const style  = dir.styles[Math.floor(Math.random()  * dir.styles.length)];
+  const effect = dir.effects[Math.floor(Math.random() * dir.effects.length)];
+  const color  = dir.colors[Math.floor(Math.random()  * dir.colors.length)];
+
+  return {
+    ...current,
+    scopes:             pickBgScopes(PW[preset], moods, memory.lastScopes),
+    moods,
+    faceLock:           true,
+    viralMode:          false,
+    autoMoodCategories: [],
+    extraInstructions:  dir.note,
+    details: {
+      ...current.details,
+      background: {
+        ...current.details.background,  // time/weather/depth/info・文字背景は現状維持（文字背景は DEAD・触らない）
+        style,
+        effect,
+        color,
+        density: dir.density,
+        place:   dir.place,
+      },
+    },
+  };
+}
+
+export function buildCodeSpaceInputs(current: PromptInputs, memory: VariationMemory): PromptInputs {
+  return buildNovelBgInputs(current, memory, "code_space");
+}
+export function buildMathWorldInputs(current: PromptInputs, memory: VariationMemory): PromptInputs {
+  return buildNovelBgInputs(current, memory, "math_world");
+}
+
+/** 斬新背景プリセットのUI表示ラベル */
+export const BG_PRESET_DISPLAY: Record<BgPreset, string> = {
+  code_space: "🖥 コード空間",
+  math_world: "🔢 数式世界",
+};
+
+type BgPresetBuilder = (current: PromptInputs, memory: VariationMemory) => PromptInputs;
+const BG_PRESET_BUILDERS: Record<BgPreset, BgPresetBuilder> = {
+  code_space: buildCodeSpaceInputs,
+  math_world: buildMathWorldInputs,
+};
+
+/**
+ * 複数の斬新背景プリセットを融合してひとつの PromptInputs を生成する（world と同型）。
+ * 背景系スコープ・中立ムードのみマージ＝人物は触らない。
+ * details はコンボ時に触らない（単一選択時のみ background を差し替え＝world と同型）。
+ */
+export function buildCombinedBgInputs(
+  current: PromptInputs,
+  presets: BgPreset[],
+  memory:  VariationMemory,
+): PromptInputs {
+  if (presets.length === 0) return current;
+  if (presets.length === 1) return BG_PRESET_BUILDERS[presets[0]](current, memory);
+
+  const built        = presets.map((p) => BG_PRESET_BUILDERS[p](current, memory));
+  const mergedScopes = [...new Set(built.flatMap((b) => b.scopes))] as Scope[];
+  const mergedMoods  = [...new Set(built.flatMap((b) => b.moods))].slice(0, 4) as Mood[];
+
+  const labels = presets.map((p) => BG_PRESET_DISPLAY[p]);
+  const combo  = labels.join(" × ");
+
+  const comboIntro = [
+    `【🌌 斬新背景コンボ：${combo}】`,
+    `${labels.join("・")}を融合した、実在しない斬新な背景空間を作ること。`,
+    "各背景テーマの最も強い要素を自然に掛け合わせ、人物・衣装・構図は一切変えない（背景のみ）。",
+    "",
+  ].join("\n");
+
+  const combinedNotes = built
+    .map((b) => b.extraInstructions ?? "")
+    .filter(Boolean)
+    .join("\n\n");
+
+  return {
+    ...current,
+    scopes:             mergedScopes,
+    moods:              mergedMoods,
     faceLock:           true,
     viralMode:          false,
     autoMoodCategories: [],

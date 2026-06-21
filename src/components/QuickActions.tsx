@@ -13,9 +13,9 @@
 
 import { useState } from "react";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
-import type { WorldPreset } from "../lib/quickActions";
+import type { WorldPreset, BgPreset } from "../lib/quickActions";
 
-export type { WorldPreset };
+export type { WorldPreset, BgPreset };
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -26,6 +26,9 @@ interface QuickActionsProps {
   onUndo:             () => void;
   // 世界観 トグル（通常クリック=単一選択・Shift+クリック=コンボ累積）
   onWorldPresetToggle: (preset: WorldPreset, additive?: boolean) => void;
+  /** 🌌 斬新背景プリセット（背景版・最大3コンボ） */
+  activeBgPresets?:    BgPreset[];
+  onBgPresetToggle?:   (preset: BgPreset, additive?: boolean) => void;
   /** 量産回避（avoidCliche・サーバ側 cliche 回避ブロック。既定ON） */
   avoidCliche?:        boolean;
   onAvoidClicheChange?: (v: boolean) => void;
@@ -130,6 +133,8 @@ export function QuickActions({
   activeWorldPresets  = [],
   onUndo,
   onWorldPresetToggle,
+  activeBgPresets     = [],
+  onBgPresetToggle,
   avoidCliche = true, onAvoidClicheChange,
   avoidRealBackground = true, onAvoidRealBackgroundChange,
 }: QuickActionsProps) {
@@ -198,6 +203,20 @@ export function QuickActions({
           </span>
         )}
       </CategoryRow>
+
+      {/* ══════ 斬新背景（背景版プリセット・人物は変えない） ══════ */}
+      {onBgPresetToggle && (
+        <CategoryRow label="斬新背景">
+          <span className="w-full text-[10px] text-text-desc leading-snug mb-0.5">背景だけを「実在しない斬新な世界」に置き換える（人物・衣装・構図は変えない / クリック=単独選択・Shift+クリック=コンボ）</span>
+          <TagBtn label="🖥 コード空間" title="背景を流れるソースコード・データラインの斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("code_space", e.shiftKey)} active={activeBgPresets.includes("code_space")} variant="teal"   disabled={disabled} />
+          <TagBtn label="🔢 数式世界" title="背景を浮遊する数式・幾何学の斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）"     onClick={(e) => onBgPresetToggle("math_world", e.shiftKey)} active={activeBgPresets.includes("math_world")} variant="indigo" disabled={disabled} />
+          {activeBgPresets.length > 1 && (
+            <span className="text-[11px] text-indigo-300/70 font-semibold self-center ml-1">
+              {activeBgPresets.length}選択中
+            </span>
+          )}
+        </CategoryRow>
+      )}
 
     </div>
   );
