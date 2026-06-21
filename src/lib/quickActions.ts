@@ -126,9 +126,11 @@ export function pickScopesWeighted(
   min            = 2,
   max            = 4,
   penalizeRecent = false,
+  forced:         readonly Scope[] = [],
 ): Scope[] {
-  const boost   = getMoodScopeBoosts(moods);
-  const lastSet = new Set(lastScopes);
+  const boost     = getMoodScopeBoosts(moods);
+  const lastSet   = new Set(lastScopes);
+  const forcedSet = new Set<Scope>(forced);
   const w: Partial<Record<string, number>> = {};
 
   for (const s of PRESET_SCOPE_POOL) {
@@ -139,7 +141,7 @@ export function pickScopesWeighted(
 
   const count   = min + Math.floor(Math.random() * (max - min + 1));
   const pool    = PRESET_SCOPE_POOL.filter((s) => (w[s] ?? 0) > 0);
-  const chosen  = new Set<Scope>();
+  const chosen  = new Set<Scope>(forced);  // forced スコープ（outfit 等）を先行シード＝必ず含める
 
   while (chosen.size < count) {
     const avail = pool.filter((s) => !chosen.has(s));
@@ -154,15 +156,25 @@ export function pickScopesWeighted(
 
   const result = [...chosen];
 
-  // 直近と完全一致 → 1 要素をランダムに入れ替えて差別化
+  // 直近と完全一致 → forced 以外の 1 要素をランダムに入れ替えて差別化（forced は必ず残す）
   if (result.length === lastScopes.length && result.every((s) => lastSet.has(s))) {
-    const rest = pool.filter((s) => !chosen.has(s));
-    if (rest.length > 0) {
-      const replaceIdx     = Math.floor(Math.random() * result.length);
-      result[replaceIdx]   = rest[Math.floor(Math.random() * rest.length)];
+    const rest         = pool.filter((s) => !chosen.has(s));
+    const swappableIdx = result.map((s, i) => (forcedSet.has(s) ? -1 : i)).filter((i) => i >= 0);
+    if (rest.length > 0 && swappableIdx.length > 0) {
+      const replaceIdx   = swappableIdx[Math.floor(Math.random() * swappableIdx.length)];
+      result[replaceIdx] = rest[Math.floor(Math.random() * rest.length)];
     }
   }
   return result;
+}
+
+/** 世界観プリセット用：衣装(outfit)を必ず含め、残りを weighted で 2〜3 軸足す（総数 3〜4・全ジャンル共通）。 */
+function pickWorldScopes(
+  base:       ScopeWeight,
+  moods:      readonly Mood[],
+  lastScopes: readonly string[],
+): Scope[] {
+  return pickScopesWeighted(base, moods, lastScopes, 3, 4, false, ["outfit"]);
 }
 
 /**
@@ -545,7 +557,7 @@ export function buildY2kInputs(current: PromptInputs, memory: VariationMemory): 
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.y2k, moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.y2k, moods, memory.lastScopes),
     moods:              dir.moods,
     faceLock:           true,
     viralMode:          false,
@@ -668,7 +680,7 @@ export function buildY3kInputs(current: PromptInputs, memory: VariationMemory): 
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.y3k, moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.y3k, moods, memory.lastScopes),
     moods,
     faceLock:           true,
     viralMode:          false,
@@ -773,7 +785,7 @@ export function buildStreetInputs(current: PromptInputs, memory: VariationMemory
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.street, moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.street, moods, memory.lastScopes),
     moods,
     faceLock:           true,
     viralMode:          false,
@@ -850,7 +862,7 @@ export function buildCinematicInputs(current: PromptInputs, memory: VariationMem
 
   return {
     ...current,
-    scopes: pickScopesWeighted(PW.cinema, moods, memory.lastScopes),
+    scopes: pickWorldScopes(PW.cinema, moods, memory.lastScopes),
     moods,
     faceLock:           true,
     viralMode:          false,
@@ -983,7 +995,7 @@ export function buildWaFuuInputs(current: PromptInputs, memory: VariationMemory)
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.wafuu, dir.moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.wafuu, dir.moods, memory.lastScopes),
     moods:              dir.moods,
     faceLock:           true,
     viralMode:          false,
@@ -1100,7 +1112,7 @@ export function buildGothicInputs(current: PromptInputs, memory: VariationMemory
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.gothic, dir.moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.gothic, dir.moods, memory.lastScopes),
     moods:              dir.moods,
     faceLock:           true,
     viralMode:          false,
@@ -1223,7 +1235,7 @@ export function buildAdVisualInputs(current: PromptInputs, memory: VariationMemo
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.ad, dir.moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.ad, dir.moods, memory.lastScopes),
     moods:              dir.moods,
     faceLock:           true,
     viralMode:          false,
@@ -1337,7 +1349,7 @@ export function buildFantasyInputs(current: PromptInputs, memory: VariationMemor
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.fantasy, dir.moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.fantasy, dir.moods, memory.lastScopes),
     moods:              dir.moods,
     faceLock:           true,
     viralMode:          false,
@@ -1468,7 +1480,7 @@ export function buildRetroInputs(current: PromptInputs, memory: VariationMemory)
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.retro, dir.moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.retro, dir.moods, memory.lastScopes),
     moods:              dir.moods,
     faceLock:           true,
     viralMode:          false,
@@ -1613,7 +1625,7 @@ export function buildJiraiInputs(current: PromptInputs, memory: VariationMemory)
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.jirai, dir.moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.jirai, dir.moods, memory.lastScopes),
     moods:              dir.moods,
     faceLock:           true,
     viralMode:          false,
@@ -1744,7 +1756,7 @@ export function buildSeikimatsuInputs(current: PromptInputs, memory: VariationMe
 
   return {
     ...current,
-    scopes:             pickScopesWeighted(PW.seikimatsu, dir.moods, memory.lastScopes),
+    scopes:             pickWorldScopes(PW.seikimatsu, dir.moods, memory.lastScopes),
     moods:              dir.moods,
     faceLock:           true,
     viralMode:          false,
