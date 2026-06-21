@@ -23,6 +23,12 @@ import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Expression, Scope } from "../types";
 
+// 守るもの行：体型/ポーズ・色味/雰囲気・元画像構図 の保護チップは UI 非表示（hide-not-delete）。
+//   state（bodyPoseLock/colorMoodLock/compositionLock）は既定 true のまま dormant 据え置き＝保護ON継続・
+//   生成結果は不変。buildInputs.locks / lockLineJa / referenceLockReason / liveIdentityRisk(Identity Shield採点)
+//   はすべて値不変で従来通り効く。顔/同一性ロック・「解除して表情を選ぶ」・表情エリアは非表示対象外。
+const SHOW_PROTECT_CHIPS = false;
+
 // ── Scope options ──────────────────────────────────────────────────────────────
 
 const SCOPE_OPTIONS: { id: Scope; label: string; hint: string }[] = [
@@ -340,6 +346,7 @@ export function ControlPanel({
             </span>
           )}
 
+          {SHOW_PROTECT_CHIPS && (<>
           {/* 他の守るものチップ */}
           <ProtectChip
             label="体型/ポーズ"
@@ -360,6 +367,7 @@ export function ControlPanel({
             warn={compConflict}
             warnTitle="カメラ/アスペクト比変更範囲と競合します"
           />
+          </>)}
           {/* 「量産回避」は生成補助（回避系）へ移動。守るものは純粋なロックのみに整理。 */}
         </div>
 
