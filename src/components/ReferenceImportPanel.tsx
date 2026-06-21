@@ -81,6 +81,17 @@ export function referenceLockReason(cat: ReferenceCategory, p: ReferenceProtecti
   return null;
 }
 
+// ── 🎯 一発「画像から変更対象を自動セット」用 定数 ───────────────────────────
+/** 自動セットで拾う scope の固定優先度（composition/camera は同一 scope camera に畳まれる）。 */
+const AUTO_SCOPE_PRIORITY: Scope[] = ["background", "outfit", "pose", "hair", "lighting", "camera", "props", "foreground"];
+/** 過剰選択を避ける上限 scope 数（3〜5個に収める）。 */
+const MAX_AUTO_SCOPES = 5;
+/** 通知表示用の scope 日本語名。 */
+const AUTO_SCOPE_JA: Record<string, string> = {
+  background: "背景", outfit: "衣装", pose: "ポーズ", hair: "髪型",
+  lighting: "光", camera: "構図/カメラ", props: "小物", foreground: "前景",
+};
+
 interface Props {
   protections: ReferenceProtections;
   /** 現在 ON の変更対象（適用済み表示用） */
@@ -112,6 +123,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   const [note, setNote] = useState<string | null>(null);
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
+  const [autoSelecting, setAutoSelecting] = useState(false);  // 🎯 一発「自動セット」（内部抽出含む）処理中フラグ
   const [lightbox, setLightbox] = useState(false);
   const [showJson, setShowJson] = useState(false);
   const [othersOpen, setOthersOpen] = useState(false);
@@ -302,6 +314,70 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     }
   }, [image, flash]);
 
+  /** 🎯 抽出済み fields(src) から変更対象 scope を固定優先度で最大5個選び、案B（scope UNION追加＋note注入）で一括適用。
+   *  ★onApply(=handleApplyReference) 経由＝保護ゲート＋scope ON(UNION)＋referenceNote のみ。setDetails/place は一切呼ばない（温室回避）。
+   *  抽出直後は state 反映待ちで applyOne が stale fields を読むため、src を直接 onApply へ渡す。 */
+  const autoSelectFromFields = useCallback((src: Record<string, string>) => {
+    const withText = REFERENCE_CATEGORIES.filter((c) => c.scope != null && (src[c.key] ?? "").trim());
+    const lockedSkipped = withText.filter((c) => referenceLockReason(c, protections));
+    const appliable = withText.filter((c) => !referenceLockReason(c, protections));
+    if (appliable.length === 0) {
+      flash(lockedSkipped.length > 0
+        ? `適用可能な変更対象がありません（ロック軸のみ：${lockedSkipped.map((c) => c.label).join("・")}）`
+        : "適用できる変更対象がありません（先に画像から抽出してください）");
+      return;
+    }
+    // scope を固定優先度で並べ、上位 MAX_AUTO_SCOPES に絞る（composition/camera は camera に畳まれ重複排除）
+    const orderedScopes: Scope[] = [];
+    for (const s of AUTO_SCOPE_PRIORITY) {
+      if (appliable.some((c) => c.scope === s) && !orderedScopes.includes(s)) orderedScopes.push(s);
+    }
+    const pickedScopes = new Set<Scope>(orderedScopes.slice(0, MAX_AUTO_SCOPES));
+    const droppedScopes = orderedScopes.slice(MAX_AUTO_SCOPES);
+    // 選ばれた scope のカテゴリを優先度順に適用（onApply 直呼び＝直近抽出値 src を確実に使う・details/place 不触）
+    const toApply = appliable
+      .filter((c) => pickedScopes.has(c.scope as Scope))
+      .sort((a, b) => AUTO_SCOPE_PRIORITY.indexOf(a.scope as Scope) - AUTO_SCOPE_PRIORITY.indexOf(b.scope as Scope));
+    let applied = 0;
+    for (const c of toApply) {
+      const text = (src[c.key] ?? "").trim();
+      if (text && onApply(c.key, text)) applied++;
+    }
+    const parts: string[] = [];
+    parts.push(applied > 0
+      ? `🎯 ${pickedScopes.size}個の変更対象を自動セット（${[...pickedScopes].map((s) => AUTO_SCOPE_JA[s] ?? s).join("・")}）`
+      : "自動セットできる変更対象がありませんでした");
+    if (lockedSkipped.length > 0) parts.push(`ロック軸は除外：${lockedSkipped.map((c) => c.label).join("・")}`);
+    if (droppedScopes.length > 0) parts.push(`上限${MAX_AUTO_SCOPES}超で除外：${droppedScopes.map((s) => AUTO_SCOPE_JA[s] ?? s).join("・")}`);
+    flash(parts.join(" ／ "));
+  }, [protections, onApply, flash]);
+
+  /** 🎯 一発：参照画像→変更対象を自動セット。未抽出なら内部で抽出してから（真の一発・spinner・連打防止）。
+   *  失敗時は scope 不変でトースト通知（フォールバック）。§4(referenceExtract)・§3データ層 不触・既存 API を呼ぶのみ。 */
+  const handleAutoSelectFromReference = useCallback(async () => {
+    if (!image) { flash("先に参照画像を貼ってください"); return; }
+    if (autoSelecting || extracting) return;
+    // 抽出済み（scope付きカテゴリに text が1つでもある）ならそのまま自動セット
+    const hasExtracted = REFERENCE_CATEGORIES.some((c) => c.scope != null && (fields[c.key] ?? "").trim());
+    if (hasExtracted) { autoSelectFromFields(fields); return; }
+    // 未抽出 → 内部で抽出してから自動セット（state 反映待ちを避け、抽出値 next を直接渡す）
+    setAutoSelecting(true);
+    setExtractError(null);
+    try {
+      const { elements } = await extractReferenceViaBackend(image);
+      const next: Record<string, string> = {};
+      for (const c of REFERENCE_CATEGORIES) next[c.key] = (elements[c.key] ?? "").trim();
+      setFields(next);
+      autoSelectFromFields(next);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setExtractError(msg);
+      flash(`自動セットに失敗：${msg}`);  // scope 不変のフォールバック
+    } finally {
+      setAutoSelecting(false);
+    }
+  }, [image, autoSelecting, extracting, fields, autoSelectFromFields, flash]);
+
   // 優先6カテゴリ（常時展開）／その他（折りたたみ）
   const PRIORITY_KEYS = ["background", "outfit", "pose", "hair", "composition", "lighting"];
   const priorityCats = REFERENCE_CATEGORIES.filter((c) => PRIORITY_KEYS.includes(c.key));
@@ -474,7 +550,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
 
         {/* 抽出ボタン（Gemini Vision で参照画像を実解析） */}
         <div className="rounded-lg border border-bg-border bg-bg-base/30 px-2.5 py-2">
-          <button type="button" disabled={!image || extracting}
+          <button type="button" disabled={!image || extracting || autoSelecting}
             onClick={() => { void runExtract(); }}
             title={image ? "Gemini Vision で参照画像を解析し各欄を埋める" : "先に参照画像を貼ってください"}
             className="w-full text-[12px] font-bold px-2.5 py-1.5 rounded-lg border border-violet-400/55 bg-violet-500/18 text-violet-50 hover:bg-violet-500/28 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
@@ -499,6 +575,19 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
           <p className="text-[10px] text-text-muted/65 leading-snug pt-1.5">
             ※ 参照画像に実際に見える要素だけを抽出します（無い要素を足しません）。
             顔・同一性・表情・体型は抽出せず、人物そのものは複製しません。手入力で上書きも可。
+          </p>
+        </div>
+
+        {/* 🎯 一発：参照画像→変更対象(scope)を自動セット（案B・UNION追加＋note注入・details/place 不触＝温室回避） */}
+        <div className="rounded-lg border border-sky-400/30 bg-sky-500/8 px-2.5 py-2">
+          <button type="button" disabled={!image || extracting || autoSelecting}
+            onClick={() => { void handleAutoSelectFromReference(); }}
+            title={image ? "参照画像を解析し、変更対象（背景/衣装/ポーズ等）を優先度順に最大5個ONにします（未解析なら自動で解析）。元画像の設定（背景の場所等）は変更しません。" : "先に参照画像を貼ってください"}
+            className="w-full text-[12px] font-bold px-2.5 py-2 rounded-lg border border-sky-400/55 bg-sky-500/18 text-sky-50 hover:bg-sky-500/28 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
+            {autoSelecting ? (<><span className="w-1.5 h-1.5 rounded-full bg-sky-200 animate-pulse" />解析して自動セット中…</>) : "🎯 画像から変更対象を自動セット"}
+          </button>
+          <p className="text-[10px] text-text-muted/65 leading-snug pt-1.5">
+            ※ 変更対象（背景/衣装/ポーズ等）を優先度順に最大5個ONにします。未解析なら自動で解析。元画像の設定（背景の場所など）は変更しません。
           </p>
         </div>
 
