@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PromptHistoryItem, ResultAnalysis } from "../types";
 import { fileToThumbnail } from "../lib/imageFile";
+import { shortenPrompt } from "../lib/shortenPrompt";
 import { FavoriteButton } from "./FavoriteButton";
 import {
   getResultImages, buildResultImagesPatch, MAX_RESULT_IMAGES,
@@ -432,6 +433,9 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
   const [expanded, setExpanded] = useState(false);
   /** ロック一覧をコピーに含めるか */
   const [includeLockHeader, setIncludeLockHeader] = useState(false);
+  /** ✂ ChatGPT向け短縮モード（既定OFF）。ON で表示/コピーを shortenPrompt() 後処理した版にする。
+   *  生成本文 item.promptText（保存データ）は無改変＝表示/コピーの整形のみ。安全方向[NG]・本文は温存。 */
+  const [shortMode, setShortMode] = useState(false);
 
   /** 通常コピー済み：IndexedDB に永続保存（item.copied を直接使用） */
   const isCopied = item.copied === true;
@@ -439,10 +443,13 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
   const pal  = paletteFor(item.proposalIndex);
   const isLocked  = item.locked === true;
 
+  /** 表示/コピーに使うテキスト（短縮ONなら後処理版・OFFなら原文）。保存データは不変。 */
+  const displayText = shortMode ? shortenPrompt(item.promptText) : item.promptText;
+
   /** コピーするテキスト（ロック一覧を含める設定なら先頭に付与） */
   const copyText = (includeLockHeader && lock)
-    ? buildLockHeader(lock) + item.promptText
-    : item.promptText;
+    ? buildLockHeader(lock) + displayText
+    : displayText;
 
   const copy = async () => {
     try {
@@ -472,8 +479,8 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
   }, [item.id, item.promptText, item.versions, onUpdate]);
 
   const isLong =
-    item.promptText.split(/\n/).length > LONG_THRESHOLD_LINES ||
-    item.promptText.length > LONG_THRESHOLD_CHARS;
+    displayText.split(/\n/).length > LONG_THRESHOLD_LINES ||
+    displayText.length > LONG_THRESHOLD_CHARS;
 
   const currentImages = getResultImages(item);
 
@@ -630,6 +637,17 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
             </label>
           )}
 
+          {/* ✂ ChatGPT向け短縮（人体補正/英語重複を圧縮・[NG]/本文は温存） */}
+          <label className="flex items-center gap-1 text-[11px] text-text-muted/80 cursor-pointer select-none" title="ChatGPT(Image2)向けに軽量化：人体補正の英語重複を削り【人体補正】を1行に圧縮。【NG】・本文（変更/雰囲気/光）はそのまま温存。生成データは無改変（表示/コピーのみ）。">
+            <input
+              type="checkbox"
+              checked={shortMode}
+              onChange={(e) => setShortMode(e.target.checked)}
+              className="accent-sky-500"
+            />
+            ✂ 短縮
+          </label>
+
           {/* 📋 コピー */}
           <button
             type="button"
@@ -692,7 +710,7 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
           ].join(" ")}
           style={{ lineHeight: "1.85", overflowWrap: "anywhere" }}
         >
-          {item.promptText}
+          {displayText}
         </pre>
         {isLong && !expanded && (
           <span className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-[#0c0f15] to-transparent pointer-events-none" />
