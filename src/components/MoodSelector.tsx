@@ -137,6 +137,11 @@ export function hasDetailSelection(moods: Mood[], autoMoodCategories: string[]):
   return detailMoodIds.some((id) => moods.includes(id));
 }
 
+// ② Stage5: クール(cool)/ミニマル(minimal)/シネマ調(grade_cinema) の chip を UI 非表示（hide-not-delete）。
+//   斬新背景プリセット等へ統合済み。Mood 型メンバ・配列データ・getGroupSelection 判定・保存データは dormant 据え置き
+//   （プリセットが内部で moods に設定する分は従来通り効く）。※ cinematic（映画風・別キー）は温存して畳まない。
+const HIDDEN_MOOD_IDS = new Set<Mood>(["cool", "minimal", "grade_cinema"]);
+
 // ─── MoodGroupRow ─────────────────────────────────────────────────────────────
 
 export function MoodGroupRow({
@@ -173,7 +178,7 @@ export function MoodGroupRow({
           title="AIが案ごとに自由に決める"
           compact
         />
-        {group.moods.map((opt) => (
+        {group.moods.filter((opt) => !HIDDEN_MOOD_IDS.has(opt.id)).map((opt) => (
           <GridCell
             key={opt.id}
             jaLabel={opt.label}
