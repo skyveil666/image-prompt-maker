@@ -1789,10 +1789,9 @@ export function DetailsCard({
 
   const allTabs: TabId[] = [...scopes, ...EXTRA_TAB_IDS];
 
-  // ── 折りたたみ開閉（P4：選択あり=初期展開 / 未選択=初期クローズ）──
-  const [openTabs, setOpenTabs] = useState<Set<TabId>>(
-    () => new Set(allTabs.filter((t) => countTab(t) > 0)),
-  );
+  // ── 折りたたみ開閉（初期は常に全て閉じる＝折りたたみ既定）──
+  //    件数バッジ（countTab）・すべて開く/閉じる ボタンは不変。ユーザーが▶で個別に開く。
+  const [openTabs, setOpenTabs] = useState<Set<TabId>>(() => new Set());
   const toggleOpen = (t: TabId) =>
     setOpenTabs((prev) => {
       const n = new Set(prev);

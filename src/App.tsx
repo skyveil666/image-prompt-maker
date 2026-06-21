@@ -304,6 +304,10 @@ export default function App() {
   const lastItemsRef = useRef<PromptHistoryItem[]>([]);
   const [generating, setGenerating] = useState(false);
   const generatingRef = useRef(false);
+  /** 生成結果リスト（案カード群）の先頭。生成完了時にここへ自動スクロールする（表示挙動のみ）。 */
+  const resultsTopRef = useRef<HTMLDivElement | null>(null);
+  /** 直前の generating 値。true→false（生成完了）の遷移検知に使う（履歴復元等の setItems では発火しない）。 */
+  const prevGeneratingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [explorerOpen, setExplorerOpen] = useState<boolean>(() => {
     try {
@@ -856,6 +860,15 @@ export default function App() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [canGenerate, generating, handleGenerate]);
+
+  // 📜 生成完了（generating true→false）かつ結果ありで、案カード先頭へ自動スクロール。
+  //    履歴復元/view復元の setItems は generating 遷移を伴わないため発火しない（生成時のみ）。
+  useEffect(() => {
+    if (prevGeneratingRef.current && !generating && items.length > 0) {
+      resultsTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    prevGeneratingRef.current = generating;
+  }, [generating, items.length]);
 
   // 🔄 別案のみ自動生成トリガーを使う。他のボタンは設定反映のみ。
   const pendingRunRef = useRef<PromptInputs | null>(null);
@@ -1984,7 +1997,7 @@ export default function App() {
               )}
 
               {hasResults && (
-                <section className="space-y-5">
+                <section ref={resultsTopRef} className="space-y-5">
                   <PromptList
                     title="統一プロンプト"
                     subtitle="日本語・項目分け（ChatGPT / Nano Banana 共通。出力先に応じて自動最適化）"
