@@ -181,6 +181,11 @@ export default function App() {
   const [activeBgPresets, setActiveBgPresets] = useState<BgPreset[]>([]);
   /** 斬新背景プリセット由来の指示文（worldCombinedNote の兄弟・extraInstructions と分離して管理） */
   const [bgPresetNote, setBgPresetNote] = useState("");
+  /** 🔗 Stage2b：世界観/斬新背景プリセットが最後に与えた scope（由来保持・非永続）。
+   *  変更対象 scopes は両者の UNION で再計算する（＝服も背景も同時フル適用）。
+   *  復元系（アレンジ/履歴復元/反映）では由来不能ゆえクリアし、次の preset toggle で再計算させる。 */
+  const [worldScopes, setWorldScopes] = useState<Scope[]>([]);
+  const [bgScopes, setBgScopes] = useState<Scope[]>([]);
   /** 参照画像から「適用」した軸タグ付き自由文（catKey → text）。生成時に extraInstructions へ統合。
    *  ※ 詳細 enum には自動反映しない（docs/23）。worldCombinedNote と同じ追加マージ方式。 */
   const [referenceNote, setReferenceNote] = useState<Record<string, string>>({});
@@ -1191,13 +1196,17 @@ export default function App() {
 
     if (next.length === 0) {
       setWorldCombinedNote("");
+      setWorldScopes([]);
+      setScopes([...bgScopes]);  // 世界観解除→斬新背景の scope のみ残す（UNION 再計算）
       setScopeFlashKey((k) => k + 1);
       showPresetToast("世界観の設定をリセットしました");
       return;
     }
 
     const combined = buildCombinedWorldInputs(buildInputs(), next, variationMemory);
-    setScopes(combined.scopes);
+    const ws = combined.scopes;
+    setWorldScopes(ws);
+    setScopes([...new Set([...ws, ...bgScopes])]);  // 世界観 ∪ 斬新背景（同時フル適用）
     setMoods(combined.moods);
     setAutoMoodCategories(combined.autoMoodCategories ?? []);
     if (next.length === 1) setDetails(combined.details);
@@ -1219,7 +1228,7 @@ export default function App() {
       ? `${next.length}つの世界観を融合します`
       : APPLY_HINT;
     showPresetToast(msg, hint);
-  }, [activeWorldPresets, buildInputs, variationMemory, showPresetToast]);
+  }, [activeWorldPresets, buildInputs, variationMemory, showPresetToast, bgScopes]);
 
   // 🌌 斬新背景プリセット（背景版）：handleWorldPresetToggle のクローン。
   // 背景系スコープ＋details.background＋bgPresetNote だけ更新し、人物・衣装・露出は触らない。
@@ -1241,13 +1250,17 @@ export default function App() {
 
     if (next.length === 0) {
       setBgPresetNote("");
+      setBgScopes([]);
+      setScopes([...worldScopes]);  // 斬新背景解除→世界観の scope のみ残す（UNION 再計算）
       setScopeFlashKey((k) => k + 1);
       showPresetToast("斬新背景の設定をリセットしました");
       return;
     }
 
     const combined = buildCombinedBgInputs(buildInputs(), next, variationMemory);
-    setScopes(combined.scopes);
+    const bs = combined.scopes;
+    setBgScopes(bs);
+    setScopes([...new Set([...worldScopes, ...bs])]);  // 世界観 ∪ 斬新背景（同時フル適用）
     setMoods(combined.moods);
     setAutoMoodCategories(combined.autoMoodCategories ?? []);
     if (next.length === 1) setDetails(combined.details);
@@ -1268,7 +1281,7 @@ export default function App() {
       ? `${next.length}つの斬新背景を融合します`
       : APPLY_HINT;
     showPresetToast(msg, hint);
-  }, [activeBgPresets, buildInputs, variationMemory, showPresetToast]);
+  }, [activeBgPresets, buildInputs, variationMemory, showPresetToast, worldScopes]);
 
   // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
   // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
@@ -1300,6 +1313,8 @@ export default function App() {
     setWorldCombinedNote("");
     setActiveBgPresets([]);
     setBgPresetNote("");
+    setWorldScopes([]);
+    setBgScopes([]);
     setActiveGodModes([]);
     setActiveBoosts([]);
     setChaosLabel(null);
@@ -1362,6 +1377,7 @@ export default function App() {
       setView("main");
       const arrangeInputs = buildArrangeInputs(buildInputs(), sourceItem);
       setScopes(arrangeInputs.scopes);
+      setWorldScopes([]); setBgScopes([]);  // 復元系：由来不能ゆえクリア（次の preset toggle で正しく再計算）
       setMoods(arrangeInputs.moods);
       setAutoMoodCategories(arrangeInputs.autoMoodCategories ?? []);
       setDetails(arrangeInputs.details);
@@ -1386,6 +1402,7 @@ export default function App() {
 
       // ── 基本設定（PromptHistoryItem に常にある） ─────────────────────────
       setScopes(item.scopes ?? []);
+      setWorldScopes([]); setBgScopes([]);  // 復元系：由来不能ゆえクリア
       setMoods(item.moods ?? []);
       setDetails(item.details ?? ({} as import("./types").DetailSettings));
       setFaceLock(item.faceLock ?? false);
@@ -1645,6 +1662,7 @@ export default function App() {
     setActiveWorldPresets(nextWorldPresets);
     setWorldCombinedNote(nextWorldNote);
     setScopes(nextScopes);
+    setWorldScopes([]); setBgScopes([]);  // 反映：世界観クリア＋scope縮約ゆえ由来クリア（次の preset toggle で再計算）
     setRealismLevel(nextRealismLevel);
     setMoods(nextMoods);
     setNgList(nextNgList);
@@ -1715,9 +1733,9 @@ export default function App() {
             worldCombinedNote={worldCombinedNote}
             referenceNoteText={referenceNoteText}
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
-            onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
+            onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes([...bgScopes]); }}
             bgPresetNote={bgPresetNote}
-            onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); }}
+            onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes([...worldScopes]); }}
             onClearReference={() => setReferenceNote({})}
             tagNg={tagNg}
             onClearTagNg={() => setTagNg([])}
@@ -1823,10 +1841,10 @@ export default function App() {
                 onResetAll={handleResetAll}
                 worldCombinedNote={worldCombinedNote}
                 referenceNoteText={referenceNoteText}
-                onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); }}
+                onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes([...bgScopes]); }}
                 activeBgPresets={activeBgPresets}
                 bgPresetNote={bgPresetNote}
-                onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); }}
+                onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes([...worldScopes]); }}
                 onClearReference={() => setReferenceNote({})}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
