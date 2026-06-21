@@ -16,6 +16,14 @@ import {
 import { exportBackup, importBackup, type ImportResult } from "../lib/backup";
 import { MAX_RECENT } from "../lib/recentImages";
 
+// 左サイドバー整理（hide-not-delete）：お気に入り分析カードとフィルタ/追加条件を UI 非表示にする。
+//   表示だけ隠し、state(filter/extraFilters/analysisOpen)・型/ラベル(FilterMode/ExtraFilter/FILTER_LABELS)・
+//   filtered useMemo・props(favoriteProfile) は dormant 据え置き＝全件表示で閲覧成立。傾向反映の機能run
+//   （App 側: buildFavoriteProfile / buildInputs 注入 / BoostArea トグル）は完全に無傷（GPB同型）。
+//   ★検索バー・データ管理（export/import/自動削除/保持期間）は hide しない（残す）。
+const SHOW_FAV_ANALYSIS = false;
+const SHOW_HISTORY_FILTERS = false;
+
 interface Props {
   onBack: () => void;
   initialFavoritesOnly?: boolean;
@@ -364,8 +372,8 @@ export function HistoryView({
             }}
           />
 
-          {/* ⭐ お気に入り分析 */}
-          {favoriteProfile && favoriteProfile.favoriteCount > 0 && (
+          {/* ⭐ お気に入り分析（hide-not-delete・表示のみ非表示／集計run・傾向反映は App 側で温存） */}
+          {SHOW_FAV_ANALYSIS && favoriteProfile && favoriteProfile.favoriteCount > 0 && (
             <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-3 space-y-2">
               <button
                 type="button"
@@ -472,7 +480,8 @@ export function HistoryView({
             </div>
           </div>
 
-          {/* フィルタ */}
+          {/* フィルタ（hide-not-delete・絞り込み表示のみ。hide 中は filter=all で全件表示・カレンダー再クリックで日付解除可） */}
+          {SHOW_HISTORY_FILTERS && (
           <div className="rounded-2xl border border-bg-border bg-bg-panel/40 p-3 space-y-3">
             <div className="text-[12px] font-semibold uppercase tracking-widest text-text-muted/90">
               フィルタ
@@ -548,6 +557,7 @@ export function HistoryView({
               )}
             </div>
           </div>
+          )}
 
           {/* データ管理 */}
           <div className="rounded-2xl border border-bg-border bg-bg-panel/40 p-3 space-y-2.5">
