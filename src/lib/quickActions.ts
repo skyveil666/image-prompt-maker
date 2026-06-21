@@ -204,6 +204,9 @@ export const PW: Record<string, ScopeWeight> = {
   // 🌌 斬新背景：背景を最優先、補助は前景・ライティングのみ（人物軸 outfit/pose/hair/camera/cyber は含めない＝人物を触らない）。
   code_space: { background: 10, lighting: 7, foreground: 6 },
   math_world: { background: 10, lighting: 6, foreground: 6 },
+  digit_world: { background: 10, lighting: 7, foreground: 6 },
+  kanji_space: { background: 10, lighting: 6, foreground: 6 },
+  typo_space:  { background: 10, lighting: 7, foreground: 6 },
 };
 
 
@@ -1884,7 +1887,7 @@ export function buildCombinedWorldInputs(
 //   - §4（promptSystem/scopeFilter/gemini）不触。details.background は REPLACE-on-apply。
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export type BgPreset = "code_space" | "math_world";
+export type BgPreset = "code_space" | "math_world" | "digit_world" | "kanji_space" | "typo_space";
 
 interface NovelBgDirection {
   label:    string;
@@ -1958,6 +1961,87 @@ const NOVEL_BG_DIRECTIONS: Record<BgPreset, NovelBgDirection> = {
       "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景の質感・空気・ライティングのみ）。",
     ].join("\n"),
   },
+  digit_world: {
+    label:   "🔟 数字世界",
+    moods:   ["cool", "minimal"],
+    styles:  ["cyber", "digital"],
+    effects: ["abstract_lines", "particles", "light_rays"],
+    colors:  ["monochrome", "high_sat"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🔟 斬新背景：数字世界】",
+      "背景を「無数の数字・数列・0と1のバイナリ」で画面いっぱいに埋め尽くす、未知のデジタル空間にする。",
+      "実在の都市・看板・ロゴは使わず、どこにも存在しない数字の世界として描く。",
+      "",
+      "▼ 奥行き：数字・数列を前景から奥へ層を成して流れ降らせ、遠近感のある深い空間にする（近景は大きく、遠景は細かく霞ませる）。",
+      "▼ 密度：画面を埋め尽くす細かい数字・無数の数列・敷き詰められた桁で情報量を最大にする（マトリックス的な数字の雨）。",
+      "▼ 明るさ：明暗の幅を持たせる。発光する数字・光る数列・グロー要素を散らし、暗がり一辺倒にしない。",
+      "▼ 馴染み：背景の光・粒子が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景要素が人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  流れ降る数列 / バイナリの雨 / 発光する桁 / デジタルカウンター / 浮遊する数字群",
+      "",
+      "▼ 守ること：",
+      "  × 顔の上に読める数字を大きく重ねない（同一性を保つ）。数字は空間・前景側に置く。",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
+  kanji_space: {
+    label:   "🖌 漢字空間",
+    moods:   ["minimal", "clean"],
+    styles:  ["abstract_art", "monochrome"],
+    effects: ["abstract_lines", "ink_bleed", "brushstroke", "geometric"],
+    colors:  ["monochrome", "beige"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🖌 斬新背景：漢字空間】",
+      "背景を「無数の漢字・古文書の文字・墨字・呪符的な文字」で画面いっぱいに敷き詰めた、未知の文字の海にする。",
+      "実在の場所・看板・ロゴは使わず、どこにも存在しない和の文字空間として描く。",
+      "",
+      "▼ 奥行き：漢字・墨字を前景から奥へ層を成して羅列し、遠近感のある深い空間にする（手前は大きく、奥は細かく無数に続かせる）。",
+      "▼ 密度：画面を埋め尽くす細かい漢字・無数の墨字・敷き詰められた古文書の文字で情報量を最大にする（巻物や呪符のような文字の海）。",
+      "▼ 明るさ：墨の濃淡と発光する文字で明暗の幅を持たせ、暗がり一辺倒にしない。",
+      "▼ 馴染み：背景の光が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景の文字が人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  墨字の羅列 / 古文書の文字 / 呪符・護符の文字 / 巻物の文字列 / 浮遊する漢字群",
+      "",
+      "▼ 守ること：",
+      "  × 顔の上に読める文字を大きく重ねない（同一性を保つ）。文字は空間・前景側に置く。",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
+  typo_space: {
+    label:   "🔤 英字タイポ空間",
+    moods:   ["cool", "minimal"],
+    styles:  ["gradient", "digital"],
+    effects: ["geometric", "color_planes", "particles", "light_rays"],
+    colors:  ["high_sat", "vivid"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🔤 斬新背景：英字タイポ空間】",
+      "背景を「英単語・アルファベット・タイポグラフィの羅列」で画面いっぱいに構成した、未知のエディトリアル空間にする。",
+      "実在のブランド名・ロゴ・看板は使わず、どこにも存在しない抽象的な文字空間として描く。",
+      "",
+      "▼ 奥行き：英字・タイポグラフィを前景から奥へ浮遊させ層を成して羅列し、遠近感のある深い空間にする（近景は大きく、遠景は細かく）。",
+      "▼ 密度：画面を埋め尽くす英単語・無数のアルファベット・敷き詰められたタイポで情報量を最大にする。",
+      "▼ 明るさ：発光する文字・色面・グロー要素で明暗と色彩の幅を持たせ、暗がり一辺倒にしない。",
+      "▼ 馴染み：背景の光が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景の文字が人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  エディトリアルなタイポ / 壁面の英文字 / 浮遊するアルファベット / 広告的タイポグラフィ / 色面と文字の構成",
+      "",
+      "▼ 守ること：",
+      "  × 顔の上に読める文字を大きく重ねない（同一性を保つ）。文字は空間・前景側に置く。",
+      "  × 実在のブランド名・ロゴ・実在の場所を出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
 };
 
 /** 斬新背景用：背景(background)を必ず含め、残りを weighted で 1〜2 軸足す（総数 2〜3・背景系のみ）。 */
@@ -2018,12 +2102,18 @@ export function buildMathWorldInputs(current: PromptInputs, memory: VariationMem
 export const BG_PRESET_DISPLAY: Record<BgPreset, string> = {
   code_space: "🖥 コード空間",
   math_world: "🔢 数式世界",
+  digit_world: "🔟 数字世界",
+  kanji_space: "🖌 漢字空間",
+  typo_space:  "🔤 英字タイポ空間",
 };
 
 type BgPresetBuilder = (current: PromptInputs, memory: VariationMemory) => PromptInputs;
 const BG_PRESET_BUILDERS: Record<BgPreset, BgPresetBuilder> = {
   code_space: buildCodeSpaceInputs,
   math_world: buildMathWorldInputs,
+  digit_world: (c, m) => buildNovelBgInputs(c, m, "digit_world"),
+  kanji_space: (c, m) => buildNovelBgInputs(c, m, "kanji_space"),
+  typo_space:  (c, m) => buildNovelBgInputs(c, m, "typo_space"),
 };
 
 /**

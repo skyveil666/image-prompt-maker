@@ -210,6 +210,9 @@ export function QuickActions({
           <span className="w-full text-[10px] text-text-desc leading-snug mb-0.5">背景だけを「実在しない斬新な世界」に置き換える（人物・衣装・構図は変えない / クリック=単独選択・Shift+クリック=コンボ）</span>
           <TagBtn label="🖥 コード空間" title="背景を流れるソースコード・データラインの斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("code_space", e.shiftKey)} active={activeBgPresets.includes("code_space")} variant="teal"   disabled={disabled} />
           <TagBtn label="🔢 数式世界" title="背景を浮遊する数式・幾何学の斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）"     onClick={(e) => onBgPresetToggle("math_world", e.shiftKey)} active={activeBgPresets.includes("math_world")} variant="indigo" disabled={disabled} />
+          <TagBtn label="🔟 数字世界" title="背景を無数の数字・数列（バイナリの雨）の斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("digit_world", e.shiftKey)} active={activeBgPresets.includes("digit_world")} variant="sky"    disabled={disabled} />
+          <TagBtn label="🖌 漢字空間" title="背景を無数の漢字・墨字・古文書の文字の海の斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("kanji_space", e.shiftKey)} active={activeBgPresets.includes("kanji_space")} variant="amber"  disabled={disabled} />
+          <TagBtn label="🔤 英字タイポ空間" title="背景を英字・タイポグラフィの羅列のエディトリアル斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("typo_space", e.shiftKey)} active={activeBgPresets.includes("typo_space")} variant="violet" disabled={disabled} />
           {activeBgPresets.length > 1 && (
             <span className="text-[11px] text-indigo-300/70 font-semibold self-center ml-1">
               {activeBgPresets.length}選択中
