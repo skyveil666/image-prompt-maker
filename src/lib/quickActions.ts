@@ -1500,14 +1500,15 @@ export function buildRetroInputs(current: PromptInputs, memory: VariationMemory)
 // ─── 🖤 地雷系 ─────────────────────────────────────────────────────────────────
 
 interface JiraiDirection {
-  label:          string;
-  moods:          Mood[];
-  outfitStyle:    OutfitStyle;
-  outfitColor:    OutfitColor;
-  outfitMaterial: OutfitMaterial;
-  hairStyle:      HairStyle;
-  bgPlace:        BackgroundPlace;
-  extraHint:      string;
+  label:            string;
+  moods:            Mood[];
+  outfitStyle:      OutfitStyle;
+  outfitColor:      OutfitColor;
+  outfitMaterial:   OutfitMaterial;
+  outfitDecoration: OutfitDecoration;
+  hairStyle:        HairStyle;
+  bgPlace:          BackgroundPlace;
+  extraHint:        string;
 }
 
 const JIRAI_DIRECTIONS: JiraiDirection[] = [
@@ -1517,6 +1518,7 @@ const JIRAI_DIRECTIONS: JiraiDirection[] = [
     outfitStyle:    "dress",
     outfitColor:    "black",
     outfitMaterial: "chiffon",
+    outfitDecoration: "ribbon",
     hairStyle:      "gothic_lolita",
     bgPlace:        "night_amusement",
     extraHint:      "黒×ピンクのベーシック地雷系。リボン・厚底・レイヤードで「かわいい」と「ダーク」を両立。",
@@ -1527,6 +1529,7 @@ const JIRAI_DIRECTIONS: JiraiDirection[] = [
     outfitStyle:    "mode",
     outfitColor:    "black",
     outfitMaterial: "cloth",
+    outfitDecoration: "moderate",
     hairStyle:      "doll",
     bgPlace:        "gallery",
     extraHint:      "ファッション誌的な地雷感。モード・建築的シルエット・白黒コントラストにピンクのアクセント。",
@@ -1537,6 +1540,7 @@ const JIRAI_DIRECTIONS: JiraiDirection[] = [
     outfitStyle:    "street",
     outfitColor:    "black",
     outfitMaterial: "denim",
+    outfitDecoration: "chain_decor",
     hairStyle:      "street",
     bgPlace:        "alley",
     extraHint:      "アーバンな空気の中で地雷系を表現。アーバン×病みかわいい。レイヤードグランジ。",
@@ -1547,6 +1551,7 @@ const JIRAI_DIRECTIONS: JiraiDirection[] = [
     outfitStyle:    "mode",
     outfitColor:    "white",
     outfitMaterial: "cloth",
+    outfitDecoration: "moderate",
     hairStyle:      "viral",
     bgPlace:        "studio",
     extraHint:      "ハイブランド広告風の地雷ビジュアル。クリーンバック×黒白ピンクのシャープなコントラスト。",
@@ -1557,6 +1562,7 @@ const JIRAI_DIRECTIONS: JiraiDirection[] = [
     outfitStyle:    "cyber",
     outfitColor:    "pink",
     outfitMaterial: "pvc",
+    outfitDecoration: "chain_decor",
     hairStyle:      "near_future",
     bgPlace:        "futuristic",
     extraHint:      "Y3K×地雷の融合。メタリックピンク・暗い未来空間・テックウェア地雷。",
@@ -1567,6 +1573,7 @@ const JIRAI_DIRECTIONS: JiraiDirection[] = [
     outfitStyle:    "gothic",
     outfitColor:    "black",
     outfitMaterial: "velvet",
+    outfitDecoration: "ribbon",
     hairStyle:      "wa_gothic",
     bgPlace:        "old_cinema",
     extraHint:      "ゴシック×地雷の融合。退廃的な空間に厚底・リボン・ダークピンクのアクセント。",
@@ -1622,7 +1629,7 @@ export function buildJiraiInputs(current: PromptInputs, memory: VariationMemory)
         style:      dir.outfitStyle,
         color:      dir.outfitColor,
         silhouette: "layered",
-        decoration: "moderate",
+        decoration: dir.outfitDecoration,
         luxury:     "refined",
         exposure:   current.details.outfit.exposure,
         material:   dir.outfitMaterial,
