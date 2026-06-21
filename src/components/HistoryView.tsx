@@ -199,6 +199,12 @@ export function HistoryView({
     void reload();
   }, [reload, refreshKey]);
 
+  // 📜 履歴/カレンダー画面を開いたら最上部（＝降順ソートの先頭＝最新プロンプト）から表示する。
+  //    view 切替は同一 document でスクロール位置が残るため、マウント時に先頭へ戻す（表示位置のみ・データ不変）。
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, []);
+
   const toggleExtraFilter = useCallback((id: ExtraFilter) => {
     setExtraFilters((prev) => {
       const next = new Set(prev);
@@ -319,8 +325,8 @@ export function HistoryView({
 
   return (
     <div className="space-y-4">
-      {/* ヘッダー行 */}
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* ヘッダー行（sticky で「←戻る」を常時表示・スクロールしても隠れない） */}
+      <div className="sticky top-0 z-30 py-2 bg-bg-base/95 backdrop-blur-sm flex items-center gap-3 flex-wrap">
         <button type="button" className="btn text-sm" onClick={onBack}>
           ← 戻る
         </button>
