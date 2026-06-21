@@ -61,7 +61,7 @@ interface Props {
   activeBgPresets: string[];
   /** 斬新背景プリセット由来の追加指示（背景スコープ時のみ全案へ注入・通常は不可視）。非空かつ背景が変更対象なら支配バッジを出す。 */
   bgPresetNote: string;
-  /** 斬新背景の解除（bgPresetNote + activeBgPresets をクリア・soft：details/scopes は戻さない）。 */
+  /** 斬新背景の解除（bgPresetNote + activeBgPresets をクリア。scopes は世界観由来へ再計算で縮約・details は戻さない）。 */
   onClearBg: () => void;
   /** 参照画像適用の解除（referenceNote をクリア）。 */
   onClearReference: () => void;

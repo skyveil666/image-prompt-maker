@@ -1674,8 +1674,9 @@ export default function App() {
     setActiveBoosts(nextBoosts);
     setActiveWorldPresets(nextWorldPresets);
     setWorldCombinedNote(nextWorldNote);
+    setActiveBgPresets([]); setBgPresetNote("");  // BG-1(§5整合)：斬新背景も世界観と対称に解除（再試行後のバッジ残留＋次回手動生成への漏れを断つ）
     setScopes(nextScopes);
-    setWorldScopes([]); setBgScopes([]);  // 反映：世界観クリア＋scope縮約ゆえ由来クリア（次の preset toggle で再計算）
+    setWorldScopes([]); setBgScopes([]);  // 反映：世界観・斬新背景クリア＋scope縮約ゆえ由来クリア（次の preset toggle で再計算）
     setRealismLevel(nextRealismLevel);
     setMoods(nextMoods);
     setNgList(nextNgList);
