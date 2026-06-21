@@ -144,8 +144,12 @@ const NgModeCtx = createContext<NgModeCtxValue>({
 type ExtraTabId = "mood" | "globalStyle" | "ng";
 type TabId = Scope | ExtraTabId;
 
-// globalStyle（絵柄＋色戦略）は最上部にピン留めする（renderのsortで rank 最上位）。
-const EXTRA_TAB_IDS: ExtraTabId[] = ["globalStyle", "mood", "ng"];
+// ① 全体スタイル（globalStyle＝絵柄＋色戦略）タブは斬新背景プリセット等へ統合済み＝UI 非表示（Stage5・hide-not-delete）。
+//   型 ExtraTabId / EXTRA_TAB_META / GlobalStyleTabContent / artStyle・colorStrategy state / buildInputs 注入は dormant 据え置き。
+const EXTRA_TAB_IDS: ExtraTabId[] = ["mood", "ng"];
+// ③ 文字背景 / 書アコーディオンも斬新背景へ統合済み＝UI 非表示（Stage5・hide-not-delete）。
+//   文字背景フィールド（textType/textMood/textLayout/textTexture）の型・IDB・state は dormant 据え置き。
+const SHOW_TEXT_BG_ACCORDION = false;
 
 interface ExtraTabMeta {
   label: string;
@@ -736,7 +740,8 @@ function BackgroundContent({ d, upd, chg }: {
         onChange={(v) => upd("background", { depth: v as DetailSettings["background"]["depth"] })} />
       <FieldSection label="情報量" fieldKey="background.info" value={d.background.info} options={BG_INFOS}
         onChange={(v) => upd("background", { info: v as DetailSettings["background"]["info"] })} />
-      {/* 文字背景 / 書（アコーディオン） */}
+      {/* 文字背景 / 書（アコーディオン）— Stage5: 斬新背景プリセットへ統合済みのため UI 非表示（hide-not-delete・state/型/IDB は dormant 据え置き）。 */}
+      {SHOW_TEXT_BG_ACCORDION && (<>
       <div className="mt-3 pt-2.5 border-t border-white/8">
         <button
           type="button"
@@ -771,6 +776,7 @@ function BackgroundContent({ d, upd, chg }: {
             onChange={(v) => upd("background", { textTexture: v as DetailSettings["background"]["textTexture"] })} />
         </div>
       )}
+      </>)}
     </div>
   );
 }
