@@ -88,8 +88,8 @@ app.post("/api/generate", async (req, res) => {
     res.status(400).json({ error: "moods must have at most 30 items" });
     return;
   }
-  if (typeof raw.extraInstructions === "string" && raw.extraInstructions.length > 2000) {
-    res.status(400).json({ error: "extraInstructions must be at most 2000 characters" });
+  if (typeof raw.extraInstructions === "string" && raw.extraInstructions.length > 6000) {
+    res.status(400).json({ error: "extraInstructions must be at most 6000 characters" });
     return;
   }
 
