@@ -538,9 +538,11 @@ export function ArrangePreviewPanel({
   // 🌌 斬新背景：bgPresetNote は buildInputs で「背景スコープ時のみ」注入＝発火条件もサーバ効果と厳密一致。
   const bgNote = bgPresetNote.trim();
   const bgFires = bgNote.length > 0 && selectedScopes.includes("background");
-  // 🚫 タグ個別NG（per-tag NG）：アレンジは {...current} で同設定を継承するため、ここでも常時可視化＋解除（§5）。
+  // 🚫 タグNGバッジは hide（hide-not-delete・2026-06）：メイン ReflectionStatusBar と同型で上部一覧を非表示。
+  //    flag を true に戻せば一覧バッジ＋×全解除が復活（tagNg state・グリッドNG・背景候補除外は常時生きている）。
+  const SHOW_TAGNG_BADGE: boolean = false;
   const tagNgLabels = tagNgToLabels(tagNg);
-  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || tagNg.length > 0;
+  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && tagNg.length > 0);
 
   // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
@@ -707,7 +709,7 @@ export function ArrangePreviewPanel({
                     clearTitle="参照画像からの適用を全案から解除する"
                   />
                 )}
-                {tagNg.length > 0 && (
+                {SHOW_TAGNG_BADGE && tagNg.length > 0 && (
                   <DominatorBadge
                     label="🚫 タグNG（候補除外・準備中）"
                     summary={tagNgLabels.join("・")}

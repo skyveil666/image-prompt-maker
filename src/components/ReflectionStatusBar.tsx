@@ -131,7 +131,10 @@ export function ReflectionStatusBar(p: Props) {
   const refNote = p.referenceNoteText.trim();
   // 背景2D化（avoidRealBackground）は既定ON・非永続だが、背景が変更対象の時だけ実際に発火する（server側ゲートと一致）
   const bgStylizeActive = p.avoidRealBackground && p.scopes.includes("background");
-  // 🚫 タグ個別NG（per-tag NG）：折りたたみ時に赤タグが見えなくなるため、ここで常時可視化＋解除（§5）。
+  // 🚫 タグNGバッジは hide（hide-not-delete・2026-06）：詳細グリッドの赤NGマークで個別可視のため上部一覧は冗長。
+  //    flag を true に戻せば一覧バッジ＋×全解除が復活する（tagNg state・グリッドNG・背景候補除外は常時生きている）。
+  //    ★アレンジ側 ArrangePreviewPanel も同型 flag で hide。一括解除は今は無し＝解除はグリッドの個別ダブルクリック。
+  const SHOW_TAGNG_BADGE: boolean = false;
   const tagNgLabels = tagNgToLabels(p.tagNg);
   // ✨派手さ→配色 連動（buildInputs と同条件で導出）：outfit が変更対象 ∧ 派手さ高(elaborate/maximal) ∧ color未指定 ∧ 連動ON
   const colorUnset = p.outfitColor === "skip" || p.outfitColor === "auto" || p.outfitColor === "inherit";
@@ -141,7 +144,7 @@ export function ReflectionStatusBar(p: Props) {
   //   発火条件もサーバ効果と厳密一致させる（bgPresetNote 非空 ∧ scopes.includes("background")）。
   const bgNote = p.bgPresetNote.trim();
   const bgFires = bgNote.length > 0 && p.scopes.includes("background");
-  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || p.tagNg.length > 0 || colorLinkActive;
+  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
   const bgLabel = p.activeBgPresets.map((b) => BG_JP[b] ?? b).join(" × ") || "適用中";
 
@@ -187,7 +190,7 @@ export function ReflectionStatusBar(p: Props) {
               clearTitle="背景2D化をOFFにする（実写背景を許可。回避▼トグルと同じ設定）"
             />
           )}
-          {p.tagNg.length > 0 && (
+          {SHOW_TAGNG_BADGE && p.tagNg.length > 0 && (
             <DominatorBadge
               label="🚫 タグNG（候補除外・準備中）"
               summary={tagNgLabels.join("・")}
