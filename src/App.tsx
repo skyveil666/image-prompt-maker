@@ -29,6 +29,7 @@ import {
   WORLD_PRESET_DISPLAY,
   buildCombinedBgInputs,
   BG_PRESET_DISPLAY,
+  buildWorldBgBridgeNote,
 } from "./lib/quickActions";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
 import { analyzeFullHistory, filterRecentWindow, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
@@ -507,7 +508,18 @@ export default function App() {
       // ＋ NG肯定誘導（splitNg：否定NG語を肯定方向の誘導文へ変換・GPT Image対策）を結合。出現制御は motifControls で別途。
       // 斬新背景ノートは「背景が変更対象の時だけ」注入（§5厳密一致：promptSystem の extra 無条件注入に対し
       //   バッジ発火条件 bgPresetNote∧scopes.includes("background") と一致させ、見えない支配ホールを作らない）。
-      extraInstructions: [worldCombinedNote, (scopes.includes("background") ? bgPresetNote : ""), referenceNoteText, extraInstructions, splitNg(ngList, forbiddenTokens).positiveGuidance].filter(Boolean).join("\n\n"),
+      // 🌍×🌌 Stage1 融合ブリッジ：世界観ノートと斬新背景ノートが両方 active かつ背景が変更対象のときだけ、
+      //   融合を促す固定の均衡文を extra 先頭に1要素挿入（front-only・§4不触・extra は promptSystem で verbatim 注入）。
+      //   片方だけ／非active なら空文字＝filter(Boolean) で脱落。gate は出力に2ノートが実際に載る条件
+      //   （worldCombinedNote∧bgPresetNote∧背景scope）と厳密一致＝activeWorldPresets/activeBgPresets と等価かつ復元エッジに安全。
+      extraInstructions: [
+        (worldCombinedNote && bgPresetNote && scopes.includes("background")) ? buildWorldBgBridgeNote() : "",
+        worldCombinedNote,
+        (scopes.includes("background") ? bgPresetNote : ""),
+        referenceNoteText,
+        extraInstructions,
+        splitNg(ngList, forbiddenTokens).positiveGuidance,
+      ].filter(Boolean).join("\n\n"),
       faceLock,
       expression: faceLock ? undefined : (expression ?? undefined),
       // 出力の【NG】にはユーザー明示NG（NG欄＋禁止モチーフ）のうち「肯定変換できなかった語」のみを載せる。

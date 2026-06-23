@@ -1828,6 +1828,22 @@ const WORLD_PRESET_BUILDERS: Record<WorldPreset, WorldPresetBuilder> = {
 };
 
 /**
+ * 🌍×🌌 世界観×斬新背景の融合ブリッジ文（Stage1・固定均衡・front-only・§4不触）。
+ * 世界観プリセットと斬新背景プリセットが両方 active かつ背景が変更対象のときだけ、App 側で
+ * buildInputs の extra 先頭へ1要素挿入する。背景を一方に寄せず両者を約半々で融合させる方向を
+ * 促す中立な指示文。worldCombinedNote/bgPresetNote/各 builder/§4 は無改変。
+ * 安全方向（露出抑制/【NG】）には一切触れない。Stage2 で worldBgBalance 値による分岐へ拡張予定。
+ */
+export function buildWorldBgBridgeNote(): string {
+  return [
+    "【世界観×斬新背景の融合指示】",
+    "世界観プリセットと斬新背景プリセットを同時に指定している。融合させるのは背景空間に限り、背景はどちらか一方に寄せず両者の要素を約半々で混ぜ合わせ、1つの画面に共存させること。",
+    "各案で「世界観の背景だけ／斬新背景だけ」へ振り分けず、毎案で両テーマが溶け合った融合背景にする。",
+    "人物・顔・同一性は上記の指示のまま維持する（融合は背景にのみ適用）。",
+  ].join("\n");
+}
+
+/**
  * 複数の世界観プリセットを融合してひとつの PromptInputs を生成する。
  * - 1つだけ選択 → 通常のビルダーを呼ぶ
  * - 複数選択 → スコープ・ムードをマージし、コンボ指示文を生成
