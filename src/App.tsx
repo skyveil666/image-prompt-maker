@@ -189,6 +189,10 @@ export default function App() {
   /** 参照画像から「適用」した軸タグ付き自由文（catKey → text）。生成時に extraInstructions へ統合。
    *  ※ 詳細 enum には自動反映しない（docs/23）。worldCombinedNote と同じ追加マージ方式。 */
   const [referenceNote, setReferenceNote] = useState<Record<string, string>>({});
+  /** 参照「適用」で“新規にON”にした scope の記録（参照由来・非永続）。×バッジ/全解除/全リセットで
+   *  referenceNote と一緒に「この分だけ」scope を OFF へ revert するための記録（対称解除）。
+   *  ★手動で既にON だった scope は記録しない＝解除時に巻き込まない。worldScopes/bgScopes とは別系統。 */
+  const [refAppliedScopes, setRefAppliedScopes] = useState<Scope[]>([]);
   /** referenceNote を「【参照画像から強制適用】」独立ブロックに整形（生成時に extraInstructions へ統合）。
    *  生成ロジック本体は不変。参照要素を最優先で反映させるため、強い宣言付きブロックにする。 */
   const referenceNoteText = useMemo(
@@ -206,6 +210,9 @@ export default function App() {
   );
   /** referenceNote を runGenerate（deps非依存）から最新参照するための ref。 */
   const referenceNoteRef = useLatestRef(referenceNote);
+  /** 解除関数（deps非依存の useCallback）から最新の scopes / 参照由来 scope を参照するための ref。 */
+  const scopesRef = useLatestRef(scopes);
+  const refAppliedScopesRef = useLatestRef(refAppliedScopes);
   /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（生成しなくても残す）。
    *  生成時の自動保存（下記 runGenerate 内）と同じデータ源（referenceContextRef＝画像+抽出 /
    *  referenceNote＝適用）を使う追加経路。kind:"picker" / batchId:"" で記録（生成バッチ無し）。
@@ -1164,7 +1171,11 @@ export default function App() {
     if (blocked) { showPresetToast("適用できません", blocked); return false; }
     // 対応 scope を ON（未選択軸のみ追加・他軸は触らない）
     if (cat.scope) {
-      setScopes((prev) => (prev.includes(cat.scope!) ? prev : [...prev, cat.scope!]));
+      const scope = cat.scope;
+      const wasOn = scopesRef.current.includes(scope); // 適用前に（手動で）ON だったか
+      setScopes((prev) => (prev.includes(scope) ? prev : [...prev, scope]));
+      // 参照が“新規にON”にした分だけ記録（手動ON分は記録しない＝解除時に巻き込まない）
+      if (!wasOn) setRefAppliedScopes((rec) => (rec.includes(scope) ? rec : [...rec, scope]));
     }
     // 軸タグ付き自由文を referenceNote へ（生成時に extraInstructions へ統合）
     setReferenceNote((prev) => ({ ...prev, [catKey]: body }));
@@ -1174,6 +1185,10 @@ export default function App() {
 
   const handleClearReference = useCallback(() => {
     setReferenceNote({});
+    // 参照が“新規にON”にした scope のみ OFF へ revert（手動ON分は温存＝対称解除）。
+    const applied = refAppliedScopesRef.current;
+    if (applied.length > 0) setScopes((prev) => prev.filter((s) => !applied.includes(s)));
+    setRefAppliedScopes([]);
   }, []);
 
   // 🧹 色重みの自動調整／Undo、AI分析エージェントの提案アクション（handleAgentAction）は
@@ -1328,6 +1343,8 @@ export default function App() {
     setBgPresetNote("");
     setWorldScopes([]);
     setBgScopes([]);
+    setReferenceNote({});      // 🖼 参照適用も完全クリア（逆residual解消＝全リセット後にバッジが残らない）
+    setRefAppliedScopes([]);   // 参照由来 scope の記録もクリア（setScopes([]) と整合）
     setActiveGodModes([]);
     setActiveBoosts([]);
     setChaosLabel(null);
@@ -1750,7 +1767,7 @@ export default function App() {
             onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes([...bgScopes]); }}
             bgPresetNote={bgPresetNote}
             onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes([...worldScopes]); }}
-            onClearReference={() => setReferenceNote({})}
+            onClearReference={handleClearReference}
             tagNg={tagNg}
             onClearTagNg={() => setTagNg([])}
             onToast={showPresetToast}
@@ -1859,7 +1876,7 @@ export default function App() {
                 activeBgPresets={activeBgPresets}
                 bgPresetNote={bgPresetNote}
                 onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes([...worldScopes]); }}
-                onClearReference={() => setReferenceNote({})}
+                onClearReference={handleClearReference}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
                 tagNg={tagNg}
