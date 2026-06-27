@@ -35,6 +35,7 @@ export function usePersistedSettings() {
   const [count, setCount] = useState<Count>(s0.count);
   const [details, setDetails] = useState<DetailSettings>(s0.details);
   const [extraInstructions, setExtraInstructions] = useState(s0.extraInstructions);
+  const [customInstruction, setCustomInstruction] = useState<string>(s0.customInstruction ?? "");
   const [ngList, setNgList] = useState(s0.ngList);
   const [tagNg, setTagNg] = useState<string[]>(s0.tagNg ?? []);
   const [bodyPoseLock, setBodyPoseLock] = useState(s0.bodyPoseLock);
@@ -80,7 +81,7 @@ export function usePersistedSettings() {
   useEffect(() => {
     saveSettings({
       scopes, moods, autoMoodCategories, count, details,
-      extraInstructions, ngList, tagNg, viralMode, strength, glossLevel,
+      extraInstructions, customInstruction, ngList, tagNg, viralMode, strength, glossLevel,
       dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
       promptTarget, avoidCliche, avoidRealBackground,
       bodyPoseLock, colorMoodLock, compositionLock,
@@ -92,7 +93,7 @@ export function usePersistedSettings() {
     });
   }, [
     scopes, moods, autoMoodCategories, count, details,
-    extraInstructions, ngList, tagNg, viralMode, strength, glossLevel,
+    extraInstructions, customInstruction, ngList, tagNg, viralMode, strength, glossLevel,
     dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
     promptTarget, avoidCliche, avoidRealBackground,
     bodyPoseLock, colorMoodLock, compositionLock,
@@ -114,6 +115,7 @@ export function usePersistedSettings() {
       setCount(next.count);
       setDetails(next.details);
       setExtraInstructions(next.extraInstructions);
+      setCustomInstruction(next.customInstruction ?? "");
       setNgList(next.ngList);
       setTagNg(next.tagNg);
       setViralMode(next.viralMode);
@@ -152,6 +154,7 @@ export function usePersistedSettings() {
     count, setCount,
     details, setDetails,
     extraInstructions, setExtraInstructions,
+    customInstruction, setCustomInstruction,
     ngList, setNgList,
     tagNg, setTagNg,
     bodyPoseLock, setBodyPoseLock,

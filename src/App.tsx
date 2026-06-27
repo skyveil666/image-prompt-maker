@@ -32,6 +32,7 @@ import {
   buildWorldBgBridgeNote,
 } from "./lib/quickActions";
 import { buildOutfitColorfulNote, buildOutfitColorVarietyNote } from "./lib/outfitColorNotes";
+import { buildCustomInstructionNote, type MemoBadge } from "./lib/axisMemoNote";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
 import { analyzeFullHistory, filterRecentWindow, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
 import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
@@ -125,6 +126,7 @@ export default function App() {
     count, setCount,
     details, setDetails,
     extraInstructions, setExtraInstructions,
+    customInstruction, setCustomInstruction,
     ngList, setNgList,
     tagNg, setTagNg,
     bodyPoseLock, setBodyPoseLock,
@@ -524,6 +526,10 @@ export default function App() {
         // 衣装色「おまかせ」：複数案で同系統に偏らないよう案ごとに主系統を割り当てる。
         //   発火＝outfit変更対象 ∧ color="auto" ∧ 色味ロックOFF（ON時は元画像色優先ゆえ注入しない）。
         (scopes.includes("outfit") && details.outfit.color === "auto" && !colorMoodLock) ? buildOutfitColorVarietyNote(count) : "",
+        // ✏ 指示（自由文・任意）：変更対象まわりの単一フリー欄。軸非依存＝非空なら全案へ強め注入。
+        //   §4不触（extraInstructions 経由・サーバは【ユーザー追加指示】として verbatim 展開）。出力は既存
+        //   サニタイザが無条件に通す（証明済）。発火条件は §5 バッジと同一（customInstruction 非空）。
+        customInstruction.trim() ? buildCustomInstructionNote(customInstruction) : "",
         splitNg(ngList, forbiddenTokens).positiveGuidance,
       ].filter(Boolean).join("\n\n"),
       faceLock,
@@ -610,6 +616,7 @@ export default function App() {
       bgPresetNote,
       referenceNoteText,
       extraInstructions,
+      customInstruction,
       ngList,
       forbiddenTokens,
       levels,
@@ -643,6 +650,23 @@ export default function App() {
       // → preferenceProfileRef / ratingAnalysisRef / imageAnalysisRef（useEffect で同期）。
       colorWeights,
     ]
+  );
+
+  // ✏ 「指示（自由文）」の §5「見えない支配」バッジ（メイン ReflectionStatusBar とアレンジ画面で共用）。
+  //   発火条件は buildInputs の注入ゲートと同一（customInstruction 非空）＝「効くのに見えない」を作らない。
+  //   アレンジも buildInputs() 経由で extra へ焼き込まれるため、この単一集合で厳密一致する。
+  const memoBadges = useMemo<MemoBadge[]>(
+    () =>
+      customInstruction.trim()
+        ? [{
+            key: "custom",
+            label: "✏ 指示反映中",
+            summary: customInstruction.trim(),
+            clearTitle: "この指示を全案から解除する（指示欄を空にします）",
+            onClear: () => setCustomInstruction(""),
+          }]
+        : [],
+    [customInstruction]
   );
 
   /**
@@ -1788,6 +1812,7 @@ export default function App() {
             onClearReference={handleClearReference}
             tagNg={tagNg}
             onClearTagNg={() => setTagNg([])}
+            memoBadges={memoBadges}
             onToast={showPresetToast}
           />
         ) : (
@@ -1903,6 +1928,7 @@ export default function App() {
                 outfitDecoration={details.outfit.decoration}
                 outfitColor={details.outfit.color}
                 onClearDecorationColorLink={() => setDecorationColorLink(false)}
+                memoBadges={memoBadges}
               />
 
 
@@ -1930,6 +1956,8 @@ export default function App() {
               <ControlPanel
                 scopes={scopes}
                 onScopesChange={setScopes}
+                customInstruction={customInstruction}
+                onCustomInstructionChange={setCustomInstruction}
                 onScopesReset={() => setScopes([])}
                 onResetAll={() => {
                   handleResetAll();

@@ -7,6 +7,7 @@ import { HistoryItemRow } from "./HistoryItemRow";
 import { ArrangePreviewPanel } from "./ArrangePreviewPanel";
 import { HistoryMiniExplorer } from "./HistoryMiniExplorer";
 import type { FavoriteProfile } from "../lib/favoriteProfile";
+import type { MemoBadge } from "../lib/axisMemoNote";
 import {
   runAutoCleanup,
   getAutoCleanupEnabled,
@@ -65,6 +66,8 @@ interface Props {
   tagNg?:               string[];
   /** タグ個別NGの一括解除。ArrangePreviewPanel へ中継。 */
   onClearTagNg?:        () => void;
+  /** ✏ 軸ごとカスタム指示メモのバッジ（App→ArrangePreviewPanel へ中継。アレンジにも焼き込まれて効く）。 */
+  memoBadges?:          MemoBadge[];
   /** トースト表示（プロンプト全文コピー完了通知などに使用）。 */
   onToast?: (msg: string) => void;
 }
@@ -111,6 +114,7 @@ export function HistoryView({
   onClearAvoidRealBg, onClearWorld, onClearReference,
   bgPresetNote, onClearBg,
   tagNg = [], onClearTagNg = () => {},
+  memoBadges = [],
   onToast,
 }: Props) {
   const [analysisOpen, setAnalysisOpen] = useState(false);
@@ -713,6 +717,7 @@ export function HistoryView({
               onClearReference={onClearReference}
               tagNg={tagNg}
               onClearTagNg={onClearTagNg}
+              memoBadges={memoBadges}
               arrangeCount={arrangeCount}
               onArrangeCountChange={setArrangeCount}
               onSaveFavorite={(p, ls) => {

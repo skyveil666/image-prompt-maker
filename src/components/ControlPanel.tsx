@@ -129,6 +129,9 @@ interface Props {
   // 変更範囲
   scopes: Scope[];
   onScopesChange: (v: Scope[]) => void;
+  /** ✏ 指示（自由文・任意）：変更対象まわりの単一フリー欄。非空なら全案へ注入＋§5バッジ（軸非依存）。 */
+  customInstruction?: string;
+  onCustomInstructionChange?: (v: string) => void;
   /** 変更対象（scopes）だけリセット */
   onScopesReset: () => void;
   /** 変更範囲＋ブースト＋お気に入り＋ZOZO まですべてリセット（守るものは維持） */
@@ -170,6 +173,7 @@ interface Props {
 
 export function ControlPanel({
   scopes, onScopesChange,
+  customInstruction = "", onCustomInstructionChange,
   onScopesReset, onResetAll,
   boostArea,
   scopeFlashKey = 0,
@@ -303,6 +307,21 @@ export function ControlPanel({
           </span>
           {/* 衣装系より後の軸 */}
           {SCOPE_OPTIONS.filter((o) => OUTFIT_GROUP_AFTER.includes(o.id)).map(renderScopeBtn)}
+        </div>
+        {/* ✏ 指示（自由文・任意）：変更対象トグルの直下。軸非依存の単一フリー欄。
+            extraInstructions 経由でサーバへ→出力は既存サニタイザが無条件に通す（§4不触・安全/NG優先）。 */}
+        <div className="mt-1.5">
+          <label className="flex items-center gap-1.5 text-[12px] font-semibold text-violet-200/90 mb-1 select-none">
+            ✏ 指示（自由文・任意）
+            <span className="text-[10px] font-normal text-text-desc">変更対象まわりの自由指示。全案に効きます</span>
+          </label>
+          <textarea
+            value={customInstruction}
+            onChange={(e) => onCustomInstructionChange?.(e.target.value)}
+            placeholder="例）右手を顎に、背景はデジタル風に…（この方向を最優先で反映。安全・NG指定には常に従う）"
+            rows={2}
+            className="w-full px-2.5 py-2 rounded-lg border border-bg-border bg-bg-base text-[12px] text-text-base placeholder:text-text-muted/45 outline-none focus:border-violet-400/50 transition resize-none"
+          />
         </div>
       </div>
 

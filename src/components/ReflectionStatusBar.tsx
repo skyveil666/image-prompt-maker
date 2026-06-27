@@ -11,6 +11,7 @@
  */
 import { useCallback, useState } from "react";
 import type { Scope } from "../types";
+import type { MemoBadge } from "../lib/axisMemoNote";
 import { DominatorBadge, summarizeNote } from "./DominatorBadge";
 import { tagNgToLabels } from "../data/tagNgOptions";
 
@@ -81,6 +82,8 @@ interface Props {
   outfitColor: string;
   /** 連動の解除（decorationColorLink を false に）。 */
   onClearDecorationColorLink: () => void;
+  /** ✏ 指示（自由文）の反映バッジ（App が buildInputs ゲートと同一条件＝customInstruction 非空で算出）。 */
+  memoBadges?: MemoBadge[];
 }
 
 // ── チップ ───────────────────────────────────────────────────────────────────
@@ -144,7 +147,7 @@ export function ReflectionStatusBar(p: Props) {
   //   発火条件もサーバ効果と厳密一致させる（bgPresetNote 非空 ∧ scopes.includes("background")）。
   const bgNote = p.bgPresetNote.trim();
   const bgFires = bgNote.length > 0 && p.scopes.includes("background");
-  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive;
+  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive || (p.memoBadges?.length ?? 0) > 0;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
   const bgLabel = p.activeBgPresets.map((b) => BG_JP[b] ?? b).join(" × ") || "適用中";
 
@@ -208,6 +211,17 @@ export function ReflectionStatusBar(p: Props) {
               clearTitle="派手さ→配色の自動連動をオフにする（衣装色は未指定のまま）"
             />
           )}
+          {/* ✏ 軸ごとカスタム指示メモ（ポーズ等）：全案に効くのに折りたたみで見えなくなるため常時バッジ化。 */}
+          {(p.memoBadges ?? []).map((b) => (
+            <DominatorBadge
+              key={b.key}
+              label={b.label}
+              summary={summarizeNote(b.summary)}
+              summaryTitle={b.summary}
+              onClear={b.onClear}
+              clearTitle={b.clearTitle}
+            />
+          ))}
         </div>
       )}
       {/* 📡 boost/god チップ＋全リセット */}

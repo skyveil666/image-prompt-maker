@@ -375,6 +375,8 @@ export interface PoseSettings {
   motion: AutoOr<PoseMotion>;
   gaze: AutoOr<PoseGaze>;
   orientation: AutoOr<PoseOrientation>;
+  /** カスタム指示メモ（自由文・この方向を最優先で反映）。空文字＝無効。軸ごとカスタム指示の第一弾。 */
+  memo?: string;
 }
 
 export type CameraAngle =
@@ -1418,6 +1420,7 @@ export const DEFAULT_DETAILS: DetailSettings = {
     motion: "skip",
     gaze: "skip",
     orientation: "skip",
+    memo: "",
   },
   camera: {
     angle: "skip",
@@ -1557,6 +1560,7 @@ export const AUTO_DETAILS: DetailSettings = {
     motion: "auto",
     gaze: "auto",
     orientation: "auto",
+    memo: "",
   },
   camera: {
     angle: "auto",

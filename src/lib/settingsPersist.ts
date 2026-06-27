@@ -34,6 +34,8 @@ export interface PersistedSettings {
   count:              Count;
   details:            DetailSettings;
   extraInstructions:  string;
+  /** ✏ 指示（自由文・任意）：変更対象まわりの単一フリー欄。非空なら全案へ注入。 */
+  customInstruction:  string;
   ngList:             string;
   /** タグ個別NG："category.field:value" 形式。送信ゲートで en 語へ解決し【NG】(ngList)へ合流する。*/
   tagNg:              string[];
@@ -90,6 +92,7 @@ export const SETTINGS_DEFAULTS: PersistedSettings = {
   count:              4 as Count,
   details:            DEFAULT_DETAILS,
   extraInstructions:  "",
+  customInstruction:  "",
   ngList:             "",
   tagNg:              [],
   viralMode:          false,

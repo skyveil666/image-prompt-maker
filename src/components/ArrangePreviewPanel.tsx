@@ -13,6 +13,7 @@ import type { ArrangeResult, Count, GeneratedProposal, PromptHistoryItem, Scope 
 import { ARRANGE_AXES, ALL_SCOPE_LABELS, arrangeCandidateScopes } from "../lib/arrange";
 import { WithImagePreview } from "./ImagePreviewTooltip";
 import { DominatorBadge, summarizeNote } from "./DominatorBadge";
+import type { MemoBadge } from "../lib/axisMemoNote";
 import { tagNgToLabels } from "../data/tagNgOptions";
 import {
   MAX_RESULT_IMAGES, RATING_LABELS,
@@ -84,6 +85,8 @@ interface Props {
   tagNg?:               string[];
   /** タグ個別NGの一括解除（App の setTagNg([])）。 */
   onClearTagNg?:        () => void;
+  /** ✏ 軸ごとカスタム指示メモのバッジ（App が main scopes+details で算出＝アレンジへ焼き込まれる集合と一致）。 */
+  memoBadges?:          MemoBadge[];
 
   // ── アレンジ生成枚数（アレンジ専用・メイン案数とは独立・非永続）──
   /** このアレンジで生成する案数（2-6）。未指定なら 2。 */
@@ -525,6 +528,7 @@ export function ArrangePreviewPanel({
   onClearTagNg = () => {},
   arrangeCount = 2,
   onArrangeCountChange = () => {},
+  memoBadges = [],
 }: Props) {
   const usedAxes = result?.changedAxes.filter((a) => a.changed) ?? [];
   const excludedAxes = result?.changedAxes.filter((a) => !a.changed) ?? [];
@@ -542,7 +546,7 @@ export function ArrangePreviewPanel({
   //    flag を true に戻せば一覧バッジ＋×全解除が復活（tagNg state・グリッドNG・背景候補除外は常時生きている）。
   const SHOW_TAGNG_BADGE: boolean = false;
   const tagNgLabels = tagNgToLabels(tagNg);
-  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && tagNg.length > 0);
+  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && tagNg.length > 0) || memoBadges.length > 0;
 
   // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
@@ -718,6 +722,17 @@ export function ArrangePreviewPanel({
                     clearTitle="タグNGを全解除（値の選択は保持）"
                   />
                 )}
+                {/* ✏ 軸ごとカスタム指示メモ（このアレンジにも焼き込まれて効く・解除でメモを空に）。 */}
+                {memoBadges.map((b) => (
+                  <DominatorBadge
+                    key={b.key}
+                    label={b.label}
+                    summary={summarizeNote(b.summary)}
+                    summaryTitle={b.summary}
+                    onClear={b.onClear}
+                    clearTitle={b.clearTitle}
+                  />
+                ))}
               </div>
             )}
 
