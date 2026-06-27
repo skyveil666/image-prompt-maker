@@ -91,6 +91,48 @@ const GENRE_BY_ID: Record<string, GenreDef> = Object.fromEntries(
 );
 
 /**
+ * ★背景NG除外用の語彙表（真因修正）。
+ * 各ジャンル id → そのジャンルを「除外する NG トークン」。トークンは
+ *  - ngExclude.place / ngExclude.style の **id**（例 "indoor" "greenhouse" "museum"）
+ *  - 本文 ngList（案Aで weather=雪 等もここに合流済み）の **語**（例 "snowy" "雪" "室内"）
+ * の両方に対して照合する（id一致 or ngList部分一致）。
+ * 場所に依存しないジャンル（luxury_fashion / magazine_cover 等）は未登録＝NG非対象。
+ */
+const GENRE_NG_TOKENS: Record<string, string[]> = {
+  museum:        ["museum", "美術館"],
+  greenhouse:    ["greenhouse", "garden", "温室", "植物園", "庭園"],
+  snow:          ["snowy", "snow", "雪"],
+  interior:      ["indoor", "室内", "interior", "インテリア"],
+  architecture:  ["indoor", "industrial", "建築", "architecture"],
+  minimal_white: ["empty_space", "studio", "白背景", "白空間"],
+  street:        ["alley", "路地", "street", "ストリート"],
+  industrial:    ["industrial", "工業", "工場", "倉庫"],
+  wa_modern:     ["japanese_room", "和室"],
+  underwater:    ["underwater", "水中"],
+};
+
+/**
+ * ngExclude(place/style の id)＋ ngList 本文に該当するジャンルを GENRE_POOL から除外する。
+ * 残ジャンル（場所非依存の12種＋非NGの場所系）で多様性を担保。
+ * 万一すべて除外され尽くした場合は従来の全プールへフォールバックし、生成は止めない（P8：殺さない）。
+ */
+function filterGenrePoolByNg(req: GenerateRequest): readonly GenreDef[] {
+  const ngIds = new Set<string>([
+    ...(req.ngExclude?.place ?? []),
+    ...(req.ngExclude?.style ?? []),
+  ]);
+  const ngListLower = (req.ngList ?? "").toLowerCase();
+  if (ngIds.size === 0 && ngListLower.trim() === "") return GENRE_POOL;
+  const isNg = (g: GenreDef): boolean => {
+    const tokens = GENRE_NG_TOKENS[g.id];
+    if (!tokens) return false;
+    return tokens.some((t) => ngIds.has(t) || ngListLower.includes(t.toLowerCase()));
+  };
+  const kept = GENRE_POOL.filter((g) => !isNg(g));
+  return kept.length > 0 ? kept : GENRE_POOL;
+}
+
+/**
  * 意外性エンジン用の「ひとさじ」プール。
  * 通常は組み合わないツイストを1案ごとに混ぜ、「その発想はなかった」を狙う。
  */
@@ -183,9 +225,13 @@ export function planBatch(req: GenerateRequest): BatchPlan {
     .map((id) => GENRE_BY_ID[id]?.label)
     .filter((v): v is string => Boolean(v));
 
+  // ★背景NG除外（真因修正）：ngExclude(place/style)＋ngList に該当するジャンルをプールから除外。
+  //   残ジャンルで多様性を担保し、全除外なら filterGenrePoolByNg が全プールへフォールバックする。
+  const pool = filterGenrePoolByNg(req);
+
   // 直近未使用を優先、その後に直近使用分を回す
-  const fresh = shuffle(GENRE_POOL.filter((g) => !recentIds.has(g.id)));
-  const stale = shuffle(GENRE_POOL.filter((g) => recentIds.has(g.id)));
+  const fresh = shuffle(pool.filter((g) => !recentIds.has(g.id)));
+  const stale = shuffle(pool.filter((g) => recentIds.has(g.id)));
   const ordered = [...fresh, ...stale];
 
   // 1パス目：ファミリー重複を避けて選ぶ
@@ -215,9 +261,9 @@ export function planBatch(req: GenerateRequest): BatchPlan {
   const items: BatchPlanItem[] = picked.map((g, i) => {
     let fusionLabels: string[] = [];
     if (godDraw) {
-      // 神引き：別ファミリーから1〜3ジャンルを融合
+      // 神引き：別ファミリーから1〜3ジャンルを融合（NG除外後のプールから・背景NGは神引きでも尊重）
       const others = shuffle(
-        GENRE_POOL.filter((o) => o.family !== g.family && o.id !== g.id)
+        pool.filter((o) => o.family !== g.family && o.id !== g.id)
       );
       const k = 1 + (i % 3); // 1〜3
       fusionLabels = others.slice(0, k).map((o) => o.label);
