@@ -31,6 +31,7 @@ import {
   BG_PRESET_DISPLAY,
   buildWorldBgBridgeNote,
 } from "./lib/quickActions";
+import { buildOutfitColorfulNote, buildOutfitColorVarietyNote } from "./lib/outfitColorNotes";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
 import { analyzeFullHistory, filterRecentWindow, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
 import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
@@ -518,6 +519,11 @@ export default function App() {
         (scopes.includes("background") ? bgPresetNote : ""),
         referenceNoteText,
         extraInstructions,
+        // 衣装の色「カラフル」：1案の中で多色化（案間バラけと独立・color="auto"と併用可）。outfit が変更対象の時だけ。
+        (scopes.includes("outfit") && details.outfit.colorful) ? buildOutfitColorfulNote() : "",
+        // 衣装色「おまかせ」：複数案で同系統に偏らないよう案ごとに主系統を割り当てる。
+        //   発火＝outfit変更対象 ∧ color="auto" ∧ 色味ロックOFF（ON時は元画像色優先ゆえ注入しない）。
+        (scopes.includes("outfit") && details.outfit.color === "auto" && !colorMoodLock) ? buildOutfitColorVarietyNote(count) : "",
         splitNg(ngList, forbiddenTokens).positiveGuidance,
       ].filter(Boolean).join("\n\n"),
       faceLock,

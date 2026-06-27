@@ -476,6 +476,7 @@ function MultiFieldSection({
   noTopMargin = false,
   maxSelect = 3,
   fieldKey,
+  extraToggle,
 }: {
   label: string;
   singleValue: string;
@@ -486,6 +487,8 @@ function MultiFieldSection({
   maxSelect?: number;
   /** per-tag NG 用 "category.field"。FIELD_OPTIONS にあるフィールドのみ NG設定トグルを出す。 */
   fieldKey?: string;
+  /** 値選択とは独立した補助トグル（例：衣装色の「カラフル」）。指定時、おまかせの後ろに1セル追加する。 */
+  extraToggle?: { jaLabel: string; active: boolean; onToggle: () => void; title?: string };
 }) {
   const ng = useContext(NgModeCtx);
   const canNg = !!fieldKey && !!FIELD_OPTIONS[fieldKey];
@@ -545,6 +548,15 @@ function MultiFieldSection({
           cellKind="auto"
           onClick={() => onChange("auto", [])}
         />
+        {extraToggle && (
+          <GridCell
+            jaLabel={extraToggle.jaLabel}
+            active={extraToggle.active}
+            cellKind="value"
+            title={extraToggle.title}
+            onClick={extraToggle.onToggle}
+          />
+        )}
         {options.map((opt) => {
           const optNg = canNg && isTagNg(ng.tagNg, fieldKey!, opt.id);
           return (
@@ -674,7 +686,13 @@ function OutfitContent({ d, upd, chg }: { d: DetailSettings; upd: Updater; chg: 
       <MultiFieldSection label="系統" fieldKey="outfit.style" singleValue={d.outfit.style} multiValues={d.multiOverrides?.["outfit.style"] ?? []} options={OUTFIT_STYLES} noTopMargin
         onChange={mc("outfit.style", "style")} />
       <MultiFieldSection label="色方向" fieldKey="outfit.color" singleValue={d.outfit.color} multiValues={d.multiOverrides?.["outfit.color"] ?? []} options={OUTFIT_COLORS}
-        onChange={mc("outfit.color", "color")} />
+        onChange={mc("outfit.color", "color")}
+        extraToggle={{
+          jaLabel: "カラフル",
+          active: !!d.outfit.colorful,
+          onToggle: () => upd("outfit", { colorful: !d.outfit.colorful }),
+          title: "複数色を組み合わせた多彩な配色（おまかせと併用可）",
+        }} />
       <MultiFieldSection label="素材" fieldKey="outfit.material" singleValue={d.outfit.material} multiValues={d.multiOverrides?.["outfit.material"] ?? []} options={OUTFIT_MATERIALS}
         onChange={mc("outfit.material", "material")} />
       <MultiFieldSection label="シルエット" fieldKey="outfit.silhouette" singleValue={d.outfit.silhouette} multiValues={d.multiOverrides?.["outfit.silhouette"] ?? []} options={OUTFIT_SILHOUETTES}

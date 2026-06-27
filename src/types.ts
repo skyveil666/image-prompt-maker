@@ -159,6 +159,9 @@ export interface OutfitSettings {
   decoration: AutoOr<OutfitDecoration>;
   season: AutoOr<OutfitSeason>;
   luxury: AutoOr<OutfitLuxury>;
+  /** カラフル（多色配色）。color の単一値とは独立した補助フラグ。color === "auto"（おまかせ）と併用可。
+   *  反映は front の extraInstructions ノート経由（§4 promptSystem は本フィールドを参照しない）。 */
+  colorful?: boolean;
 }
 
 export type BackgroundPlace =
@@ -1355,6 +1358,7 @@ export const DEFAULT_DETAILS: DetailSettings = {
     decoration: "skip",
     season: "skip",
     luxury: "skip",
+    colorful: false,
   },
   cosplay: {
     genre:         "skip",
