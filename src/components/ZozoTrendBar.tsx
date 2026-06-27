@@ -42,6 +42,8 @@ export function ZozoTrendBar({
   const [mode, setMode]         = useState<"auto" | "paste">("auto");
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview]   = useState<ZozoTrend | null>(null);
+  // 候補の中からユーザーがタップで選んだものだけ反映する（非永続・取得用の一時選択）。
+  const [selectedTraits, setSelectedTraits] = useState<Set<string>>(new Set());
 
   // ── 現在の反映ステータス（バッジ）──
   const isApplied  = !!applied && applied.traits.length > 0;
@@ -52,6 +54,7 @@ export function ZozoTrendBar({
   const disabled   = !outfitScopeOn;                        // 衣装OFF＝衣装補助は無効（グレーアウト）
 
   const handleFetch = () => {
+    setSelectedTraits(new Set()); // 取得直後は全未選択から（20個一括注入の混雑を避け、意図的に選ばせる）
     if (mode === "paste") {
       setPreview(extractZozoFromText(pasteText, age, categories));
     } else {
@@ -60,9 +63,26 @@ export function ZozoTrendBar({
   };
 
   const handleApply = () => {
-    if (preview && preview.traits.length > 0) {
-      onApply({ ...preview, mode: "assist" });
-    }
+    if (!preview) return;
+    // ★選択したトレンドだけ反映（未選択は載せない＝一括注入の混雑を解消）。下流は traits[] を絞るだけ。
+    const traits = preview.traits.filter((t) => selectedTraits.has(t));
+    if (traits.length > 0) onApply({ ...preview, traits, mode: "assist" });
+  };
+
+  /** 候補トレンドのタップ選択トグル。 */
+  const toggleTrait = (t: string) => {
+    setSelectedTraits((prev) => {
+      const next = new Set(prev);
+      if (next.has(t)) next.delete(t);
+      else next.add(t);
+      return next;
+    });
+  };
+  const allTraitsSelected =
+    !!preview && preview.traits.length > 0 && selectedTraits.size === preview.traits.length;
+  const toggleSelectAll = () => {
+    if (!preview) return;
+    setSelectedTraits(allTraitsSelected ? new Set() : new Set(preview.traits));
   };
 
   /** カテゴリ複数選択トグル。おまかせ(auto)/全身コーデ(full) は広域モード＝排他（押すと単独に）。
@@ -259,13 +279,41 @@ export function ZozoTrendBar({
                 👗 ZOZOトレンド {preview.ageLabel}・{preview.categoryLabel}
               </div>
               {preview.traits.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {preview.traits.map((t) => (
-                    <span key={t}
-                      className="text-[13px] font-medium px-2.5 py-1 rounded-full border border-pink-400/45 bg-pink-400/14 text-pink-100 leading-none">
-                      {t}
+                <div className="space-y-1.5">
+                  {/* 選択ヘッダー：選択中N個 ＋ 全選択/全解除 トグル */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-pink-200/75 leading-none">
+                      タップで選択 — <span className="font-bold text-pink-100">選択中 {selectedTraits.size} 個</span>
                     </span>
-                  ))}
+                    <button
+                      type="button"
+                      onClick={toggleSelectAll}
+                      className="text-[11px] px-2 py-0.5 rounded-md border border-pink-400/40 text-pink-200/85 hover:bg-pink-400/15 transition leading-none"
+                    >
+                      {allTraitsSelected ? "全解除" : "全選択"}
+                    </button>
+                  </div>
+                  {/* 候補（タップで選択／解除）*/}
+                  <div className="flex flex-wrap gap-1.5">
+                    {preview.traits.map((t) => {
+                      const sel = selectedTraits.has(t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => toggleTrait(t)}
+                          className={[
+                            "text-[13px] font-medium px-2.5 py-1 rounded-full border leading-none transition",
+                            sel
+                              ? "border-pink-400/70 bg-pink-400/30 text-pink-50 shadow-[0_0_6px_rgba(244,114,182,0.4)]"
+                              : "border-pink-400/30 bg-pink-400/8 text-pink-200/65 hover:bg-pink-400/16 hover:text-pink-100",
+                          ].join(" ")}
+                        >
+                          {sel ? "✓ " : ""}{t}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
                 <p className="text-[13px] text-text-muted/75 leading-snug">
@@ -288,12 +336,12 @@ export function ZozoTrendBar({
                 ) : (
                   <button
                     type="button"
-                    disabled={preview.traits.length === 0}
+                    disabled={selectedTraits.size === 0}
                     onClick={handleApply}
-                    title="この内容で衣装プロンプトへ反映する"
+                    title="選択したトレンドだけを衣装プロンプトへ反映する"
                     className="text-[12px] px-2.5 py-1 rounded-lg border border-pink-400/60 bg-pink-500/20 text-pink-50 font-semibold hover:bg-pink-500/30 transition disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    ✓ 反映する（補助）
+                    ✓ 反映する（{selectedTraits.size}個）
                   </button>
                 )}
 
