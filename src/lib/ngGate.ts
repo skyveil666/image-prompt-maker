@@ -35,7 +35,7 @@ export function applyNgGate(
 }
 
 /** 2つのNG文字列を行単位でマージし、重複行を排除して改行連結する（冪等）。 */
-function mergeNgLines(a: string | undefined, b: string | undefined): string {
+export function mergeNgLines(a: string | undefined, b: string | undefined): string {
   const lines: string[] = [];
   const seen = new Set<string>();
   for (const src of [a ?? "", b ?? ""]) {

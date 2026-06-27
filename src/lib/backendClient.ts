@@ -1,6 +1,6 @@
 import type { GeneratedProposal, PromptInputs } from "../types";
-import { applyNgGate } from "./ngGate";
-import { tagNgToBgExclude } from "../data/tagNgOptions";
+import { applyNgGate, mergeNgLines } from "./ngGate";
+import { tagNgToBgExclude, tagNgToNgTerms } from "../data/tagNgOptions";
 
 export interface BackendResponse {
   proposals: GeneratedProposal[];
@@ -55,12 +55,21 @@ export async function generateViaBackend(
 ): Promise<BackendResponse> {
   // 🔒 NG出口一括適用：/api/generate への唯一の送信関数。どの経路（runGenerate /
   //    インラインアレンジ）を通っても、fetch 直前に NG を冪等復元する。送信はこの1回が唯一の真実。
-  // 🚫 ①tagNg分離：タグ個別NG(tagNg) は【NG】(ngList) へ合流させない。
-  //    【NG】はユーザーの手動NG欄(rawNgList)のみ＝既存どおり維持。
+  // 🚫 ①手動NG：ユーザーの手動NG欄(rawNgList) を【NG】(ngList) へ（既存どおり）。
   const gated = applyNgGate(inputs, rawNgList, forbiddenTokens);
-  // 🚫 ②候補除外：tagNg → 背景候補の事前除外 id（place/style）。サーバの「背景バリエーション指示」が
+  // 🚫 ②候補除外：tagNg の background.place/style → 背景候補の事前除外 id。サーバの「背景バリエーション指示」が
   //    参照して NG済みの場所/スタイルを積極採用リストから外す（本文の【NG】とは別経路・読み取り専用派生）。
   const ngExclude = tagNgToBgExclude(tagNg);
+  // 🚫 ③tagNg救済（背景NG漏れ Layer1）：place/style 以外の tagNg（背景の weather=雪/time/color/density 等、
+  //    および非背景フィールド）は ②候補除外に乗らず握り潰されていた。これらを literal な【NG】語(en)へ変換し
+  //    ①の【NG】に dedup 合流させる（front完結・§4不触）。place/style は ② のままで二重処理しない。
+  const nonPlaceStyleTagNg = tagNg.filter(
+    (k) => !k.startsWith("background.place:") && !k.startsWith("background.style:"),
+  );
+  const tagNgTerms = tagNgToNgTerms(nonPlaceStyleTagNg);
+  const finalNgList = tagNgTerms.length
+    ? mergeNgLines(gated.ngList, tagNgTerms.join("\n"))
+    : gated.ngList;
   const res = await fetch("/api/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -76,7 +85,7 @@ export async function generateViaBackend(
       details: gated.details,
       extraInstructions: gated.extraInstructions,
       faceLock: inputs.faceLock,
-      ngList: gated.ngList,
+      ngList: finalNgList,
       ngExclude,
       viralMode: inputs.viralMode,
       strength: inputs.strength,
