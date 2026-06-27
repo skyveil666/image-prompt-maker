@@ -38,7 +38,7 @@ export function ZozoTrendBar({
 }: Props) {
   const [open, setOpen]         = useState(false);
   const [age, setAge]           = useState<ZozoAge>("twenties"); // 初期値：20代
-  const [category, setCategory] = useState<ZozoCategory>("auto");
+  const [categories, setCategories] = useState<ZozoCategory[]>(["auto"]);
   const [mode, setMode]         = useState<"auto" | "paste">("auto");
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview]   = useState<ZozoTrend | null>(null);
@@ -53,9 +53,9 @@ export function ZozoTrendBar({
 
   const handleFetch = () => {
     if (mode === "paste") {
-      setPreview(extractZozoFromText(pasteText, age, category));
+      setPreview(extractZozoFromText(pasteText, age, categories));
     } else {
-      setPreview(sampleZozoTrend(age, category));
+      setPreview(sampleZozoTrend(age, categories));
     }
   };
 
@@ -63,6 +63,18 @@ export function ZozoTrendBar({
     if (preview && preview.traits.length > 0) {
       onApply({ ...preview, mode: "assist" });
     }
+  };
+
+  /** カテゴリ複数選択トグル。おまかせ(auto)/全身コーデ(full) は広域モード＝排他（押すと単独に）。
+   *  個別カテゴリは auto/full を外してトグル。空になったら おまかせ に戻す
+   *  （＝おまかせ／全身 と 個別 は相互排他で「同時選択」は発生しない）。 */
+  const toggleCategory = (v: ZozoCategory) => {
+    setCategories((prev) => {
+      if (v === "auto" || v === "full") return [v];
+      const base = prev.filter((c) => c !== "auto" && c !== "full");
+      const next = base.includes(v) ? base.filter((c) => c !== v) : [...base, v];
+      return next.length === 0 ? ["auto"] : next;
+    });
   };
 
   return (
@@ -178,10 +190,10 @@ export function ZozoTrendBar({
                 <button
                   key={o.value}
                   type="button"
-                  onClick={() => setCategory(o.value)}
+                  onClick={() => toggleCategory(o.value)}
                   className={[
                     "text-[13px] font-semibold px-2.5 py-1 rounded-lg border leading-none transition",
-                    category === o.value
+                    categories.includes(o.value)
                       ? "border-pink-400/70 bg-pink-400/22 text-pink-100"
                       : "border-bg-border/70 text-text-muted/80 hover:text-text-base hover:border-pink-400/45",
                   ].join(" ")}

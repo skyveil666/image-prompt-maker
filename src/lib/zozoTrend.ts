@@ -147,6 +147,12 @@ function ageLabelOf(age: ZozoAge): string {
 function categoryLabelOf(cat: ZozoCategory): string {
   return ZOZO_CATEGORY_OPTIONS.find((o) => o.value === cat)?.label ?? "おまかせ";
 }
+/** 複数カテゴリ → 表示ラベル（おまかせ/全身コーデは単独表示・個別は「・」連結）。 */
+function categoryLabelOfMulti(categories: ZozoCategory[]): string {
+  if (categories.length === 0 || categories.includes("auto")) return categoryLabelOf("auto");
+  if (categories.includes("full")) return categoryLabelOf("full");
+  return categories.map((c) => categoryLabelOf(c)).join("・");
+}
 
 function pickStyle(age: ZozoAge): string {
   const keys = ageToStyleKeys(age);
@@ -160,40 +166,31 @@ function pickStyle(age: ZozoAge): string {
  * 年代・カテゴリに応じてトレンド属性をランダムに組み合わせる。
  * 毎回違う組み合わせになる（Math.random）。
  */
-export function sampleZozoTrend(age: ZozoAge, category: ZozoCategory): ZozoTrend {
-  const style = pickStyle(age);
-  // 色は2トーン候補を渡す（案ごとに選択肢ができる）
-  const colors = pickN(COLOR_POOL, 2);
-  let items: string[] = [];
+export function sampleZozoTrend(age: ZozoAge, categories: ZozoCategory[]): ZozoTrend {
+  // おまかせ(auto)／全身コーデ(full)／未選択 は「広域モード」＝全カテゴリ横断。
+  const isOmakase =
+    categories.length === 0 ||
+    categories.includes("auto") ||
+    categories.includes("full");
 
-  if (category === "auto" || category === "full") {
-    // ── 全身コーデ：4案以上生成でも各案が差別化できるよう候補を多めに取得 ──
-    //
-    // トップス：2〜3種類を候補として渡す（各案が異なるトップスを選べる）
-    const tops = pickN(CATEGORY_POOL.tops, 3);
-    //
-    // ボトムス：パンツ・スカート・ワンピの中で2カテゴリを無作為に選んで1種ずつ
-    type BottomKey = "pants" | "skirt" | "onepiece";
-    const BOTTOM_KEYS: BottomKey[] = ["pants", "skirt", "onepiece"];
-    const bottomByCategory: string[] = [];
-    const bottomCategories = shuffle(BOTTOM_KEYS).slice(0, 2);
-    for (const cat of bottomCategories) {
-      const picked = pickN(CATEGORY_POOL[cat], 1);
-      bottomByCategory.push(...picked);
-    }
-    // アウター（50%の確率で1点追加）
-    const outer = Math.random() < 0.5 ? pickN(CATEGORY_POOL.outer, 1) : [];
-    // シューズは1種で十分（ユーザーもそう言っている）
-    const shoes = pickN(CATEGORY_POOL.shoes, 1);
-    items = [...tops, ...bottomByCategory, ...outer, ...shoes];
+  let traits: string[];
+  if (isOmakase) {
+    // 全カテゴリ横断で約20個（アイテム17＋色2＋系統1）。
+    const colors = pickN(COLOR_POOL, 2);
+    const style = pickStyle(age);
+    const allItems = pickN(Object.values(CATEGORY_POOL).flat(), 17);
+    traits = Array.from(new Set([...allItems, ...colors, style])).filter(Boolean).slice(0, 20);
   } else {
-    // 特定カテゴリ：そのカテゴリから3点（多めに渡して案ごとの差別化に使う）
-    const pool = CATEGORY_POOL[category];
-    items = pickN(pool, 3);
+    // 個別カテゴリ：選択したカテゴリごとに5個ずつ UNION（色・系統は付けない＝純粋なカテゴリ傾向）。
+    // 例：トップス＋シューズ＝約10個。データは増やさず既存プール（各5〜10件）の範囲で収まる。
+    const specific = categories.filter(
+      (c): c is Exclude<ZozoCategory, "auto" | "full"> => c !== "auto" && c !== "full",
+    );
+    const items = specific.flatMap((c) => pickN(CATEGORY_POOL[c], 5));
+    traits = Array.from(new Set(items)).filter(Boolean);
   }
 
-  const traits = Array.from(new Set([...items, ...colors, style])).filter(Boolean);
-  return { ageLabel: ageLabelOf(age), categoryLabel: categoryLabelOf(category), traits };
+  return { ageLabel: ageLabelOf(age), categoryLabel: categoryLabelOfMulti(categories), traits };
 }
 
 // ── 手動貼り付け抽出 ──────────────────────────────────────────────────────────
@@ -247,7 +244,7 @@ const EXTRACT_DICT: { label: string; tokens: string[] }[] = [
  * 貼り付けテキストからトレンド属性を抽出する。
  * 辞書にあるトークンのみ拾うため、ブランド名・商品名は自然に除外される。
  */
-export function extractZozoFromText(text: string, age: ZozoAge, category: ZozoCategory): ZozoTrend {
+export function extractZozoFromText(text: string, age: ZozoAge, categories: ZozoCategory[]): ZozoTrend {
   const norm = text.toLowerCase().normalize("NFC");
   const found: string[] = [];
   for (const entry of EXTRACT_DICT) {
@@ -257,7 +254,7 @@ export function extractZozoFromText(text: string, age: ZozoAge, category: ZozoCa
   }
   return {
     ageLabel: ageLabelOf(age),
-    categoryLabel: categoryLabelOf(category),
+    categoryLabel: categoryLabelOfMulti(categories),
     traits: found.slice(0, 8),
   };
 }
