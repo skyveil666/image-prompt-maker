@@ -161,6 +161,19 @@ const SEASON_CATEGORY_POOL: Record<ZozoSeason, Record<Exclude<ZozoCategory, "aut
   },
 };
 
+/** 季節別カラー方向（おまかせ＋季節時に2つ添える）。春=パステル／夏=ビビッド・クリア／秋=アースカラー・くすみ。 */
+const SEASON_COLOR_POOL: Record<ZozoSeason, string[]> = {
+  spring: ["パステルトーン", "淡色コーデ", "くすみピンク", "ミントグリーン", "ラベンダーカラー", "シャーベットカラー", "桜カラー"],
+  summer: ["ビビッドカラー", "クリアカラー", "白基調の清潔感", "寒色トーン", "ネオンアクセント", "モノトーン", "トロピカルカラー"],
+  autumn: ["アースカラー", "くすみカラー", "ブラウン基調", "ボルドー", "テラコッタ", "モスグリーン", "ベージュ系"],
+};
+/** 季節の素材/空気感（おまかせ＋季節時に1つ添える）。 */
+const SEASON_ACCENT: Record<ZozoSeason, string[]> = {
+  spring: ["春らしい軽やかな素材", "抜け感のある春コーデ"],
+  summer: ["夏向けの軽やか素材", "涼しげなシアー素材", "リゾート感のある着こなし"],
+  autumn: ["秋の落ち着いた質感", "あたたかみのある素材感"],
+};
+
 // ── ユーティリティ ────────────────────────────────────────────────────────────
 
 function shuffle<T>(arr: readonly T[]): T[] {
@@ -231,11 +244,14 @@ export function sampleZozoTrend(age: ZozoAge, categories: ZozoCategory[], season
 
   let traits: string[];
   if (isOmakase) {
-    // 全カテゴリ横断で約20個（アイテム17＋色2＋系統1）。母集団だけ季節で切り替わる。
-    const colors = pickN(COLOR_POOL, 2);
+    // 全カテゴリ横断で約20個。季節指定時は季節カラー＋季節の素材/空気感を添える
+    //（春=パステル系／夏=ビビッド・クリア系／秋=アースカラー・くすみ系）。母集団も季節で切替。
+    const colors = season ? pickN(SEASON_COLOR_POOL[season], 2) : pickN(COLOR_POOL, 2);
+    const accent = season ? pickN(SEASON_ACCENT[season], 1) : [];
     const style = pickStyle(age);
-    const allItems = pickN(Object.values(pool).flat(), 17);
-    traits = Array.from(new Set([...allItems, ...colors, style])).filter(Boolean).slice(0, 20);
+    const itemN = season ? 16 : 17; // 季節時は accent 1 を入れる分アイテムを1減らし約20に保つ
+    const allItems = pickN(Object.values(pool).flat(), itemN);
+    traits = Array.from(new Set([...allItems, ...colors, ...accent, style])).filter(Boolean).slice(0, 20);
   } else {
     // 個別カテゴリ：選択したカテゴリごとに5個ずつ UNION（色・系統は付けない＝純粋なカテゴリ傾向）。
     // 例：トップス＋シューズ＝約10個。母集団だけ季節で切り替わる。
