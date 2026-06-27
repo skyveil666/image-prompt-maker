@@ -11,8 +11,8 @@
 import { useState } from "react";
 import {
   sampleZozoTrend, extractZozoFromText,
-  ZOZO_AGE_OPTIONS, ZOZO_CATEGORY_OPTIONS,
-  type ZozoAge, type ZozoCategory, type ZozoTrend,
+  ZOZO_AGE_OPTIONS, ZOZO_CATEGORY_OPTIONS, ZOZO_SEASON_OPTIONS,
+  type ZozoAge, type ZozoCategory, type ZozoSeason, type ZozoTrend,
 } from "../lib/zozoTrend";
 
 interface Props {
@@ -39,6 +39,7 @@ export function ZozoTrendBar({
   const [open, setOpen]         = useState(false);
   const [age, setAge]           = useState<ZozoAge>("twenties"); // 初期値：20代
   const [categories, setCategories] = useState<ZozoCategory[]>(["auto"]);
+  const [season, setSeason]     = useState<ZozoSeason>("summer"); // 季節（既定=夏）
   const [mode, setMode]         = useState<"auto" | "paste">("auto");
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview]   = useState<ZozoTrend | null>(null);
@@ -56,9 +57,9 @@ export function ZozoTrendBar({
   const handleFetch = () => {
     setSelectedTraits(new Set()); // 取得直後は全未選択から（20個一括注入の混雑を避け、意図的に選ばせる）
     if (mode === "paste") {
-      setPreview(extractZozoFromText(pasteText, age, categories));
+      setPreview(extractZozoFromText(pasteText, age, categories, season));
     } else {
-      setPreview(sampleZozoTrend(age, categories));
+      setPreview(sampleZozoTrend(age, categories, season));
     }
   };
 
@@ -179,6 +180,28 @@ export function ZozoTrendBar({
           )}
 
           <div className={disabled ? "opacity-50 pointer-events-none select-none" : ""}>
+
+          {/* 季節（夏/春/秋・既定=夏）*/}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[13px] font-semibold text-text-muted/80 w-14 shrink-0">季節</span>
+            <div className="flex flex-wrap gap-1.5">
+              {ZOZO_SEASON_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setSeason(o.value)}
+                  className={[
+                    "text-[13px] font-semibold px-2.5 py-1 rounded-lg border leading-none transition",
+                    season === o.value
+                      ? "border-pink-400/70 bg-pink-400/22 text-pink-100"
+                      : "border-bg-border/70 text-text-muted/80 hover:text-text-base hover:border-pink-400/45",
+                  ].join(" ")}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* 年代 */}
           <div className="flex items-center gap-2 flex-wrap">

@@ -20,6 +20,9 @@ export type ZozoCategory =
   | "auto" | "tops" | "outer" | "pants" | "skirt" | "onepiece"
   | "shoes" | "bag" | "accessory" | "full";
 
+/** 季節（春/夏/秋）。冬は未定義（今回は作らない）。未指定時は季節フィルタ無し（現行プールで従来動作）。 */
+export type ZozoSeason = "spring" | "summer" | "autumn";
+
 /** 反映モード：OFF=未反映 / assist=補助反映 / priority=優先反映（衣装方針の主軸） */
 export type ZozoMode = "assist" | "priority";
 
@@ -52,6 +55,12 @@ export const ZOZO_CATEGORY_OPTIONS: { value: ZozoCategory; label: string }[] = [
   { value: "bag",       label: "バッグ" },
   { value: "accessory", label: "アクセサリー" },
   { value: "full",      label: "全身コーデ" },
+];
+
+export const ZOZO_SEASON_OPTIONS: { value: ZozoSeason; label: string }[] = [
+  { value: "summer", label: "夏" },
+  { value: "spring", label: "春" },
+  { value: "autumn", label: "秋" },
 ];
 
 // ── トレンドライブラリ ────────────────────────────────────────────────────────
@@ -115,6 +124,43 @@ const CATEGORY_POOL: Record<Exclude<ZozoCategory, "auto" | "full">, string[]> = 
   ],
 };
 
+/**
+ * 季節別アイテムプール（夏/春/秋・冬なし）。8カテゴリ × 各8〜12語、夏を主軸に厚め。
+ * season 指定時に CATEGORY_POOL の代わりに使う（未指定時は現行 CATEGORY_POOL ＝後方互換）。
+ */
+const SEASON_CATEGORY_POOL: Record<ZozoSeason, Record<Exclude<ZozoCategory, "auto" | "full">, string[]>> = {
+  summer: {
+    tops: ["短丈トップス", "シアートップス", "オフショルブラウス", "タンクトップ", "クロップドカットソー", "チューブトップにシアー重ね", "ノースリーブブラウス", "バンドカラーシャツ", "リブタンク", "レースキャミ", "フレンチスリーブT", "ホルターネック"],
+    outer: ["薄手シアーカーディガン", "リネンシャツ羽織り", "ショート丈ボレロ", "UVカットパーカー", "透け素材の羽織り", "メッシュカーディガン", "七分袖リネンシャツ"],
+    pants: ["ワイドリネンパンツ", "ショートパンツ", "クロップドデニム", "ガウチョパンツ", "リラックスパンツ", "ナイロンショーツ", "ハーフパンツ", "バミューダパンツ", "シアーレイヤードパンツ", "カラーパンツ"],
+    skirt: ["マキシスカート", "シアーレイヤードスカート", "デニムミニ", "ティアードロングスカート", "リネンスカート", "プリーツミニ", "ラップスカート", "フレアミニ", "カラースカート", "メッシュスカート"],
+    onepiece: ["キャミワンピ", "シアーワンピース", "リゾートワンピ", "タンクワンピ", "マキシワンピ", "バンドゥにシャツ羽織り", "リネンワンピース", "ホルターワンピ", "ティアードワンピ", "シャツワンピース"],
+    shoes: ["スポーツサンダル", "厚底サンダル", "ミュール", "トングサンダル", "クリアサンダル", "グルカサンダル", "編み込みサンダル", "ストラップサンダル", "白スニーカー", "バブーシュ"],
+    bag: ["かごバッグ", "クリアバッグ", "メッシュバッグ", "ミニショルダー", "ストローバッグ", "ラフィアバッグ", "巾着バッグ", "ネットバッグ", "ミニトート"],
+    accessory: ["ビッグフープ", "シェルアクセ", "サングラス", "バケットハット", "アンクレット", "麦わら帽子", "ビーズアクセ", "シルバーバングル", "ヘアバンド"],
+  },
+  spring: {
+    tops: ["シアーブラウス", "パステルニット", "短丈カーディガン", "フリルブラウス", "ボーダーカットソー", "パフスリーブブラウス", "レースキャミ", "リネンシャツ", "七分袖トップス", "クロップドニット"],
+    outer: ["トレンチコート", "薄手デニムジャケット", "ライトカーディガン", "ナイロンブルゾン", "ショート丈ジャケット", "シャツジャケット", "スプリングコート", "カラーブルゾン"],
+    pants: ["センタープレスパンツ", "ワイドデニム", "クロップドパンツ", "リネンパンツ", "ストレートデニム", "テーパードパンツ", "カラーパンツ", "フレアパンツ"],
+    skirt: ["プリーツスカート", "フレアミニ", "花柄ロングスカート", "デニムスカート", "ティアードスカート", "シアーレイヤードスカート", "パステルスカート", "ラップスカート"],
+    onepiece: ["シャツワンピース", "フレアワンピース", "花柄ワンピース", "キャミワンピの重ね着", "リネンワンピース", "パフスリーブワンピ", "パステルワンピ", "ティアードワンピ"],
+    shoes: ["バレエシューズ", "ローファー", "白スニーカー", "メリージェーン", "フラットサンダル", "スリングバック", "パステルパンプス", "カラースニーカー"],
+    bag: ["ミニショルダー", "かごバッグ", "トートバッグ", "巾着バッグ", "ナイロンバッグ", "パステルバッグ", "ハンドバッグ", "ミニトート"],
+    accessory: ["細ネックレス", "パールアクセ", "シルバーフープ", "ヘアクリップ", "スカーフ", "ベレー帽", "リボンアクセ", "カチューシャ"],
+  },
+  autumn: {
+    tops: ["リブニット", "ベスト重ね着", "タートルニット", "ロゴT", "シャツレイヤード", "ケーブルニット", "モヘアニット", "ビッグシルエットスウェット", "ハイネックカットソー", "ボーダーニット"],
+    outer: ["トレンチコート", "レザー風ジャケット", "ニットカーディガン羽織り", "MA-1風ブルゾン", "チェックジャケット", "スエード風ジャケット", "キルティングベスト", "コーデュロイジャケット"],
+    pants: ["コーデュロイパンツ", "ワイドデニム", "センタープレスパンツ", "レザー風パンツ", "バギーパンツ", "チェックパンツ", "ブラウンパンツ", "テーパードパンツ"],
+    skirt: ["マーメイドロングスカート", "チェックプリーツ", "コーデュロイスカート", "サテンロングスカート", "タイトスカート", "ニットスカート", "ブラウンフレアスカート", "ラップスカート"],
+    onepiece: ["ニットワンピース", "シャツワンピース", "ジャンパースカート", "サロペット", "ベロアワンピ", "レイヤードワンピ", "チェックワンピ", "タートルワンピ"],
+    shoes: ["ローファー", "ショートブーツ", "厚底スニーカー", "ローヒールパンプス", "サイドゴアブーツ", "バレエシューズ", "ブラウンブーツ", "スエードローファー"],
+    bag: ["ビッグトート", "レザー風ショルダー", "スエード風バッグ", "巾着バッグ", "ハンドバッグ", "ブラウントート", "ミニショルダー"],
+    accessory: ["ベレー帽", "ニット帽", "薄手マフラー", "チェーンアクセ", "べっ甲アクセ", "レザー風グローブ", "ブラウンスカーフ", "ゴールドアクセ"],
+  },
+};
+
 // ── ユーティリティ ────────────────────────────────────────────────────────────
 
 function shuffle<T>(arr: readonly T[]): T[] {
@@ -153,6 +199,14 @@ function categoryLabelOfMulti(categories: ZozoCategory[]): string {
   if (categories.includes("full")) return categoryLabelOf("full");
   return categories.map((c) => categoryLabelOf(c)).join("・");
 }
+function seasonLabelOf(s: ZozoSeason): string {
+  return ZOZO_SEASON_OPTIONS.find((o) => o.value === s)?.label ?? "夏";
+}
+/** カテゴリ表示ラベル（季節があれば「夏・トップス…」と前置）。表示専用＝payloadには載らない。 */
+function labelOf(categories: ZozoCategory[], season?: ZozoSeason): string {
+  const cat = categoryLabelOfMulti(categories);
+  return season ? `${seasonLabelOf(season)}・${cat}` : cat;
+}
 
 function pickStyle(age: ZozoAge): string {
   const keys = ageToStyleKeys(age);
@@ -166,7 +220,9 @@ function pickStyle(age: ZozoAge): string {
  * 年代・カテゴリに応じてトレンド属性をランダムに組み合わせる。
  * 毎回違う組み合わせになる（Math.random）。
  */
-export function sampleZozoTrend(age: ZozoAge, categories: ZozoCategory[]): ZozoTrend {
+export function sampleZozoTrend(age: ZozoAge, categories: ZozoCategory[], season?: ZozoSeason): ZozoTrend {
+  // 季節指定時は季節プール（夏/春/秋）、未指定時は現行 CATEGORY_POOL（後方互換＝commit 1/2 を壊さない）。
+  const pool = season ? SEASON_CATEGORY_POOL[season] : CATEGORY_POOL;
   // おまかせ(auto)／全身コーデ(full)／未選択 は「広域モード」＝全カテゴリ横断。
   const isOmakase =
     categories.length === 0 ||
@@ -175,22 +231,22 @@ export function sampleZozoTrend(age: ZozoAge, categories: ZozoCategory[]): ZozoT
 
   let traits: string[];
   if (isOmakase) {
-    // 全カテゴリ横断で約20個（アイテム17＋色2＋系統1）。
+    // 全カテゴリ横断で約20個（アイテム17＋色2＋系統1）。母集団だけ季節で切り替わる。
     const colors = pickN(COLOR_POOL, 2);
     const style = pickStyle(age);
-    const allItems = pickN(Object.values(CATEGORY_POOL).flat(), 17);
+    const allItems = pickN(Object.values(pool).flat(), 17);
     traits = Array.from(new Set([...allItems, ...colors, style])).filter(Boolean).slice(0, 20);
   } else {
     // 個別カテゴリ：選択したカテゴリごとに5個ずつ UNION（色・系統は付けない＝純粋なカテゴリ傾向）。
-    // 例：トップス＋シューズ＝約10個。データは増やさず既存プール（各5〜10件）の範囲で収まる。
+    // 例：トップス＋シューズ＝約10個。母集団だけ季節で切り替わる。
     const specific = categories.filter(
       (c): c is Exclude<ZozoCategory, "auto" | "full"> => c !== "auto" && c !== "full",
     );
-    const items = specific.flatMap((c) => pickN(CATEGORY_POOL[c], 5));
+    const items = specific.flatMap((c) => pickN(pool[c], 5));
     traits = Array.from(new Set(items)).filter(Boolean);
   }
 
-  return { ageLabel: ageLabelOf(age), categoryLabel: categoryLabelOfMulti(categories), traits };
+  return { ageLabel: ageLabelOf(age), categoryLabel: labelOf(categories, season), traits };
 }
 
 // ── 手動貼り付け抽出 ──────────────────────────────────────────────────────────
@@ -244,7 +300,7 @@ const EXTRACT_DICT: { label: string; tokens: string[] }[] = [
  * 貼り付けテキストからトレンド属性を抽出する。
  * 辞書にあるトークンのみ拾うため、ブランド名・商品名は自然に除外される。
  */
-export function extractZozoFromText(text: string, age: ZozoAge, categories: ZozoCategory[]): ZozoTrend {
+export function extractZozoFromText(text: string, age: ZozoAge, categories: ZozoCategory[], season?: ZozoSeason): ZozoTrend {
   const norm = text.toLowerCase().normalize("NFC");
   const found: string[] = [];
   for (const entry of EXTRACT_DICT) {
@@ -254,7 +310,7 @@ export function extractZozoFromText(text: string, age: ZozoAge, categories: Zozo
   }
   return {
     ageLabel: ageLabelOf(age),
-    categoryLabel: categoryLabelOfMulti(categories),
+    categoryLabel: labelOf(categories, season),
     traits: found.slice(0, 8),
   };
 }
