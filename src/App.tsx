@@ -1273,7 +1273,7 @@ export default function App() {
     if (next.length === 0) {
       setWorldCombinedNote("");
       setWorldScopes([]);
-      setScopes([...bgScopes]);  // 世界観解除→斬新背景の scope のみ残す（UNION 再計算）
+      setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes])]);  // 世界観解除→世界観 scope だけ外し、斬新背景＋手動 scope は残す（UNION 再計算・手動追加の巻き添え防止）
       setScopeFlashKey((k) => k + 1);
       showPresetToast("世界観の設定をリセットしました");
       return;
@@ -1304,7 +1304,7 @@ export default function App() {
       ? `${next.length}つの世界観を融合します`
       : APPLY_HINT;
     showPresetToast(msg, hint);
-  }, [activeWorldPresets, buildInputs, variationMemory, showPresetToast, bgScopes]);
+  }, [activeWorldPresets, buildInputs, variationMemory, showPresetToast, bgScopes, worldScopes]);
 
   // 🌌 斬新背景プリセット（背景版）：handleWorldPresetToggle のクローン。
   // 背景系スコープ＋details.background＋bgPresetNote だけ更新し、人物・衣装・露出は触らない。
@@ -1327,7 +1327,7 @@ export default function App() {
     if (next.length === 0) {
       setBgPresetNote("");
       setBgScopes([]);
-      setScopes([...worldScopes]);  // 斬新背景解除→世界観の scope のみ残す（UNION 再計算）
+      setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes])]);  // 斬新背景解除→斬新背景 scope だけ外し、世界観＋手動 scope は残す（UNION 再計算・手動追加の巻き添え防止）
       setScopeFlashKey((k) => k + 1);
       showPresetToast("斬新背景の設定をリセットしました");
       return;
@@ -1357,7 +1357,7 @@ export default function App() {
       ? `${next.length}つの斬新背景を融合します`
       : APPLY_HINT;
     showPresetToast(msg, hint);
-  }, [activeBgPresets, buildInputs, variationMemory, showPresetToast, worldScopes]);
+  }, [activeBgPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes]);
 
   // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
   // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
@@ -1813,9 +1813,9 @@ export default function App() {
             worldCombinedNote={worldCombinedNote}
             referenceNoteText={referenceNoteText}
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
-            onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes([...bgScopes]); }}
+            onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes])]); }}
             bgPresetNote={bgPresetNote}
-            onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes([...worldScopes]); }}
+            onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes])]); }}
             onClearReference={handleClearReference}
             tagNg={tagNg}
             onClearTagNg={() => setTagNg([])}
@@ -1922,10 +1922,10 @@ export default function App() {
                 onResetAll={handleResetAll}
                 worldCombinedNote={worldCombinedNote}
                 referenceNoteText={referenceNoteText}
-                onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes([...bgScopes]); }}
+                onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes])]); }}
                 activeBgPresets={activeBgPresets}
                 bgPresetNote={bgPresetNote}
-                onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes([...worldScopes]); }}
+                onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes])]); }}
                 onClearReference={handleClearReference}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
