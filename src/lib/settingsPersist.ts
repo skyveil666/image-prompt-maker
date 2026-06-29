@@ -148,6 +148,11 @@ function mergeDetails(saved: unknown): DetailSettings {
     myth:        merge(DEFAULT_DETAILS.myth,        s.myth),
     lighting:    merge(DEFAULT_DETAILS.lighting,    s.lighting),
     aspectRatio: merge(DEFAULT_DETAILS.aspectRatio, s.aspectRatio),
+    // 複数選択(multiOverrides)はトップレベル任意フィールド。上の14サブ再構築から漏れるため明示復元する
+    //（これが無いとリロード/別タブ同期のたびにユーザーの複数選択が黙って単一値へ戻る）。
+    ...(s.multiOverrides && typeof s.multiOverrides === "object" && !Array.isArray(s.multiOverrides)
+      ? { multiOverrides: s.multiOverrides as Record<string, string[]> }
+      : {}),
   };
 }
 
