@@ -550,11 +550,17 @@ export function ArrangePreviewPanel({
 
   // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
+  // アレンジ元(source)が変わったら案ローカル(画像/評価)は引き継がない。同一ソースの再アレンジ時のみ位置で引き継ぐ
+  //（別の元プロンプトをアレンジした時に前回の貼付画像が案へ残り、保存で誤った画像が別案に添付されるのを防ぐ）。
+  const prevSourceIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (result) {
+      const srcId = result.source?.id ?? null;
+      const sameSource = prevSourceIdRef.current === srcId;
+      prevSourceIdRef.current = srcId;
       setProposalStates((prev) =>
         result.proposals.map((_, i) => {
-          const existing = prev[i];
+          const existing = sameSource ? prev[i] : undefined;
           if (existing && (existing.images.length > 0 || existing.ratings.some((r) => r != null))) {
             return existing;
           }
