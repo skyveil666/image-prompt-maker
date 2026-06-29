@@ -289,21 +289,6 @@ export function getComboControls(
   return out;
 }
 
-/** block(完全NG)中のコンボから NG指定 用フレーズを返す（クライアント側で ngList に注入） */
-export function getNgPhrasesFromCombos(
-  comboMap: ComboPolicyMap,
-  keyToCombo: Map<string, { motifLabels: string[]; motifIds: string[] }>
-): string[] {
-  const out: string[] = [];
-  for (const [k, p] of Object.entries(comboMap)) {
-    if (p !== "block") continue;
-    const info = keyToCombo.get(k);
-    if (!info || info.motifLabels.length < 2) continue;
-    out.push(`${info.motifLabels.join(" + ")}の同時使用`);
-  }
-  return out;
-}
-
 /** 構成ポリシーの件数（block / alt） */
 export function countComboPolicies(map: ComboPolicyMap): { block: number; alt: number } {
   let block = 0, alt = 0;

@@ -1114,11 +1114,6 @@ export interface IdentityShieldSummary {
   warnings: string[];
 }
 
-export interface GenerationResult {
-  proposals: GeneratedProposal[];
-  negative?: string;
-}
-
 export type HistoryStatus = "unused" | "used" | "good" | "bad" | "posted";
 
 /**
