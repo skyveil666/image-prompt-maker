@@ -1102,7 +1102,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
         <LargePreview
           state={hover}
           folderName={folderName}
-          isFav={favNames.has(hover.image.name)}
+          isFav={favNames.has(`${folderPath}/${hover.image.name}`)}
           isPinned={false}
           onSelect={() => void handleSelect(hover.image)}
           onSelectAndClose={() => { void handleSelect(hover.image); onClose?.(); }}
@@ -1119,7 +1119,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
         <LargePreview
           state={pinned}
           folderName={folderName}
-          isFav={favNames.has(pinned.image.name)}
+          isFav={favNames.has(`${folderPath}/${pinned.image.name}`)}
           isPinned={true}
           onSelect={() => void handleSelect(pinned.image)}
           onSelectAndClose={() => { void handleSelect(pinned.image); onClose?.(); }}
@@ -1132,7 +1132,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
       {ctxMenu && (
         <ContextMenu
           state={ctxMenu}
-          isFav={favNames.has(ctxMenu.image.name)}
+          isFav={favNames.has(`${folderPath}/${ctxMenu.image.name}`)}
           onFav={() => void handleToggleFav(ctxMenu.image)}
           onCopy={() => void handleCopy(ctxMenu.image)}
           onHide={() => hideImage(ctxMenu.image.id)}
