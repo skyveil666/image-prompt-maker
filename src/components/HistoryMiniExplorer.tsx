@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listRecentImages, addRecentImage, type RecentImageItem } from "../lib/recentImages";
 import { fileToThumbnail } from "../lib/imageFile";
+import { imageContentHash } from "../lib/imageThumb";
 
 interface Props {
   /** 選択中の画像 dataURL（親へ lift-up） */
@@ -58,11 +59,12 @@ export function HistoryMiniExplorer({ selectedImage, onSelectImage, onUseForArra
     try {
       const thumb = await fileToThumbnail(file, 400, 0.85);
       if (thumb) {
-        onSelectImage(thumb);
-        // 最近の画像に追加
-        await addRecentImage({ imageHash: `hist-${Date.now()}`, originalDataUrl: thumb });
-        const fresh = await listRecentImages();
-        setRecentImages(fresh);
+        // 最近の画像へ：content hash で dedup（Date.now だと同一画像が毎回重複していた）
+        const hash = await imageContentHash(thumb);
+        const { list, item } = await addRecentImage({ imageHash: hash, originalDataUrl: thumb });
+        // 保存後の imageDataUrl で選択（thumb 自身は保存後フィールドと一致せず選択枠が点灯しなかった）
+        onSelectImage(item.imageDataUrl);
+        setRecentImages(list);
       }
     } finally {
       setLoading(false);
@@ -75,9 +77,11 @@ export function HistoryMiniExplorer({ selectedImage, onSelectImage, onUseForArra
     e.target.value = "";
   }, [processImageFile]);
 
-  // Ctrl+V ペースト（このコンポーネント内にフォーカスがある時）
+  // Ctrl+V ペースト（テキスト入力欄にフォーカスがある時はテキスト貼付を妨げない＝ImageUploader と同方針）
   useEffect(() => {
     const handler = (e: ClipboardEvent) => {
+      const active = document.activeElement;
+      if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
       const items = Array.from(e.clipboardData?.items ?? []);
       const img = items.find((it) => it.type.startsWith("image/"))?.getAsFile();
       if (img) { e.preventDefault(); void processImageFile(img); }
