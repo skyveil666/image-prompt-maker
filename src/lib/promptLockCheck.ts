@@ -157,6 +157,24 @@ function isProtectiveLine(line: string): boolean {
   return PROTECTIVE_LINE_HINTS.some((h) => l.includes(h.toLowerCase()));
 }
 
+/**
+ * 禁止ワードが haystack に「実質的に」含まれるか。素朴な includes は誤検知が多い。
+ *  - 単一漢字は「直前が漢字でない」位置のみ該当＝複合語の末尾を除外（"家庭"の庭・"校庭"の庭 を背景変更と誤検知しない）。
+ *  - それ以外（複数文字の和語・英語・フレーズ）は従来どおり部分一致（挙動不変）。
+ * ※ 既知の限界：文頭に現れる単一漢字（例「森の妖精風の衣装」の森）は語境界で判別できず検出のまま。
+ *   axis ごとの文脈判定（その行が衣装の話か背景の話か）が必要で、それは別タスク。advisory（警告のみ）なので実害は限定的。
+ */
+function forbiddenWordHit(haystack: string, word: string): boolean {
+  if (!word) return false;
+  if ([...word].length === 1 && /\p{Script=Han}/u.test(word)) {
+    for (let i = haystack.indexOf(word); i >= 0; i = haystack.indexOf(word, i + 1)) {
+      if (i === 0 || !/\p{Script=Han}/u.test(haystack[i - 1])) return true;
+    }
+    return false;
+  }
+  return haystack.includes(word);
+}
+
 /** axis → 日本語ラベル（警告メッセージ用）。Scope→ラベルは scopeLabels.ts に一本化。 */
 const AXIS_JP: Record<keyof ChangeTargets, string> = ALL_SCOPE_LABELS;
 
@@ -193,7 +211,7 @@ export function validatePromptLocks(promptText: string, lock: LockState): Prompt
   (Object.keys(FORBIDDEN_WORDS) as (keyof ChangeTargets)[]).forEach((axis) => {
     const isProtected = !lock.changeTargets[axis];
     if (!isProtected) return; // 変更対象なら検査不要
-    const matched = FORBIDDEN_WORDS[axis].filter((w) => haystack.includes(w.toLowerCase()));
+    const matched = FORBIDDEN_WORDS[axis].filter((w) => forbiddenWordHit(haystack, w.toLowerCase()));
     if (matched.length > 0) {
       const jp = AXIS_JP[axis];
       const lockedLabel = axis === "background" ? "背景固定ON" : `${jp}OFF`;
