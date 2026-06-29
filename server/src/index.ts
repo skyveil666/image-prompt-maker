@@ -346,7 +346,9 @@ app.post("/api/analyze-preferences", async (req, res) => {
     res.json({
       result,
       model,
-      sampleSize: samples.length,
+      // gemini.ts の analyzePreferences は samples.slice(0,60) のみ実分析するため、表示件数も60で頭打ちにする
+      //（受理は最大100だが「N件で分析」表示が実分析数を超えないように＝過大表示の防止。§4 gemini.ts の上限と一致）。
+      sampleSize: Math.min(samples.length, 60),
       generatedAt: Date.now(),
     });
   } catch (err) {
