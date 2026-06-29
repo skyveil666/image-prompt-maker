@@ -525,7 +525,11 @@ export default function App() {
         (scopes.includes("outfit") && details.outfit.colorful) ? buildOutfitColorfulNote() : "",
         // 衣装色「おまかせ」：複数案で同系統に偏らないよう案ごとに主系統を割り当てる。
         //   発火＝outfit変更対象 ∧ color="auto" ∧ 色味ロックOFF（ON時は元画像色優先ゆえ注入しない）。
-        (scopes.includes("outfit") && details.outfit.color === "auto" && !colorMoodLock) ? buildOutfitColorVarietyNote(count) : "",
+        // decorationColorLink が配色を gradient/accent_color に上書きする時はこの variety note を抑止
+        //（payload色が「固定」になるのに「案ごとに色を変える」が同時に乗る二重指示を防ぐ）。
+        (scopes.includes("outfit") && details.outfit.color === "auto" && !colorMoodLock
+          && !(decorationColorLink && (details.outfit.decoration === "maximal" || details.outfit.decoration === "elaborate")))
+          ? buildOutfitColorVarietyNote(count) : "",
         // ✏ 指示（自由文・任意）：変更対象まわりの単一フリー欄。軸非依存＝非空なら全案へ強め注入。
         //   §4不触（extraInstructions 経由・サーバは【ユーザー追加指示】として verbatim 展開）。出力は既存
         //   サニタイザが無条件に通す（証明済）。発火条件は §5 バッジと同一（customInstruction 非空）。
