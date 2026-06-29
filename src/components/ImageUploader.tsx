@@ -119,7 +119,7 @@ export function ImageUploader({ value, onChange }: Props) {
           type="file"
           accept="image/png,image/jpeg,image/webp"
           className="hidden"
-          onChange={(e) => void handleFile(e.target.files?.[0])}
+          onChange={(e) => { void handleFile(e.target.files?.[0]); e.target.value = ""; }}
         />
       </div>
       {value && (
