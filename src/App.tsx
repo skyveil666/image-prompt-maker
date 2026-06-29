@@ -822,7 +822,9 @@ export default function App() {
         setArrangeSource(null);
       }
     },
-    [imageDataUrl, runBiasAnalysis, ngList, forbiddenTokens, tagNg]
+    // windLevel/zozoApplied/activeBoosts/colorStrategy/artStyle は settingsSnapshot(774-780)で読むため deps に含める
+    //（含めないと「同じ構成で再生成」スナップショットだけ古い値で保存され、後の履歴復元で誤った設定が戻る）。
+    [imageDataUrl, runBiasAnalysis, ngList, forbiddenTokens, tagNg, windLevel, zozoApplied, activeBoosts, colorStrategy, artStyle]
   );
 
   // skyveilProfile/Strength は後で宣言されるため、handleGenerate からは ref 経由で参照（TDZ回避）
@@ -1394,6 +1396,7 @@ export default function App() {
     setAutoMoodCategories([]);
     setExtraInstructions("");
     setNgList("");
+    setCustomInstruction("");  // ✏ 指示（自由文）も全リセットで解除（§5整合：全案支配＋✏バッジ残留を断つ）
     setViralMode(false);
     setAvoidCliche(false);
     setAvoidRealBackground(true);
