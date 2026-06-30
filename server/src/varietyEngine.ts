@@ -48,7 +48,7 @@ export const GENRE_POOL: readonly GenreDef[] = [
     hint: "MVのワンシーン・色鮮やかな照明演出・ステージ感・キャッチーな華やかさ" },
 
   { id: "contemporary_art", label: "現代アート", family: "art",
-    hint: "現代美術の知的な静謐・抽象性・コンセプチュアルな空間・前衛的な表現" },
+    hint: "現代美術の知的な静謐・抽象性・コンセプチュアルな構成・前衛的な表現" },
   { id: "museum", label: "美術館展示", family: "art",
     hint: "ホワイトキューブ・展示照明・静けさ・作品として鑑賞される構え" },
   { id: "concept_art", label: "コンセプトアート", family: "art",
@@ -57,14 +57,14 @@ export const GENRE_POOL: readonly GenreDef[] = [
   { id: "underwater", label: "水中幻想", family: "nature",
     hint: "水中の浮遊感・揺らめく光・気泡・髪と布のたゆたい・幻想的な青の層" },
   { id: "greenhouse", label: "温室植物園", family: "nature",
-    hint: "ガラス越しの拡散光・植物の緑と湿度・有機的な空間・柔らかな陰影" },
+    hint: "ガラス越しの拡散光・植物の緑と湿度・有機的な広がり・柔らかな陰影" },
   { id: "snow", label: "雪景色", family: "nature",
     hint: "雪の白・吐息・凛とした冷気・静寂・寒色の透明感と防寒の質感" },
 
   { id: "minimal_white", label: "白背景ミニマル", family: "studio",
-    hint: "純白の無地空間・極限の引き算・被写体と余白の緊張・クリーンな影" },
+    hint: "純白の背景・極限の引き算・被写体と余白の緊張・クリーンな影" },
   { id: "interior", label: "インテリア写真", family: "studio",
-    hint: "上質なインテリア空間・家具と光の調和・生活感のある洗練・自然光" },
+    hint: "上質なインテリア・家具と光の調和・生活感のある洗練・自然光" },
   { id: "architecture", label: "建築写真", family: "studio",
     hint: "建築のシャープな直線・対称・幾何学・コンクリ/ガラス/光の構造美" },
 
