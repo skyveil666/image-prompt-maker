@@ -1395,13 +1395,13 @@ function describeDetails(
     if (bgStyleVals.length >= 2)
       fixed.push(`【背景スタイル】：${bgStyleVals.map(v => (BG_LABELS.style as Record<string, string>)[v] ?? v).join("×")}（複数スタイルを自然に融合）`);
     else if (b.style && b.style !== "auto" && b.style !== "skip")
-      fixed.push(`【背景スタイル】：${BG_LABELS.style[b.style as keyof typeof BG_LABELS.style]}（固定）`);
+      fixed.push(`【背景スタイル】：${BG_LABELS.style[b.style as keyof typeof BG_LABELS.style]}（この作風を軸として保持しつつ、案ごとに表現・構図を変えて展開する）`);
     else if (b.style === "auto") vary.push("背景スタイル");
     const bgPlaceVals = getMultiVals(details.multiOverrides, "background.place");
     if (bgPlaceVals.length >= 2) {
       fixed.push(`場所：${bgPlaceVals.map(v => (BG_LABELS.place as Record<string, string>)[v] ?? v).join("と")}を組み合わせた空間（複数ロケーションを自然に融合）`);
     } else if (b.place !== "auto" && b.place !== "skip") {
-      fixed.push(`場所：${BG_LABELS.place[b.place as keyof typeof BG_LABELS.place]}（固定）`);
+      fixed.push(`場所：${BG_LABELS.place[b.place as keyof typeof BG_LABELS.place]}（この場所を軸として保持しつつ、案ごとに見せ方・構図・要素を変えて展開する）`);
     } else if (b.place === "auto") vary.push("場所");
     const bgColorVals = getMultiVals(details.multiOverrides, "background.color");
     if (bgColorVals.length >= 2) fixed.push(`色：${bgColorVals.map(v => (BG_LABELS.color as Record<string, string>)[v] ?? v).join("×")}の配色（複数色を自然に配分）`);
