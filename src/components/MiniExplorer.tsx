@@ -29,10 +29,32 @@ import {
   readImagesFromDir,
   readSubfolders,
   removeExplorerFavorite,
+  resetRecentDatesOnce,
   saveRecentFolder,
   saveRootHandle,
   verifyPermission,
+  type RecentFolder,
 } from "../lib/miniExplorer";
+
+// ── Quick Access helpers: 追加日の表示名 & 月別12色（季節配色） ───────────────
+/** 月(1-12)→色。春=緑/桜・夏=青/水色・秋=橙/茶・冬=白/青紫。undated=グレー。実機で微調整。 */
+const MONTH_COLORS: Record<number, string> = {
+  1: "#c7d2fe", 2: "#a5b4fc",                 // 冬：青紫
+  3: "#bbf7d0", 4: "#f9a8d4", 5: "#86efac",   // 春：若草・桜・緑
+  6: "#7dd3fc", 7: "#38bdf8", 8: "#0ea5e9",   // 夏：水色〜青
+  9: "#fdba74", 10: "#fb923c", 11: "#b45309", // 秋：橙〜茶
+  12: "#e5e7eb",                              // 冬：白/淡
+};
+function monthColor(addedAt: number | null): string {
+  if (addedAt == null) return "#6b7280"; // undated=グレー
+  return MONTH_COLORS[new Date(addedAt).getMonth() + 1] ?? "#6b7280";
+}
+/** addedAt→「M月D日」。undated は null。 */
+function formatAddedDate(addedAt: number | null): string | null {
+  if (addedAt == null) return null;
+  const d = new Date(addedAt);
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -522,7 +544,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
   const [favNames,  setFavNames]  = useState<Set<string>>(new Set());
 
   // ── UI state ─────────────────────────────────────────────────────────
-  const [recents,   setRecents]   = useState<FileSystemDirectoryHandle[]>([]);
+  const [recents,   setRecents]   = useState<RecentFolder[]>([]);
   const [sort,      setSort]      = useState<SortKey>("name");
   const [thumbMode, setThumbMode] = useState<ThumbMode>(
     () => (localStorage.getItem(THUMB_MODE_KEY) as ThumbMode) ?? "md",
@@ -611,6 +633,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
       setFavorites(favs);
       setFavNames(new Set(favs.map((f) => f.name)));
 
+      await resetRecentDatesOnce(); // 機能導入前の既存フォルダを一度だけ undated 化（OS名表示に戻す）
       const recent = await loadRecentFolders();
       setRecents(recent);
 
@@ -690,6 +713,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
     try {
       const ok = await verifyPermission(handle);
       if (!ok) return;
+      // 既存フォルダを開くだけでは日付を付けない（＝無視・OS名のまま）。日付は新規追加時のみ。
       await initRoot(handle, false);
     } catch { /* ignore */ }
   }, [initRoot]);
@@ -923,14 +947,14 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
                   <div className="px-3 py-1 text-[12px] uppercase tracking-widest text-text-muted/90 font-bold select-none">
                     📌 クイックアクセス
                   </div>
-                  {recents.map((h) => (
-                    <button key={h.name} type="button"
-                      onClick={() => void handleOpenRecent(h)}
+                  {recents.map((r) => (
+                    <button key={r.handle.name} type="button"
+                      onClick={() => void handleOpenRecent(r.handle)}
                       className={["w-full flex items-center gap-1.5 px-3 h-[28px] text-left text-[13px] transition-colors hover:bg-white/[0.06] select-none",
-                        rootHandle?.name === h.name ? "text-accent/90 font-medium" : "text-text-muted/90 hover:text-text-base"].join(" ")}
-                      title={h.name}>
-                      <span className="shrink-0 text-[12px]">📁</span>
-                      <span className="truncate">{h.name}</span>
+                        rootHandle?.name === r.handle.name ? "text-accent/90 font-medium" : "text-text-muted/90 hover:text-text-base"].join(" ")}
+                      title={r.handle.name}>
+                      <span className="shrink-0 text-[12px] rounded-sm px-[1px]" style={{ backgroundColor: monthColor(r.addedAt) }}>📁</span>
+                      <span className="truncate">{formatAddedDate(r.addedAt) ?? r.handle.name}</span>
                     </button>
                   ))}
                   <div className="mx-3 mt-1 mb-0.5 border-t border-bg-border/40" />

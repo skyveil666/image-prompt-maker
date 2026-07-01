@@ -310,39 +310,100 @@ export const isFSASupported = (): boolean =>
 const MAX_RECENTS = 6;
 const RECENT_PREFIX = "__recent_";
 
-/** Save a folder as the most-recently-used root (deduped by name, max 6). */
-export async function saveRecentFolder(
-  handle: FileSystemDirectoryHandle,
-): Promise<void> {
+/**
+ * Quick Access に追加した1フォルダ。
+ * addedAt = アプリに追加した日時（＝表示する日付・月色・並び順）。機能導入前の既存フォルダ／旧データは null（＝OS名表示）。
+ * handle は idb 永続化可能な FileSystemDirectoryHandle。ラッパーごと構造化クローンで保存する。
+ */
+export interface RecentFolder {
+  handle: FileSystemDirectoryHandle;
+  addedAt: number | null;
+}
+
+/** 保存値が新形式 {handle, addedAt} か（旧＝生ハンドル）を判定。 */
+function isRecentRecord(v: unknown): v is { handle: FileSystemDirectoryHandle; addedAt?: unknown } {
+  return typeof v === "object" && v !== null && "handle" in v;
+}
+
+const RECENT_RESET_FLAG = "ipm_recentDatesReset_v1";
+
+/**
+ * 機能導入前の既存フォルダを一度だけ undated 化する（＝OS名表示に戻し「無視」する）。
+ * これ以降に追加したフォルダだけが addedAt（追加日）を持つ。handle は保持（Quick Access からは消さない）。
+ * localStorage フラグで1回のみ実行。clear/deleteDatabase は使わず __recent_i スロットの再書き込みのみ（非破壊）。
+ */
+export async function resetRecentDatesOnce(): Promise<void> {
+  try {
+    if (localStorage.getItem(RECENT_RESET_FLAG)) return;
+  } catch { return; }
   const existing = await loadRecentFolders();
-  const deduped  = [handle, ...existing.filter((h) => h.name !== handle.name)].slice(
-    0,
-    MAX_RECENTS,
-  );
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx    = db.transaction(STORE_FOLDERS, "readwrite");
     const store = tx.objectStore(STORE_FOLDERS);
-    // Clear old slots then rewrite
     for (let i = 0; i < MAX_RECENTS; i++) store.delete(`${RECENT_PREFIX}${i}`);
-    deduped.forEach((h, i) => store.put(h, `${RECENT_PREFIX}${i}`));
+    existing.forEach((r, i) => store.put({ handle: r.handle, addedAt: null }, `${RECENT_PREFIX}${i}`));
+    tx.oncomplete = () => resolve();
+    tx.onerror   = () => reject(tx.error);
+  });
+  try { localStorage.setItem(RECENT_RESET_FLAG, "1"); } catch { /* ignore */ }
+}
+
+/**
+ * フォルダを Quick Access に記録する（additive・非破壊）。
+ * - 新規／旧 undated：addedAt=now（＝追加した日）を付与。
+ * - 既に addedAt を持つ再追加：保持し先頭へ動かさない。
+ * - 並びは addedAt desc（undated 末尾）で最大6件。__recent_i スロットのみ書き換える。
+ */
+export async function saveRecentFolder(
+  handle: FileSystemDirectoryHandle,
+): Promise<void> {
+  const existing = await loadRecentFolders();
+  const now = Date.now();
+  const idx = existing.findIndex((r) => r.handle.name === handle.name);
+  let next: RecentFolder[];
+  if (idx >= 0) {
+    const keptAddedAt = existing[idx].addedAt ?? now;
+    next = existing.slice();
+    next[idx] = { handle, addedAt: keptAddedAt };
+  } else {
+    next = [{ handle, addedAt: now }, ...existing];
+  }
+  next.sort((a, b) => (b.addedAt ?? -Infinity) - (a.addedAt ?? -Infinity));
+  next = next.slice(0, MAX_RECENTS);
+
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx    = db.transaction(STORE_FOLDERS, "readwrite");
+    const store = tx.objectStore(STORE_FOLDERS);
+    // Clear recent slots then rewrite（__root__/タブ別ハンドルは別キーなので不触）
+    for (let i = 0; i < MAX_RECENTS; i++) store.delete(`${RECENT_PREFIX}${i}`);
+    next.forEach((r, i) => store.put({ handle: r.handle, addedAt: r.addedAt }, `${RECENT_PREFIX}${i}`));
     tx.oncomplete = () => resolve();
     tx.onerror   = () => reject(tx.error);
   });
 }
 
-/** Load all saved recent folders (most-recent-first, holes removed). */
-export async function loadRecentFolders(): Promise<FileSystemDirectoryHandle[]> {
+/**
+ * Quick Access のフォルダ一覧を addedAt desc（undated 末尾）で返す。
+ * 旧データ（生ハンドル）は addedAt:null として後方互換で読む。
+ */
+export async function loadRecentFolders(): Promise<RecentFolder[]> {
   const db      = await openDb();
-  const results: FileSystemDirectoryHandle[] = [];
+  const results: RecentFolder[] = [];
   for (let i = 0; i < MAX_RECENTS; i++) {
-    const h = await new Promise<FileSystemDirectoryHandle | null>((resolve) => {
+    const v = await new Promise<unknown>((resolve) => {
       const tx  = db.transaction(STORE_FOLDERS, "readonly");
       const req = tx.objectStore(STORE_FOLDERS).get(`${RECENT_PREFIX}${i}`);
-      req.onsuccess = () => resolve((req.result as FileSystemDirectoryHandle) ?? null);
+      req.onsuccess = () => resolve(req.result ?? null);
       req.onerror   = () => resolve(null);
     });
-    if (h) results.push(h);
+    if (!v) continue;
+    if (isRecentRecord(v)) {
+      results.push({ handle: v.handle, addedAt: typeof v.addedAt === "number" ? v.addedAt : null });
+    } else {
+      results.push({ handle: v as FileSystemDirectoryHandle, addedAt: null });
+    }
   }
   return results;
 }
