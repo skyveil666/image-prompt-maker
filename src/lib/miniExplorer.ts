@@ -331,10 +331,16 @@ const RECENT_RESET_FLAG = "ipm_recentDatesReset_v1";
  * 機能導入前の既存フォルダを一度だけ undated 化する（＝OS名表示に戻し「無視」する）。
  * これ以降に追加したフォルダだけが addedAt（追加日）を持つ。handle は保持（Quick Access からは消さない）。
  * localStorage フラグで1回のみ実行。clear/deleteDatabase は使わず __recent_i スロットの再書き込みのみ（非破壊）。
+ *
+ * フラグは破壊的な書き換えの「前」に立てる：idb書込後にフラグ書込だけ失敗すると次回mountで
+ * reset が再実行され、その間に新規追加された正当な addedAt まで巻き戻す事故になるため。
+ * フラグ書込（localStorage）自体が失敗する環境（quota超過/プライベートモード等）では、
+ * reset 本体を一切実行しない（安全側＝二重実行の可能性がある操作はしない）。
  */
 export async function resetRecentDatesOnce(): Promise<void> {
   try {
     if (localStorage.getItem(RECENT_RESET_FLAG)) return;
+    localStorage.setItem(RECENT_RESET_FLAG, "1");
   } catch { return; }
   const existing = await loadRecentFolders();
   const db = await openDb();
@@ -346,13 +352,32 @@ export async function resetRecentDatesOnce(): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror   = () => reject(tx.error);
   });
-  try { localStorage.setItem(RECENT_RESET_FLAG, "1"); } catch { /* ignore */ }
+}
+
+/**
+ * 既存リストの中から handle と実体が同じエントリの index を探す（isSameEntry・名前でなく実体比較）。
+ * 別の場所にある同名フォルダ（例：複数の「Photos」）を別エントリとして扱うため。
+ * isSameEntry が使えない環境のみ、従来どおり名前一致にフォールバックする。
+ */
+async function findSameEntryIndex(
+  list: RecentFolder[],
+  handle: FileSystemDirectoryHandle,
+): Promise<number> {
+  for (let i = 0; i < list.length; i++) {
+    try {
+      if (await handle.isSameEntry(list[i].handle)) return i;
+    } catch {
+      if (list[i].handle.name === handle.name) return i;
+    }
+  }
+  return -1;
 }
 
 /**
  * フォルダを Quick Access に記録する（additive・非破壊）。
  * - 新規／旧 undated：addedAt=now（＝追加した日）を付与。
- * - 既に addedAt を持つ再追加：保持し先頭へ動かさない。
+ * - 既に addedAt を持つ再追加（同一実体）：保持し先頭へ動かさない。
+ * - 別の場所にある同名フォルダは別エントリとして追加する（実体比較・M4修正）。
  * - 並びは addedAt desc（undated 末尾）で最大6件。__recent_i スロットのみ書き換える。
  */
 export async function saveRecentFolder(
@@ -360,7 +385,7 @@ export async function saveRecentFolder(
 ): Promise<void> {
   const existing = await loadRecentFolders();
   const now = Date.now();
-  const idx = existing.findIndex((r) => r.handle.name === handle.name);
+  const idx = await findSameEntryIndex(existing, handle);
   let next: RecentFolder[];
   if (idx >= 0) {
     const keptAddedAt = existing[idx].addedAt ?? now;

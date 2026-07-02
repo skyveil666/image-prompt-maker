@@ -17,6 +17,8 @@ interface FileSystemHandle {
   requestPermission(
     descriptor?: FileSystemHandlePermissionDescriptor
   ): Promise<PermissionState>;
+  /** 同一のファイルシステムエントリを指しているか（名前でなく実体で比較）。 */
+  isSameEntry(other: FileSystemHandle): Promise<boolean>;
 }
 
 interface FileSystemDirectoryHandle {

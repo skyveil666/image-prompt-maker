@@ -633,7 +633,9 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
       setFavorites(favs);
       setFavNames(new Set(favs.map((f) => f.name)));
 
-      await resetRecentDatesOnce(); // 機能導入前の既存フォルダを一度だけ undated 化（OS名表示に戻す）
+      try {
+        await resetRecentDatesOnce(); // 機能導入前の既存フォルダを一度だけ undated 化（OS名表示に戻す）
+      } catch { /* idb エラー時も下の recents/root 復元を止めない */ }
       const recent = await loadRecentFolders();
       setRecents(recent);
 
@@ -947,8 +949,8 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
                   <div className="px-3 py-1 text-[12px] uppercase tracking-widest text-text-muted/90 font-bold select-none">
                     📌 クイックアクセス
                   </div>
-                  {recents.map((r) => (
-                    <button key={r.handle.name} type="button"
+                  {recents.map((r, i) => (
+                    <button key={`${r.handle.name}-${i}`} type="button"
                       onClick={() => void handleOpenRecent(r.handle)}
                       className={["w-full flex items-center gap-1.5 px-3 h-[28px] text-left text-[13px] transition-colors hover:bg-white/[0.06] select-none",
                         rootHandle?.name === r.handle.name ? "text-accent/90 font-medium" : "text-text-muted/90 hover:text-text-base"].join(" ")}
