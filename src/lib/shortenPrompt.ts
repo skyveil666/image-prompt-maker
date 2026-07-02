@@ -24,11 +24,11 @@ const PROPOSAL_SEPARATOR = "---案区切り---";
 
 /** 【人体補正】の圧縮版（解剖補正の要点を全て保持した1行）。元の冗長な日本語＋英語重複を置換する。 */
 const SHORT_BODY_FIX =
-  "【人体補正】手指は片手5本・自然な関節・手首肘なめらか／脚・膝・足首の接地を整合／8〜9頭身・元画像の体型比率を維持／標準〜ポートレートレンズ（広角歪み・魚眼不使用）。";
+  "【人体補正】手指は片手5本・自然な関節・手首肘なめらか／脚・膝・足首の接地を整合／体型のプロポーションを元画像と同じに保ち脚や胴を縦に引き伸ばさない／標準〜ポートレートレンズ（広角歪み・魚眼不使用）。";
 
 /** 単独行の「純英語 解剖補足」を検出（日本語を含まない行のみ対象＝本文の取りこぼし防止）。 */
 const ENGLISH_BODY_FIX_RE =
-  /^(Anatomically correct|Legs:\s|Keep natural|use standard-to-portrait|do not apply (fisheye|wide)|head\/leg\/face)/i;
+  /^(Anatomically correct|Legs:\s|Keep natural|Keep body proportions|use standard-to-portrait|do not apply (fisheye|wide)|head\/leg\/face)/i;
 
 /** 日本語（かな/カナ/漢字）を含むか。含む行は本文として保持（英語補足判定から除外）。 */
 function hasJapanese(s: string): boolean {
