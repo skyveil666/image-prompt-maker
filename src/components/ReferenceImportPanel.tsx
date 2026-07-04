@@ -19,6 +19,9 @@ import type { Scope } from "../types";
 import { extractReferenceViaBackend } from "../lib/backendClient";
 import { readFileAsDataUrl } from "../lib/imageFile";
 import { useAutoResizeTextarea } from "../lib/useAutoResizeTextarea";
+import { useLatestRef } from "../lib/useLatestRef";
+import { saveReferenceRecord, updateReferenceRecord } from "../lib/referenceRecords";
+import { imageContentHash, makeThumbnail } from "../lib/imageThumb";
 
 /** 内容に合わせて高さが自動で伸びる textarea（抽出結果をスクロールせず読めるように） */
 function AutoTextarea({ value, onChange, placeholder, minRows = 4 }: {
@@ -92,6 +95,23 @@ const AUTO_SCOPE_JA: Record<string, string> = {
   lighting: "光", camera: "構図/カメラ", props: "小物", foreground: "前景",
 };
 
+// ── 🖼 参照スロット（段階1：Nスロット化の土台。最大3・最小1） ──────────────────
+/** 参照ピッカーの1スロット（画像1枚＋その抽出結果／選択／抽出中フラグ）。 */
+export interface RefSlot {
+  image: string | null;
+  fields: Record<string, string>;
+  selected: Set<string>;
+  extracting: boolean;
+  extractError: string | null;
+  autoSelecting: boolean;
+  /** 段階3：この画像を自動保存した参照履歴レコードのid（未保存はnull）。抽出完了時に同じレコードへ追記する。 */
+  recordId: string | null;
+}
+export const MAX_REF_SLOTS = 3;
+function emptySlot(): RefSlot {
+  return { image: null, fields: {}, selected: new Set(), extracting: false, extractError: null, autoSelecting: false, recordId: null };
+}
+
 interface Props {
   protections: ReferenceProtections;
   /** 現在 ON の変更対象（適用済み表示用） */
@@ -116,20 +136,49 @@ interface Props {
 
 export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, onSaveToHistory, reuseSeed, onReuseConsumed }: Props) {
   const [open, setOpen] = useState(false);
-  const [image, setImage] = useState<string | null>(null);
-  const [fields, setFields] = useState<Record<string, string>>({});
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // 🖼 段階1：最大3スロット（画像/抽出結果/選択/抽出中フラグを配列化）。段階1の適用は「アクティブスロット」1つに対して行う（既存経路不変）。
+  const [slots, setSlots] = useState<RefSlot[]>([emptySlot()]);
+  const [activeSlot, setActiveSlot] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const [note, setNote] = useState<string | null>(null);
-  const [extracting, setExtracting] = useState(false);
-  const [extractError, setExtractError] = useState<string | null>(null);
-  const [autoSelecting, setAutoSelecting] = useState(false);  // 🎯 一発「自動セット」（内部抽出含む）処理中フラグ
   const [lightbox, setLightbox] = useState(false);
   const [showJson, setShowJson] = useState(false);
   const [othersOpen, setOthersOpen] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // アクティブスロットの値を既存の変数名で導出（下の関数群・JSXは単一画像時代とほぼ同じコードのまま動く）。
+  const current = slots[activeSlot] ?? emptySlot();
+  const { image, fields, selected, extracting, extractError, autoSelecting } = current;
+  // 段階3：抽出完了時に recordId を最新値で読むための ref（自動保存の非同期完了と抽出のタイミングが
+  // 前後してもレースなく正しいレコードへ追記できるようにする）。
+  const slotsRef = useLatestRef(slots);
+
+  /** 指定スロットを部分更新する（配列の該当indexだけ差し替え・他スロットは不変）。 */
+  const updateSlot = useCallback((index: number, patch: Partial<RefSlot> | ((s: RefSlot) => Partial<RefSlot>)) => {
+    setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, ...(typeof patch === "function" ? patch(s) : patch) } : s)));
+  }, []);
+
+  /** スロットを追加（最大3）。追加したスロットをアクティブにする。 */
+  const addSlot = useCallback(() => {
+    setSlots((prev) => {
+      if (prev.length >= MAX_REF_SLOTS) return prev;
+      const next = [...prev, emptySlot()];
+      setActiveSlot(next.length - 1);
+      return next;
+    });
+  }, []);
+
+  /** スロットを削除（最小1）。削除後もアクティブ index が範囲内に収まるよう調整する。 */
+  const removeSlot = useCallback((index: number) => {
+    setSlots((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((_, i) => i !== index);
+      setActiveSlot((cur) => Math.min(cur > index ? cur - 1 : cur, next.length - 1));
+      return next;
+    });
+  }, []);
 
   const currentJson = REFERENCE_CATEGORIES.reduce<Record<string, string>>((acc, c) => {
     acc[c.key] = (fields[c.key] ?? "").trim();
@@ -156,24 +205,50 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   // token が変わるたびに再実行（同一レコードの再利用も拾う）。適用はユーザーが従来どおり押す＝適用ロジック不変。
   useEffect(() => {
     if (!reuseSeed) return;
-    setImage(reuseSeed.image);
-    setFields(() => {
-      const next: Record<string, string> = {};
-      for (const c of REFERENCE_CATEGORIES) next[c.key] = (reuseSeed.extracted[c.key] ?? "").trim();
-      return next;
-    });
-    setSelected(new Set());
+    const next: Record<string, string> = {};
+    for (const c of REFERENCE_CATEGORIES) next[c.key] = (reuseSeed.extracted[c.key] ?? "").trim();
+    // 履歴は単一画像レコード（段階1）＝スロットを1件にリセットして流し込む。
+    // recordId は紐付けない（reuseSeed.image はサムネであり元画像と contentHash が一致しない場合があるため、
+    // 再度お気に入り登録すれば新規レコードとして安全に保存される＝データ破壊なし）。
+    setSlots([{ image: reuseSeed.image, fields: next, selected: new Set(), extracting: false, extractError: null, autoSelecting: false, recordId: null }]);
+    setActiveSlot(0);
     setOpen(true);
     flash("♻ 履歴から再利用しました。内容を確認し「適用」で反映してください。");
     onReuseConsumed?.(); // 親が seed を null に戻す＝再マウント時の二重注入防止
   }, [reuseSeed, flash, onReuseConsumed]);
 
+  /** 段階3：画像をスロットへセットした直後に「Reference Picker履歴」へ自動保存する（入れた瞬間の自動保存）。
+   *  contentHash で dedup（同じ画像を入れ直しても新規レコードを作らない・saveReferenceRecord側で判定）。
+   *  抽出前のため extracted は空で保存し、抽出が完了したら同じレコードへ追記する（runExtract/handleAutoSelectFromReference）。
+   *  失敗してもピッカーの操作は妨げない（ベストエフォート・トースト無し＝自動保存は静かに行う）。 */
+  const autoSaveSlotImage = useCallback(async (slotIndex: number, image: string) => {
+    try {
+      const [refThumb, contentHash] = await Promise.all([makeThumbnail(image), imageContentHash(image)]);
+      const id = await saveReferenceRecord({
+        refThumb,
+        contentHash,
+        extracted: {},
+        applied: {},
+        batchId: "",
+        kind: "picker",
+      });
+      updateSlot(slotIndex, { recordId: id });
+    } catch {
+      /* 自動保存の失敗はピッカー操作を止めない */
+    }
+  }, [updateSlot]);
+
   const loadFile = useCallback((file: File) => {
     if (!file.type.startsWith("image/")) { flash("画像ファイルを入れてください"); return; }
+    // 取り込んだ画像は「アクティブスロット」へ入る（スロット・ストリップで切り替えて別スロットへ入れる）。
     readFileAsDataUrl(file)
-      .then((url) => { setImage(url); setOpen(true); })
+      .then((url) => {
+        updateSlot(activeSlot, { image: url, recordId: null }); // 新しい画像＝前の recordId はリセット
+        setOpen(true);
+        void autoSaveSlotImage(activeSlot, url); // 入れた瞬間に自動保存（段階3）
+      })
       .catch(() => flash("画像の読み込みに失敗しました"));
-  }, [flash]);
+  }, [flash, activeSlot, updateSlot, autoSaveSlotImage]);
 
   // Ctrl+V / Cmd+V / スクショ貼付（クリップボードに画像がある時だけ作動・テキスト貼付は妨げない）
   // ピッカーが open の時だけ購読する（閉じている間は貼付を生成用 ImageUploader に渡す）。
@@ -218,8 +293,12 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     }
   }, [loadFile, flash]);
 
-  const setField = (k: string, v: string) => setFields((p) => ({ ...p, [k]: v }));
-  const toggleSel = (k: string) => setSelected((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  const setField = (k: string, v: string) => updateSlot(activeSlot, (s) => ({ fields: { ...s.fields, [k]: v } }));
+  const toggleSel = (k: string) => updateSlot(activeSlot, (s) => {
+    const n = new Set(s.selected);
+    n.has(k) ? n.delete(k) : n.add(k);
+    return { selected: n };
+  });
 
   /** 1カテゴリを適用（空文字・ロック時はスキップ）。適用できたら true。 */
   const applyOne = useCallback((catKey: string): boolean => {
@@ -251,11 +330,10 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   }, [fields, protections, applyOne, flash]);
 
   const clearAll = useCallback(() => {
-    setFields({});
-    setSelected(new Set());
+    updateSlot(activeSlot, { fields: {}, selected: new Set() });
     onClearAll();
     flash("参照反映を全解除しました");
-  }, [onClearAll, flash]);
+  }, [activeSlot, updateSlot, onClearAll, flash]);
 
   /** 現在の13カテゴリ欄を JSON にしてコピー（抽出結果の比較・共有用） */
   const copyJson = useCallback(() => {
@@ -287,32 +365,39 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     }
   }, [image, onSaveToHistory, saving, flash]);
 
-  /** Gemini Vision で参照画像を解析し、13カテゴリ欄を実抽出結果で埋める。 */
+  /** Gemini Vision で「アクティブスロット」の参照画像を解析し、そのスロットの13カテゴリ欄を実抽出結果で埋める。
+   *  slotIndex は呼び出し時（＝ボタン押下時）に確定するため、実行中にユーザーが別スロットへ切り替えても
+   *  結果は元のスロットへ正しく反映される（他スロットの独立抽出と混線しない・各スロット1回=1呼び出し）。 */
   const runExtract = useCallback(async () => {
-    if (!image) { flash("先に参照画像を貼ってください"); return; }
-    setExtracting(true);
-    setExtractError(null);
+    const slotIndex = activeSlot;
+    const slot = slots[slotIndex];
+    if (!slot?.image) { flash("先に参照画像を貼ってください"); return; }
+    const img = slot.image;
+    updateSlot(slotIndex, { extracting: true, extractError: null });
     try {
-      const { elements, missingRequired } = await extractReferenceViaBackend(image);
+      const { elements, missingRequired } = await extractReferenceViaBackend(img);
       // 実抽出結果で各欄を上書き（空文字のカテゴリは空のまま＝でっち上げない）
-      setFields(() => {
-        const next: Record<string, string> = {};
-        for (const c of REFERENCE_CATEGORIES) next[c.key] = (elements[c.key] ?? "").trim();
-        return next;
-      });
+      const nextFields = REFERENCE_CATEGORIES.reduce<Record<string, string>>((acc, c) => {
+        acc[c.key] = (elements[c.key] ?? "").trim();
+        return acc;
+      }, {});
+      updateSlot(slotIndex, { fields: nextFields });
+      // 段階3：入れた瞬間に自動保存済みのレコードがあれば、抽出結果をそこへ追記（新規レコードは作らない）。
+      const recordId = slotsRef.current[slotIndex]?.recordId;
+      if (recordId) void updateReferenceRecord(recordId, { extracted: nextFields });
       flash(
         missingRequired.length > 0
-          ? `抽出しました。${missingRequired.length}件の必須カテゴリが空でした。手入力で補ってください。`
-          : "参照画像から抽出しました。内容を確認し「○○に適用」で反映してください。",
+          ? `スロット${slotIndex + 1}：抽出しました。${missingRequired.length}件の必須カテゴリが空でした。手入力で補ってください。`
+          : `スロット${slotIndex + 1}：参照画像から抽出しました。内容を確認し「○○に適用」で反映してください。`,
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setExtractError(msg);
-      flash(`抽出に失敗：${msg}`);
+      updateSlot(slotIndex, { extractError: msg });
+      flash(`スロット${slotIndex + 1}：抽出に失敗：${msg}`);
     } finally {
-      setExtracting(false);
+      updateSlot(slotIndex, { extracting: false });
     }
-  }, [image, flash]);
+  }, [activeSlot, slots, flash, updateSlot]);
 
   /** 🎯 抽出済み fields(src) から変更対象 scope を固定優先度で最大5個選び、案B（scope UNION追加＋note注入）で一括適用。
    *  ★onApply(=handleApplyReference) 経由＝保護ゲート＋scope ON(UNION)＋referenceNote のみ。setDetails/place は一切呼ばない（温室回避）。
@@ -352,31 +437,36 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     flash(parts.join(" ／ "));
   }, [protections, onApply, flash]);
 
-  /** 🎯 一発：参照画像→変更対象を自動セット。未抽出なら内部で抽出してから（真の一発・spinner・連打防止）。
-   *  失敗時は scope 不変でトースト通知（フォールバック）。§4(referenceExtract)・§3データ層 不触・既存 API を呼ぶのみ。 */
+  /** 🎯 一発：「アクティブスロット」の参照画像→変更対象を自動セット。未抽出なら内部で抽出してから（真の一発・spinner・連打防止）。
+   *  失敗時は scope 不変でトースト通知（フォールバック）。§4(referenceExtract)・§3データ層 不触・既存 API を呼ぶのみ。
+   *  slotIndex は呼び出し時に確定＝実行中に別スロットへ切り替えても結果は元のスロットへ正しく反映される。 */
   const handleAutoSelectFromReference = useCallback(async () => {
-    if (!image) { flash("先に参照画像を貼ってください"); return; }
-    if (autoSelecting || extracting) return;
+    const slotIndex = activeSlot;
+    const slot = slots[slotIndex];
+    if (!slot?.image) { flash("先に参照画像を貼ってください"); return; }
+    if (slot.autoSelecting || slot.extracting) return;
     // 抽出済み（scope付きカテゴリに text が1つでもある）ならそのまま自動セット
-    const hasExtracted = REFERENCE_CATEGORIES.some((c) => c.scope != null && (fields[c.key] ?? "").trim());
-    if (hasExtracted) { autoSelectFromFields(fields); return; }
+    const hasExtracted = REFERENCE_CATEGORIES.some((c) => c.scope != null && (slot.fields[c.key] ?? "").trim());
+    if (hasExtracted) { autoSelectFromFields(slot.fields); return; }
     // 未抽出 → 内部で抽出してから自動セット（state 反映待ちを避け、抽出値 next を直接渡す）
-    setAutoSelecting(true);
-    setExtractError(null);
+    updateSlot(slotIndex, { autoSelecting: true, extractError: null });
     try {
-      const { elements } = await extractReferenceViaBackend(image);
+      const { elements } = await extractReferenceViaBackend(slot.image);
       const next: Record<string, string> = {};
       for (const c of REFERENCE_CATEGORIES) next[c.key] = (elements[c.key] ?? "").trim();
-      setFields(next);
+      updateSlot(slotIndex, { fields: next });
+      // 段階3：自動保存済みレコードがあれば抽出結果を追記（新規レコードは作らない）。
+      const recordId = slotsRef.current[slotIndex]?.recordId;
+      if (recordId) void updateReferenceRecord(recordId, { extracted: next });
       autoSelectFromFields(next);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      setExtractError(msg);
+      updateSlot(slotIndex, { extractError: msg });
       flash(`自動セットに失敗：${msg}`);  // scope 不変のフォールバック
     } finally {
-      setAutoSelecting(false);
+      updateSlot(slotIndex, { autoSelecting: false });
     }
-  }, [image, autoSelecting, extracting, fields, autoSelectFromFields, flash]);
+  }, [activeSlot, slots, autoSelectFromFields, flash, updateSlot]);
 
   // 優先6カテゴリ（常時展開）／その他（折りたたみ）
   const PRIORITY_KEYS = ["background", "outfit", "pose", "hair", "composition", "lighting"];
@@ -510,7 +600,57 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
             </button>
           </div>
         )}
-        {/* 取り込みエリア */}
+        {/* 🖼 スロット・ストリップ（段階1：最大3・追加/削除・サムネ・抽出中インジケータ）。
+            クリックでアクティブスロットを切り替え、下の取り込みエリア／抽出ボタンはアクティブスロットに対して動作する。 */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {slots.map((s, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setActiveSlot(i)}
+              title={`スロット${i + 1}${s.image ? "" : "（空）"}${i === activeSlot ? "・選択中" : ""}`}
+              className={[
+                "relative w-11 h-11 rounded-lg border overflow-hidden shrink-0 transition",
+                i === activeSlot ? "border-violet-400 ring-2 ring-violet-400/50" : "border-bg-border hover:border-violet-400/40",
+              ].join(" ")}
+            >
+              {s.image ? (
+                <img src={s.image} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="flex items-center justify-center w-full h-full text-[11px] text-text-muted/55 bg-bg-base/40">{i + 1}</span>
+              )}
+              {(s.extracting || s.autoSelecting) && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45">
+                  <span className="w-2 h-2 rounded-full bg-violet-200 animate-pulse" />
+                </span>
+              )}
+              {slots.length > 1 && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); removeSlot(i); }}
+                  title="このスロットを削除"
+                  className="absolute top-0 right-0 w-3.5 h-3.5 flex items-center justify-center bg-black/65 text-white text-[9px] leading-none rounded-bl hover:bg-rose-500/80 transition"
+                >✕</span>
+              )}
+            </button>
+          ))}
+          {slots.length < MAX_REF_SLOTS && (
+            <button
+              type="button"
+              onClick={addSlot}
+              title="参照画像スロットを追加（最大3）"
+              className="w-11 h-11 rounded-lg border border-dashed border-bg-border flex items-center justify-center text-[16px] text-text-muted/55 hover:text-text-base hover:border-violet-400/50 transition shrink-0"
+            >＋</button>
+          )}
+          {slots.length > 1 && (
+            <span className="text-[10px] text-text-muted/60 leading-tight">
+              スロット{activeSlot + 1}/{slots.length}を編集中・各スロットは個別に抽出します（{slots.length}枚なら{slots.length}回のAPI呼び出し）
+            </span>
+          )}
+        </div>
+
+        {/* 取り込みエリア（アクティブスロットに対して動作） */}
         <div
           onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -528,7 +668,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
               <div className="flex items-center justify-center gap-2">
                 <button type="button" onClick={() => fileRef.current?.click()}
                   className="text-[11px] px-2 py-0.5 rounded border border-bg-border bg-bg-panel text-text-muted hover:text-text-base transition">画像を変更</button>
-                <button type="button" onClick={() => setImage(null)}
+                <button type="button" onClick={() => updateSlot(activeSlot, { image: null })}
                   className="text-[11px] px-2 py-0.5 rounded border border-rose-400/35 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition">画像を外す</button>
               </div>
             </div>
