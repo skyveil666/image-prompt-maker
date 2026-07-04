@@ -2089,21 +2089,21 @@ export default function App() {
         )}
       </main>
 
-      {/* 🖼 参照画像 / 要素抽出 右側固定パネル（fixed・新規要素・main view のみ） */}
-      {view === "main" && (
-        <ReferenceImportPanel
-          protections={{ bodyPoseLock, compositionLock, colorMoodLock }}
-          activeScopes={scopes}
-          appliedNote={referenceNote}
-          onApply={handleApplyReference}
-          onClearAll={handleClearReference}
-          onContextChange={handleReferenceContextChange}
-          onOpenCompare={() => setCompareOpen(true)}
-          onSaveToHistory={handleSaveReferenceToHistory}
-          reuseSeed={referenceReuseSeed}
-          onReuseConsumed={handleReuseConsumed}
-        />
-      )}
+      {/* 🖼 参照画像 / 要素抽出 右側固定パネル（fixed・新規要素）。
+          常時マウントし visible で表示/非表示のみ切替（history等でのアンマウント→state初期化を防止）。 */}
+      <ReferenceImportPanel
+        visible={view === "main"}
+        protections={{ bodyPoseLock, compositionLock, colorMoodLock }}
+        activeScopes={scopes}
+        appliedNote={referenceNote}
+        onApply={handleApplyReference}
+        onClearAll={handleClearReference}
+        onContextChange={handleReferenceContextChange}
+        onOpenCompare={() => setCompareOpen(true)}
+        onSaveToHistory={handleSaveReferenceToHistory}
+        reuseSeed={referenceReuseSeed}
+        onReuseConsumed={handleReuseConsumed}
+      />
 
       {/* 🆚 Compare Mode（参照↔生成 比較・全幅ビュー） */}
       <CompareModeView open={compareOpen} onClose={() => setCompareOpen(false)} onReuse={handleReuseReference} />

@@ -112,6 +112,11 @@ function emptySlot(): RefSlot {
 }
 
 interface Props {
+  /** true=main view（表示）／false=history等の他view（非表示・アンマウントしない＝state保持）。
+   *  旧実装は親側 {view==="main" && <Panel/>} の条件付きレンダーで、view切替のたびに
+   *  本コンポーネントがアンマウント→再マウントされ全state（slots等）が初期化されていた。
+   *  常時マウント＋本フラグで見た目だけ隠す方式に変更（state破棄バグの修正）。 */
+  visible: boolean;
   protections: ReferenceProtections;
   /** 現在 ON の変更対象（適用済み表示用） */
   activeScopes: Scope[];
@@ -135,7 +140,7 @@ interface Props {
   onReuseConsumed?: () => void;
 }
 
-export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, reuseSeed, onReuseConsumed }: Props) {
+export function ReferenceImportPanel({ visible, protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, reuseSeed, onReuseConsumed }: Props) {
   const [open, setOpen] = useState(false);
   // 🖼 段階1：最大3スロット（画像/抽出結果/抽出中フラグを配列化）。
   const [slots, setSlots] = useState<RefSlot[]>([emptySlot()]);
@@ -287,7 +292,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   // 画像を処理する時は capture フェーズで先取りし、stopImmediatePropagation で
   // ImageUploader（window/bubble）等の他リスナーへの伝播を止める＝左の画像選択欄への二重ロードを防ぐ。
   useEffect(() => {
-    if (!open) return;
+    if (!visible || !open) return;
     const onPaste = (e: ClipboardEvent) => {
       const items = e.clipboardData?.items;
       if (!items) return;
@@ -301,7 +306,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     };
     window.addEventListener("paste", onPaste, true);
     return () => window.removeEventListener("paste", onPaste, true);
-  }, [open, loadFile]);
+  }, [visible, open, loadFile]);
 
   // 右クリック→独自メニュー「貼り付け」。navigator.clipboard.read() で画像を取得（ユーザー操作起点）。
   // 権限拒否・未対応・画像なし等で失敗したら Ctrl+V を案内（Ctrl+V は常に有効＝二重化）。
@@ -600,6 +605,9 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
       </div>
     );
   };
+
+  // ── 非表示（history等の他view）：アンマウントせず見た目だけ隠す（state保持） ──────
+  if (!visible) return null;
 
   // ── 折りたたみハンドル ────────────────────────────────────────────
   if (!open) {
