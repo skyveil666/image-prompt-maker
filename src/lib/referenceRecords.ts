@@ -27,6 +27,10 @@ export interface ReferenceRecord {
   createdAt: number;
   /** 参照画像サムネ（dataURL・makeThumbnail で圧縮済み） */
   refThumb: string;
+  /** 段階1：Nスロット対応の器（optional・現状は未使用＝書き込み側は追加しない）。
+   *  段階2でスロット別サムネ＋カテゴリごとの抽出元スロット index（imageSourceMap 等）を運用する。
+   *  既存レコード（refThumb 単一）は本フィールド無しのまま後方互換で読める。 */
+  refThumbs?: string[];
   /** Gemini 抽出の13カテゴリ（cat -> テキスト） */
   extracted: Record<string, string>;
   /** 実際に適用した軸（referenceNote：cat -> テキスト） */
@@ -56,8 +60,8 @@ export interface ReferenceRecord {
   note?: string;
 }
 
-/** 参照レコード保持上限（古いものから間引く。サムネ込みなので控えめ） */
-const MAX_RECORDS = 500;
+/** 参照レコード保持上限（非favoriteのみでカウント。古いものから間引く。サムネ込みなので控えめ）。 */
+const MAX_RECORDS = 50;
 /** ID 重複防止用の連番（同一 ms に複数記録されても衝突しない） */
 let seq = 0;
 
@@ -86,11 +90,16 @@ export async function saveReferenceRecord(
   }
 }
 
+/**
+ * 上限超過分を古い順に間引く。★favorite=true は件数カウント・削除対象の両方から除外（保護）。
+ * 非favoriteレコードだけを createdAt desc で並べ、上限を超えた古いものだけ削除する。
+ */
 async function pruneIfNeeded(): Promise<void> {
   try {
     const all = await getAll<ReferenceRecord>(STORE_REFERENCE_RECORDS);
-    if (all.length <= MAX_RECORDS) return;
-    const sorted = all.sort((a, b) => b.createdAt - a.createdAt);
+    const nonFavorite = all.filter((r) => !r.favorite);
+    if (nonFavorite.length <= MAX_RECORDS) return;
+    const sorted = nonFavorite.sort((a, b) => b.createdAt - a.createdAt);
     const toRemove = sorted.slice(MAX_RECORDS);
     await Promise.all(toRemove.map((e) => remove(STORE_REFERENCE_RECORDS, e.id)));
   } catch {
