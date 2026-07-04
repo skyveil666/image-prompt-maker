@@ -100,7 +100,6 @@ const AUTO_SCOPE_JA: Record<string, string> = {
 export interface RefSlot {
   image: string | null;
   fields: Record<string, string>;
-  selected: Set<string>;
   extracting: boolean;
   extractError: string | null;
   autoSelecting: boolean;
@@ -109,7 +108,7 @@ export interface RefSlot {
 }
 export const MAX_REF_SLOTS = 3;
 function emptySlot(): RefSlot {
-  return { image: null, fields: {}, selected: new Set(), extracting: false, extractError: null, autoSelecting: false, recordId: null };
+  return { image: null, fields: {}, extracting: false, extractError: null, autoSelecting: false, recordId: null };
 }
 
 interface Props {
@@ -138,9 +137,13 @@ interface Props {
 
 export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, reuseSeed, onReuseConsumed }: Props) {
   const [open, setOpen] = useState(false);
-  // 🖼 段階1：最大3スロット（画像/抽出結果/選択/抽出中フラグを配列化）。段階1の適用は「アクティブスロット」1つに対して行う（既存経路不変）。
+  // 🖼 段階1：最大3スロット（画像/抽出結果/抽出中フラグを配列化）。
   const [slots, setSlots] = useState<RefSlot[]>([emptySlot()]);
   const [activeSlot, setActiveSlot] = useState(0);
+  // 🖼 段階2：要素ごとの横断選択。catKey → どのスロットindexから取るか（未指定＝activeSlotへフォールバック）。
+  const [catSlotMap, setCatSlotMap] = useState<Record<string, number>>({});
+  // 段階2：チェックボックス選択はカテゴリ単位の概念（スロットに紐付かない）＝トップレベルへ昇格。
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
   const [dragOver, setDragOver] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState(false);
@@ -152,10 +155,23 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
 
   // アクティブスロットの値を既存の変数名で導出（下の関数群・JSXは単一画像時代とほぼ同じコードのまま動く）。
   const current = slots[activeSlot] ?? emptySlot();
-  const { image, fields, selected, extracting, extractError, autoSelecting } = current;
+  const { image, fields, extracting, extractError, autoSelecting } = current;
   // 段階3：抽出完了時に recordId を最新値で読むための ref（自動保存の非同期完了と抽出のタイミングが
   // 前後してもレースなく正しいレコードへ追記できるようにする）。
   const slotsRef = useLatestRef(slots);
+
+  /** 段階2：catKey が実際にどのスロットindexから取られるか解決する（未指定・範囲外はactiveSlotへフォールバック）。 */
+  const resolveCatSlotIndex = useCallback((catKey: string): number => {
+    const mapped = catSlotMap[catKey];
+    if (mapped != null && mapped < slots.length) return mapped;
+    return activeSlot;
+  }, [catSlotMap, activeSlot, slots.length]);
+
+  /** 段階2：catKey の実効テキスト（解決したスロットのfields[catKey]）。 */
+  const resolveCatText = useCallback((catKey: string): string => {
+    const slotIndex = resolveCatSlotIndex(catKey);
+    return (slots[slotIndex]?.fields[catKey] ?? "").trim();
+  }, [slots, resolveCatSlotIndex]);
 
   /** 指定スロットを部分更新する（配列の該当indexだけ差し替え・他スロットは不変）。 */
   const updateSlot = useCallback((index: number, patch: Partial<RefSlot> | ((s: RefSlot) => Partial<RefSlot>)) => {
@@ -172,7 +188,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     });
   }, []);
 
-  /** スロットを削除（最小1）。削除後もアクティブ index が範囲内に収まるよう調整する。 */
+  /** スロットを削除（最小1）。削除後もアクティブ index・横断選択マップが範囲内に収まるよう調整する。 */
   const removeSlot = useCallback((index: number) => {
     setSlots((prev) => {
       if (prev.length <= 1) return prev;
@@ -180,10 +196,21 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
       setActiveSlot((cur) => Math.min(cur > index ? cur - 1 : cur, next.length - 1));
       return next;
     });
+    // 段階2：削除したindexを指していた横断選択はactiveSlotへフォールバック（削除）。
+    // 削除indexより後ろを指していた分は配列シフトに合わせて1つ詰める。
+    setCatSlotMap((prev) => {
+      const next: Record<string, number> = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (v === index) continue;
+        next[k] = v > index ? v - 1 : v;
+      }
+      return next;
+    });
   }, []);
 
+  // 段階2：JSON確認/コピーは「実際に適用される組み合わせ」＝各カテゴリの解決済みテキストを表示する。
   const currentJson = REFERENCE_CATEGORIES.reduce<Record<string, string>>((acc, c) => {
-    acc[c.key] = (fields[c.key] ?? "").trim();
+    acc[c.key] = resolveCatText(c.key);
     return acc;
   }, {});
 
@@ -212,8 +239,11 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     // 履歴は単一画像レコード（段階1）＝スロットを1件にリセットして流し込む。
     // recordId は紐付けない（reuseSeed.image はサムネであり元画像と contentHash が一致しない場合があるため、
     // 再度お気に入り登録すれば新規レコードとして安全に保存される＝データ破壊なし）。
-    setSlots([{ image: reuseSeed.image, fields: next, selected: new Set(), extracting: false, extractError: null, autoSelecting: false, recordId: null }]);
+    setSlots([{ image: reuseSeed.image, fields: next, extracting: false, extractError: null, autoSelecting: false, recordId: null }]);
     setActiveSlot(0);
+    // 段階2：単一スロットへ戻すため、古い横断選択マップ・チェック選択はリセット（既定＝スロット1）。
+    setCatSlotMap({});
+    setSelectedCats(new Set());
     setOpen(true);
     flash("♻ 履歴から再利用しました。内容を確認し「適用」で反映してください。");
     onReuseConsumed?.(); // 親が seed を null に戻す＝再マウント時の二重注入防止
@@ -295,52 +325,60 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     }
   }, [loadFile, flash]);
 
-  const setField = (k: string, v: string) => updateSlot(activeSlot, (s) => ({ fields: { ...s.fields, [k]: v } }));
-  const toggleSel = (k: string) => updateSlot(activeSlot, (s) => {
-    const n = new Set(s.selected);
+  // 段階2：編集は「そのカテゴリの解決済みソーススロット」へ書き込む（activeSlotではない場合がある）。
+  const setField = (k: string, v: string) => {
+    const slotIndex = resolveCatSlotIndex(k);
+    updateSlot(slotIndex, (s) => ({ fields: { ...s.fields, [k]: v } }));
+  };
+  const toggleSel = (k: string) => setSelectedCats((p) => {
+    const n = new Set(p);
     n.has(k) ? n.delete(k) : n.add(k);
-    return { selected: n };
+    return n;
   });
 
-  /** 1カテゴリを適用（空文字・ロック時はスキップ）。適用できたら true。 */
+  /** 1カテゴリを適用（空文字・ロック時はスキップ）。適用できたら true。
+   *  段階2：text の出所は「そのカテゴリに選ばれたスロット」の抽出結果（resolveCatText）。
+   *  ★handleApplyReference(catKey, text) のシグネチャ・安全経路は不変＝出所が増えるだけ。 */
   const applyOne = useCallback((catKey: string): boolean => {
     const cat = REFERENCE_CATEGORIES.find((c) => c.key === catKey);
     if (!cat) return false;
-    const text = (fields[catKey] ?? "").trim();
+    const text = resolveCatText(catKey);
     if (!text) { flash(`「${cat.label}」に内容がありません`); return false; }
     if (referenceLockReason(cat, protections)) { flash(referenceLockReason(cat, protections)!); return false; }
     return onApply(catKey, text);
-  }, [fields, protections, onApply, flash]);
+  }, [resolveCatText, protections, onApply, flash]);
 
   const applySelected = useCallback(() => {
-    const keys = REFERENCE_CATEGORIES.filter((c) => selected.has(c.key)).map((c) => c.key);
+    const keys = REFERENCE_CATEGORIES.filter((c) => selectedCats.has(c.key)).map((c) => c.key);
     if (keys.length === 0) { flash("適用する項目を選択してください"); return; }
     let n = 0;
     for (const k of keys) if (applyOne(k)) n++;
     flash(n > 0 ? `${n}件を適用しました` : "適用できる項目がありませんでした");
-  }, [selected, applyOne, flash]);
+  }, [selectedCats, applyOne, flash]);
 
-  /** text 有り・非ロックの全カテゴリへ一括適用（適用は既存 applyOne を再利用＝適用ロジック不変）。 */
+  /** text 有り・非ロックの全カテゴリへ一括適用（適用は既存 applyOne を再利用＝適用ロジック不変）。
+   *  段階2：各カテゴリは選ばれたスロットのテキストで判定・適用される。 */
   const applyAll = useCallback(() => {
     const keys = REFERENCE_CATEGORIES
-      .filter((c) => (fields[c.key] ?? "").trim() && !referenceLockReason(c, protections))
+      .filter((c) => resolveCatText(c.key) && !referenceLockReason(c, protections))
       .map((c) => c.key);
     if (keys.length === 0) { flash("適用できる項目がありません"); return; }
     let n = 0;
     for (const k of keys) if (applyOne(k)) n++;
     flash(n > 0 ? `${n}件をすべて適用しました` : "適用できる項目がありませんでした");
-  }, [fields, protections, applyOne, flash]);
+  }, [resolveCatText, protections, applyOne, flash]);
 
   const clearAll = useCallback(() => {
-    updateSlot(activeSlot, { fields: {}, selected: new Set() });
+    updateSlot(activeSlot, { fields: {} });
+    setSelectedCats(new Set());
     onClearAll();
     flash("参照反映を全解除しました");
   }, [activeSlot, updateSlot, onClearAll, flash]);
 
-  /** 現在の13カテゴリ欄を JSON にしてコピー（抽出結果の比較・共有用） */
+  /** 現在の13カテゴリ欄を JSON にしてコピー（抽出結果の比較・共有用・段階2＝解決済みの組み合わせ） */
   const copyJson = useCallback(() => {
     const obj: Record<string, string> = {};
-    for (const c of REFERENCE_CATEGORIES) obj[c.key] = (fields[c.key] ?? "").trim();
+    for (const c of REFERENCE_CATEGORIES) obj[c.key] = resolveCatText(c.key);
     const json = JSON.stringify(obj, null, 2);
     if (navigator.clipboard?.writeText) {
       navigator.clipboard.writeText(json).then(
@@ -350,7 +388,7 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     } else {
       window.prompt("抽出JSON（コピーしてください）", json);
     }
-  }, [fields, flash]);
+  }, [resolveCatText, flash]);
 
   /** ⭐ 段階4：現在のアクティブスロットの参照履歴レコードをお気に入り登録する（旧「📌 履歴に保存」ボタンを転用）。
    *  画像は入れた瞬間（loadFile→autoSaveSlotImage）に既に自動保存済み＝ここでは favorite:true を立てるだけ。
@@ -493,15 +531,18 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
   const priorityCats = REFERENCE_CATEGORIES.filter((c) => PRIORITY_KEYS.includes(c.key));
   const otherCats = REFERENCE_CATEGORIES.filter((c) => !PRIORITY_KEYS.includes(c.key));
 
-  /** 抽出済みだが未適用（text有り・未適用・非ロック）＝「適用押し忘れ」候補。 */
+  /** 抽出済みだが未適用（text有り・未適用・非ロック）＝「適用押し忘れ」候補。段階2：解決済みテキストで判定。 */
   const unappliedCats = REFERENCE_CATEGORIES.filter(
-    (c) => (fields[c.key] ?? "").trim() && appliedNote[c.key] == null && !referenceLockReason(c, protections),
+    (c) => resolveCatText(c.key) && appliedNote[c.key] == null && !referenceLockReason(c, protections),
   );
 
-  /** カテゴリ別カード（状態バッジ：未適用/適用済み/保護で適用不可） */
+  /** カテゴリ別カード（状態バッジ：未適用/適用済み/保護で適用不可）。
+   *  段階2：スロットが2枚以上ある時だけ「どのスロットから取るか」の小セレクタを表示する。 */
   const renderCard = (cat: ReferenceCategory) => {
+    const srcSlotIndex = resolveCatSlotIndex(cat.key);
+    const text = resolveCatText(cat.key);
     const lockReason = referenceLockReason(cat, protections);
-    const hasText = (fields[cat.key] ?? "").trim().length > 0;
+    const hasText = text.length > 0;
     const applied = appliedNote[cat.key] != null;
     const scopeOn = cat.scope != null && activeScopes.includes(cat.scope);
     const status = lockReason
@@ -521,16 +562,30 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
           : "border-bg-border bg-bg-base/40",
       ].join(" ")}>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <input type="checkbox" checked={selected.has(cat.key)} onChange={() => toggleSel(cat.key)}
+          <input type="checkbox" checked={selectedCats.has(cat.key)} onChange={() => toggleSel(cat.key)}
             disabled={!!lockReason} className="accent-violet-400 disabled:opacity-40" />
           <span className="text-[12px] font-bold text-text-base">{cat.label}</span>
           <span className={["text-[9px] px-1.5 py-0.5 rounded-full border leading-none", status.cls].join(" ")}>{status.text}</span>
           {cat.scope && scopeOn && (
             <span className="text-[9px] px-1 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 text-emerald-200 leading-none">変更対象ON</span>
           )}
+          {slots.length > 1 && (
+            <select
+              value={srcSlotIndex}
+              onChange={(e) => setCatSlotMap((prev) => ({ ...prev, [cat.key]: Number(e.target.value) }))}
+              title={`「${cat.label}」をどのスロット（画像）から取るか`}
+              className="ml-auto text-[9px] px-1 py-0.5 rounded border border-sky-400/40 bg-sky-500/10 text-sky-100"
+            >
+              {slots.map((s, i) => (
+                <option key={i} value={i}>
+                  スロット{i + 1}{(s.fields[cat.key] ?? "").trim() ? "" : "（空）"}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <AutoTextarea
-          value={fields[cat.key] ?? ""}
+          value={text}
           onChange={(v) => setField(cat.key, v)}
           placeholder={cat.placeholder}
           minRows={["background", "outfit", "pose"].includes(cat.key) ? 6 : 4}
