@@ -27,6 +27,8 @@ export interface ReferenceRecord {
   createdAt: number;
   /** 参照画像サムネ（dataURL・makeThumbnail で圧縮済み） */
   refThumb: string;
+  /** 画像の内容ハッシュ（imageContentHash）。段階3：同一画像の重複保存を防ぐdedupキー（optional・後方互換）。 */
+  contentHash?: string;
   /** 段階1：Nスロット対応の器（optional・現状は未使用＝書き込み側は追加しない）。
    *  段階2でスロット別サムネ＋カテゴリごとの抽出元スロット index（imageSourceMap 等）を運用する。
    *  既存レコード（refThumb 単一）は本フィールド無しのまま後方互換で読める。 */
@@ -69,14 +71,27 @@ let seq = 0;
 export type ReferenceRecordInput = Omit<ReferenceRecord, "id" | "createdAt">;
 
 /**
- * 参照レコードを1件保存する。失敗しても生成フローを止めないため握りつぶす。
- * 戻り値：保存できた id（失敗時 null）。
+ * 参照レコードを1件保存する（段階3：contentHash dedup対応）。
+ * - rec.contentHash が指定され、同じ contentHash を持つ既存レコードがあれば、新規作成せず
+ *   その既存レコードの createdAt だけ更新して返す（recentImages.ts と同じ「先勝ち更新」パターン。
+ *   extracted/applied 等の他フィールドは書き換えない）。
+ * - contentHash 未指定（既存呼び出し元）は従来どおり常に新規作成＝完全後方互換。
+ * - 失敗しても生成フローを止めないため握りつぶす。
+ * 戻り値：保存/更新できた id（失敗時 null）。
  */
 export async function saveReferenceRecord(
   rec: ReferenceRecordInput,
   createdAt: number = Date.now(),
 ): Promise<string | null> {
   try {
+    if (rec.contentHash) {
+      const all = await getAll<ReferenceRecord>(STORE_REFERENCE_RECORDS);
+      const existing = all.find((r) => r.contentHash === rec.contentHash);
+      if (existing) {
+        await put(STORE_REFERENCE_RECORDS, { ...existing, createdAt });
+        return existing.id;
+      }
+    }
     seq = (seq + 1) % 1_000_000;
     const id = `ref_${createdAt}_${seq.toString().padStart(6, "0")}`;
     const entry: ReferenceRecord = { ...rec, id, createdAt };
