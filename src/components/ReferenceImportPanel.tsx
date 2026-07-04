@@ -126,7 +126,9 @@ interface Props {
   onContextChange?: (ctx: { image: string; extracted: Record<string, string> } | null) => void;
   /** Compare Mode（参照↔生成 比較ビュー）を開く（任意）。 */
   onOpenCompare?: () => void;
-  /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（任意）。保存できたら true。 */
+  /** 📌 旧・現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（任意・段階3で dormant 化）。
+   *  段階3以降は画像を入れた瞬間に自動保存されるため、本コンポーネントは内部で呼ばない。
+   *  呼び出し元（App.tsx）の関数・本フィールドは hide-not-delete で温存。 */
   onSaveToHistory?: () => Promise<boolean>;
   /** ♻ 🕘履歴からの再利用 seed（任意）。token が変わるたびに 参照画像（サムネ）＋抽出を流し込み、開く。 */
   reuseSeed?: { image: string; extracted: Record<string, string>; token: number } | null;
@@ -134,7 +136,7 @@ interface Props {
   onReuseConsumed?: () => void;
 }
 
-export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, onSaveToHistory, reuseSeed, onReuseConsumed }: Props) {
+export function ReferenceImportPanel({ protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, reuseSeed, onReuseConsumed }: Props) {
   const [open, setOpen] = useState(false);
   // 🖼 段階1：最大3スロット（画像/抽出結果/選択/抽出中フラグを配列化）。段階1の適用は「アクティブスロット」1つに対して行う（既存経路不変）。
   const [slots, setSlots] = useState<RefSlot[]>([emptySlot()]);
@@ -350,20 +352,38 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
     }
   }, [fields, flash]);
 
-  /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（生成しなくても残せる）。
-   *  保存自体は App 側（onSaveToHistory）が referenceContextRef から行う＝抽出/適用ロジックには触れない。 */
-  const doSaveToHistory = useCallback(async () => {
-    if (!image || !onSaveToHistory || saving) return;
+  /** ⭐ 段階4：現在のアクティブスロットの参照履歴レコードをお気に入り登録する（旧「📌 履歴に保存」ボタンを転用）。
+   *  画像は入れた瞬間（loadFile→autoSaveSlotImage）に既に自動保存済み＝ここでは favorite:true を立てるだけ。
+   *  自動保存がまだ完了していない稀なケース（極端に速い操作）はその場で保存してから favorite を立てる。
+   *  既存の favorite 機構（CompareModeView の toggleFavorite と同じ updateReferenceRecord）を再利用。 */
+  const markActiveSlotFavorite = useCallback(async () => {
+    const slotIndex = activeSlot;
+    const slot = slotsRef.current[slotIndex];
+    if (!slot?.image || saving) return;
     setSaving(true);
     try {
-      const ok = await onSaveToHistory();
-      flash(ok ? "✅ 履歴に保存しました（🕘 履歴で確認・再利用できます）" : "保存に失敗しました");
+      let recordId = slot.recordId;
+      if (!recordId) {
+        const [refThumb, contentHash] = await Promise.all([makeThumbnail(slot.image), imageContentHash(slot.image)]);
+        recordId = await saveReferenceRecord({
+          refThumb,
+          contentHash,
+          extracted: slot.fields,
+          applied: {},
+          batchId: "",
+          kind: "picker",
+        });
+        if (recordId) updateSlot(slotIndex, { recordId });
+      }
+      if (!recordId) { flash("登録に失敗しました"); return; }
+      const ok = await updateReferenceRecord(recordId, { favorite: true });
+      flash(ok ? "⭐ お気に入りに登録しました（🕘 履歴で確認できます）" : "登録に失敗しました");
     } catch {
-      flash("保存に失敗しました");
+      flash("登録に失敗しました");
     } finally {
       setSaving(false);
     }
-  }, [image, onSaveToHistory, saving, flash]);
+  }, [activeSlot, saving, flash, updateSlot]);
 
   /** Gemini Vision で「アクティブスロット」の参照画像を解析し、そのスロットの13カテゴリ欄を実抽出結果で埋める。
    *  slotIndex は呼び出し時（＝ボタン押下時）に確定するため、実行中にユーザーが別スロットへ切り替えても
@@ -704,14 +724,12 @@ export function ReferenceImportPanel({ protections, activeScopes, appliedNote, o
             className="mt-1.5 w-full text-[11px] px-2 py-1 rounded border border-bg-border bg-bg-panel text-text-muted hover:text-text-base transition">
             📋 抽出JSONをコピー
           </button>
-          {onSaveToHistory && (
-            <button type="button" disabled={!image || saving}
-              onClick={() => { void doSaveToHistory(); }}
-              title={image ? "現在の参照画像＋抽出を「Reference Picker履歴」に保存（生成しなくても残せる・あとで🕘 履歴から再利用/比較できます）" : "先に参照画像を貼ってください"}
-              className="mt-1.5 w-full text-[11px] font-semibold px-2 py-1 rounded border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed">
-              {saving ? "保存中…" : "📌 この参照を履歴に保存"}
-            </button>
-          )}
+          <button type="button" disabled={!image || saving}
+            onClick={() => { void markActiveSlotFavorite(); }}
+            title={image ? "このスロットの参照を「Reference Picker履歴」でお気に入り登録します（画像は入れた時点で自動保存済み・お気に入りは上限から保護されます）" : "先に参照画像を貼ってください"}
+            className="mt-1.5 w-full text-[11px] font-semibold px-2 py-1 rounded border border-amber-400/45 bg-amber-500/12 text-amber-100 hover:bg-amber-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed">
+            {saving ? "登録中…" : "⭐ お気に入りに登録"}
+          </button>
           <p className="text-[10px] text-text-muted/65 leading-snug pt-1.5">
             ※ 参照画像に実際に見える要素だけを抽出します（無い要素を足しません）。
             顔・同一性・表情・体型は抽出せず、人物そのものは複製しません。手入力で上書きも可。
