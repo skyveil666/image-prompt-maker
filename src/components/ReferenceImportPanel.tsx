@@ -112,6 +112,16 @@ function emptySlot(): RefSlot {
   return { image: null, fields: {}, extracting: false, extractError: null, autoSelecting: false, recordId: null };
 }
 
+/** 段階3：スロット識別色（見出しのみに使用・0=青/1=緑/2=橙）。ReflectionStatusBar の TONE_CLS 設計を参考。
+ *  ※「どのスロットか」の区別用。セルの赤枠（適用中か）とは役割を分ける（色が競合しないよう見出し限定）。 */
+function slotColor(i: number): string {
+  switch (i) {
+    case 0: return "border-sky-400/50 bg-sky-500/15 text-sky-100";          // 青＝スロット1
+    case 1: return "border-emerald-400/50 bg-emerald-500/15 text-emerald-100"; // 緑＝スロット2
+    default: return "border-orange-400/50 bg-orange-500/15 text-orange-100";   // 橙＝スロット3
+  }
+}
+
 interface Props {
   /** true=main view（表示）／false=history等の他view（非表示・アンマウントしない＝state保持）。
    *  旧実装は親側 {view==="main" && <Panel/>} の条件付きレンダーで、view切替のたびに
@@ -539,8 +549,10 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
         "rounded-lg border px-2.5 py-2 space-y-1.5",
         lockReason
           ? "border-bg-border bg-bg-base/20 opacity-70"
-          : hasText && !applied
-          ? "border-amber-400/50 bg-amber-400/[0.06] ring-1 ring-amber-400/25"
+          : applied
+          ? "border-rose-500/70 bg-rose-500/[0.07] ring-1 ring-rose-500/40"   // 段階3：適用中(このセルが適用元)＝赤枠
+          : hasText
+          ? "border-amber-400/50 bg-amber-400/[0.06] ring-1 ring-amber-400/25" // 抽出済み・未適用＝黄枠
           : "border-bg-border bg-bg-base/40",
       ].join(" ")}>
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -588,7 +600,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
       >
         {/* カラムヘッダ（スロット番号・貼り付け先インジケータ・中身をクリア） */}
         <div className="shrink-0 flex items-center gap-1.5 mb-1.5">
-          <span className="text-[12px] font-bold text-text-base">スロット{i + 1}</span>
+          <span className={["text-[12px] font-bold px-2 py-0.5 rounded-md border leading-none", slotColor(i)].join(" ")}>スロット{i + 1}</span>
           {active && <span title="Ctrl+V の貼り付け先" className="text-[9px] px-1 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-200 leading-none">貼付先</span>}
           {busy && <span className="w-1.5 h-1.5 rounded-full bg-violet-200 animate-pulse" />}
           {hasContent && (
