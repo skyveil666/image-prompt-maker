@@ -135,13 +135,16 @@ interface Props {
    *  段階3以降は画像を入れた瞬間に自動保存されるため、本コンポーネントは内部で呼ばない。
    *  呼び出し元（App.tsx）の関数・本フィールドは hide-not-delete で温存。 */
   onSaveToHistory?: () => Promise<boolean>;
+  /** 🖼 上部バーの「参照ピッカー」ボタンから開く（任意）。値が変わる（増える）たびにパネルを開く。
+   *  段階3：右端の縦タブ導線を廃止し、開く導線を App の上部バーへ集約するための signal。 */
+  openToken?: number;
   /** ♻ 🕘履歴からの再利用 seed（任意）。token が変わるたびに 参照画像（サムネ）＋抽出を流し込み、開く。 */
   reuseSeed?: { image: string; extracted: Record<string, string>; token: number } | null;
   /** ♻ seed を流し込み終えたら呼ぶ（任意）。親が seed を null に戻し、再マウント時の二重注入を防ぐ。 */
   onReuseConsumed?: () => void;
 }
 
-export function ReferenceImportPanel({ visible, protections, activeScopes, appliedNote, onApply, onContextChange, onOpenCompare, reuseSeed, onReuseConsumed }: Props) {
+export function ReferenceImportPanel({ visible, protections, activeScopes, appliedNote, onApply, onContextChange, onOpenCompare, openToken, reuseSeed, onReuseConsumed }: Props) {
   const [open, setOpen] = useState(false);
   // 🖼 段階3：カラム＝スロットの1対1（常に3固定）。空カラムに画像を落とせば埋まる（追加/削除ボタンは廃止）。
   const [slots, setSlots] = useState<RefSlot[]>(() => Array.from({ length: MAX_REF_SLOTS }, () => emptySlot()));
@@ -293,6 +296,12 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
   }, [visible, open]);
+
+  // 段階3：上部バーの「🖼 参照ピッカー」ボタンから開く。openToken が増えるたびにパネルを開く
+  // （初期値 0 の初回発火は開かない・以後クリックごとに +1 されて再オープンする）。
+  useEffect(() => {
+    if (openToken != null && openToken > 0) setOpen(true);
+  }, [openToken]);
 
   // 段階3：Escape でパネルを閉じる（ライトボックス→右クリックメニュー→パネルの順で優先）。
   // enabled=visible && open の時だけリスナーを張る（他view・折りたたみ時は無反応）。
@@ -647,20 +656,8 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
   // ── 非表示（history等の他view）：アンマウントせず見た目だけ隠す（state保持） ──────
   if (!visible) return null;
 
-  // ── 折りたたみハンドル ────────────────────────────────────────────
-  if (!open) {
-    const appliedCount = Object.keys(appliedNote).length;
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title="Reference Picker（参照ピッカー / 要素抽出）を開く"
-        className="fixed right-0 top-1/3 z-30 -translate-y-1/2 rounded-l-lg border border-r-0 border-violet-400/45 bg-violet-500/15 px-1.5 py-3 text-[11px] font-bold text-violet-100 hover:bg-violet-500/25 transition [writing-mode:vertical-rl] leading-tight"
-      >
-        🖼 参照ピッカー{appliedCount > 0 ? `（${appliedCount}）` : ""}
-      </button>
-    );
-  }
+  // ── 閉じている間は何も描画しない（開く導線は App 上部バーの「🖼 参照ピッカー」ボタンに集約） ──
+  if (!open) return null;
 
   return (
     // 段階3：横ドロワー → 全画面大パネル（CompareModeView と同じ 2層シェル：bg-base 外殻 + bg-panel 内殻）。

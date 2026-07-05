@@ -254,6 +254,12 @@ export default function App() {
   }, []);
   /** ♻ ピッカーが seed を流し込み終えたら null に戻す（再マウント時の二重注入防止）。 */
   const handleReuseConsumed = useCallback(() => setReferenceReuseSeed(null), []);
+  /** 🖼 上部バーの「参照ピッカー」ボタンから参照ピッカーを開くための signal（右端縦タブ導線を置換）。 */
+  const [referenceOpenToken, setReferenceOpenToken] = useState(0);
+  const openReferencePicker = useCallback(() => {
+    setView("main");                          // ピッカーは main view でのみ表示（visible ガード）
+    setReferenceOpenToken((t) => t + 1);      // token を増やしてピッカーを開く
+  }, []);
   // 分析ラボ（孤立入口）は撤去（#4）。詳細探索は分析センターの重複分析/🔭発見タブに集約。
   // 🧹 分析センター（DuplicateAnalysisPanel）撤去（タスクB・案X）：開閉 state・無視候補語 state は廃止。
   /** Phase D: Compare評価(referenceRecords)を集計した好み素材。マウント＋Compareクローズ（評価後）に再読込。 */
@@ -1846,6 +1852,15 @@ export default function App() {
                   justCompleted={justCompleted}
                   onGenerate={handleGenerate}
                 />
+                {/* 🖼 参照ピッカーを開く（右端縦タブ導線を上部バーへ集約） */}
+                <button
+                  type="button"
+                  onClick={openReferencePicker}
+                  title="Reference Picker（参照ピッカー / 要素抽出）を開く"
+                  className="text-[12px] font-bold px-3 py-1.5 rounded-lg border border-violet-400/45 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25 transition inline-flex items-center gap-1.5 whitespace-nowrap"
+                >
+                  🖼 参照ピッカー{Object.keys(referenceNote).length > 0 ? `（${Object.keys(referenceNote).length}）` : ""}
+                </button>
               </>
             }
             progressSlot={
@@ -2101,6 +2116,7 @@ export default function App() {
         onContextChange={handleReferenceContextChange}
         onOpenCompare={() => setCompareOpen(true)}
         onSaveToHistory={handleSaveReferenceToHistory}
+        openToken={referenceOpenToken}
         reuseSeed={referenceReuseSeed}
         onReuseConsumed={handleReuseConsumed}
       />
