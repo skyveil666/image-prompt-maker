@@ -20,6 +20,7 @@ import { extractReferenceViaBackend } from "../lib/backendClient";
 import { readFileAsDataUrl } from "../lib/imageFile";
 import { useAutoResizeTextarea } from "../lib/useAutoResizeTextarea";
 import { useLatestRef } from "../lib/useLatestRef";
+import { useEscapeKey } from "../lib/useEscapeKey";
 import { saveReferenceRecord, updateReferenceRecord } from "../lib/referenceRecords";
 import { imageContentHash, makeThumbnail } from "../lib/imageThumb";
 
@@ -307,6 +308,23 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     window.addEventListener("paste", onPaste, true);
     return () => window.removeEventListener("paste", onPaste, true);
   }, [visible, open, loadFile]);
+
+  // 段階3：全画面パネル表示中（visible && open）は背面（メイン画面）のスクロールを止める
+  // （背面スクロール防止＋スクロールバーのガター解消・CompareModeView と同じパターン）。
+  useEffect(() => {
+    if (!visible || !open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [visible, open]);
+
+  // 段階3：Escape でパネルを閉じる（ライトボックス→右クリックメニュー→パネルの順で優先）。
+  // enabled=visible && open の時だけリスナーを張る（他view・折りたたみ時は無反応）。
+  useEscapeKey(() => {
+    if (lightbox) setLightbox(false);
+    else if (ctxMenu) setCtxMenu(null);
+    else setOpen(false);
+  }, visible && open);
 
   // 右クリック→独自メニュー「貼り付け」。navigator.clipboard.read() で画像を取得（ユーザー操作起点）。
   // 権限拒否・未対応・画像なし等で失敗したら Ctrl+V を案内（Ctrl+V は常に有効＝二重化）。
@@ -625,7 +643,9 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
   }
 
   return (
-    <aside className="fixed right-0 top-14 bottom-0 z-30 w-[94vw] sm:w-[460px] lg:w-[760px] max-w-[96vw] flex flex-col border-l border-bg-border bg-bg-panel/95 backdrop-blur-sm shadow-2xl">
+    // 段階3：横ドロワー → 全画面大パネル（CompareModeView と同じ 2層シェル：bg-base 外殻 + bg-panel 内殻）。
+    <aside className="fixed inset-0 z-40 flex flex-col bg-bg-base">
+      <div className="flex-1 min-h-0 flex flex-col bg-bg-panel overflow-hidden">
       {/* ヘッダ */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-bg-border shrink-0">
         <span className="text-[14px]">🖼</span>
@@ -646,7 +666,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
           {showJson ? "🔎 JSONを隠す" : "🔎 抽出JSONを見る"}
         </button>
         <button type="button" onClick={() => setOpen(false)}
-          className="text-[12px] text-text-muted hover:text-text-base transition leading-none px-1">▶ 閉じる</button>
+          className="text-[12px] text-text-muted hover:text-text-base transition leading-none px-1">✕ 閉じる</button>
       </div>
 
       {/* 抽出JSON 一括表示 */}
@@ -846,6 +866,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
           {note}
         </div>
       )}
+      </div>{/* /内殻（bg-panel） */}
 
       {/* 参照画像 拡大表示（クリックで閉じる） */}
       {lightbox && image && (
