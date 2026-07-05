@@ -1245,6 +1245,31 @@ export default function App() {
     setRefAppliedScopes([]);
   }, []);
 
+  /** 🖼 参照画像：要素を1つだけ「解除」（catKey単位・段階3コミット5）。
+   *  referenceNote から その catKey を外し、その scope を参照が“新規ON”にしていて かつ 他の適用済み要素が
+   *  同じ scope を使っていない時のみ scope を OFF へ revert（handleClearReference の対称解除を catKey 単位化）。
+   *  ★手動ON分・他要素が使う scope は温存。安全経路（onApply/referenceNote の catKey→text）には非関与＝外すのみ。 */
+  const handleUnapplyReference = useCallback((catKey: string) => {
+    if (referenceNoteRef.current[catKey] == null) return; // 未適用なら何もしない
+    setReferenceNote((prev) => {
+      if (!(catKey in prev)) return prev;
+      const next = { ...prev };
+      delete next[catKey];
+      return next;
+    });
+    const scope = REFERENCE_CATEGORIES.find((c) => c.key === catKey)?.scope;
+    if (scope && refAppliedScopesRef.current.includes(scope)) {
+      // 同じ scope を使う「他の」適用済み要素が残っていれば scope は維持（解除する catKey は除外して判定）
+      const stillUsed = REFERENCE_CATEGORIES.some(
+        (c) => c.key !== catKey && c.scope === scope && referenceNoteRef.current[c.key] != null,
+      );
+      if (!stillUsed) {
+        setScopes((prev) => prev.filter((s) => s !== scope));
+        setRefAppliedScopes((rec) => rec.filter((s) => s !== scope));
+      }
+    }
+  }, []);
+
   // 🧹 色重みの自動調整／Undo、AI分析エージェントの提案アクション（handleAgentAction）は
   //    分析センター撤去（タスクB・案X）で廃止。colorWeights 本体と buildInputs 使用は温存。
 
@@ -2112,6 +2137,7 @@ export default function App() {
         activeScopes={scopes}
         appliedNote={referenceNote}
         onApply={handleApplyReference}
+        onUnapply={handleUnapplyReference}
         onClearAll={handleClearReference}
         onContextChange={handleReferenceContextChange}
         onOpenCompare={() => setCompareOpen(true)}

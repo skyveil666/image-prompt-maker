@@ -135,6 +135,8 @@ interface Props {
   appliedNote: Record<string, string>;
   /** [適用]。許可されたら true。App 側で保護ゲート最終判定＋scope ON＋note追記。 */
   onApply: (catKey: string, text: string) => boolean;
+  /** 🖼 要素を1つだけ解除（catKey単位・段階3コミット5）。App 側で referenceNote から catKey を外す。 */
+  onUnapply?: (catKey: string) => void;
   /** 全解除（referenceNote クリア） */
   onClearAll: () => void;
   /** 参照画像＋抽出13カテゴリの変化を親へ通知（Compare Mode 用・任意）。生成時に参照レコードへ残す。 */
@@ -154,7 +156,7 @@ interface Props {
   onReuseConsumed?: () => void;
 }
 
-export function ReferenceImportPanel({ visible, protections, activeScopes, appliedNote, onApply, onContextChange, onOpenCompare, openToken, reuseSeed, onReuseConsumed }: Props) {
+export function ReferenceImportPanel({ visible, protections, activeScopes, appliedNote, onApply, onUnapply, onContextChange, onOpenCompare, openToken, reuseSeed, onReuseConsumed }: Props) {
   const [open, setOpen] = useState(false);
   // 🖼 段階3：カラム＝スロットの1対1（常に3固定）。空カラムに画像を落とせば埋まる（追加/削除ボタンは廃止）。
   const [slots, setSlots] = useState<RefSlot[]>(() => Array.from({ length: MAX_REF_SLOTS }, () => emptySlot()));
@@ -571,7 +573,14 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
           placeholder={cat.placeholder}
           minRows={["background", "outfit", "pose"].includes(cat.key) ? 6 : 4}
         />
-        <div className="flex items-center justify-end">
+        <div className="flex items-center justify-end gap-1.5">
+          {applied && (
+            <button type="button" onClick={() => onUnapply?.(cat.key)}
+              title={`「${cat.label}」の反映を解除（この要素だけ・他の適用は残ります）`}
+              className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-rose-400/50 bg-rose-500/12 text-rose-100 hover:bg-rose-500/22 transition">
+              解除
+            </button>
+          )}
           <button type="button" onClick={applyFromHere} disabled={!!lockReason}
             title={lockReason ?? `${cat.label}をこのカラム（スロット${slotIndex + 1}）から変更対象に反映`}
             className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-violet-400/50 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25 transition disabled:opacity-40 disabled:cursor-not-allowed">
