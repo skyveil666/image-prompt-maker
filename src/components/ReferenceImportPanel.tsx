@@ -211,6 +211,20 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     window.setTimeout(() => setNote((cur) => (cur === m ? null : cur)), 2600);
   }, []);
 
+  /** 段階3：カラム単位クリア（クリアインプレース＝スロット枠は残して中身だけ空に・削除して詰めない＝常に3カラム維持）。
+   *  画像/抽出結果/抽出中フラグ/recordId を空にし、catSlotMap から このスロットを指すエントリを削除する。
+   *  ★適用済み referenceNote は解除しない（referenceNote は catKey→text のみでスロット由来を持たないため
+   *  構造的に不可）。適用の取り消しは §5 の 🖼参照画像バッジ「× 解除」で行う（作業state のみを空にする）。 */
+  const clearSlot = useCallback((i: number) => {
+    updateSlot(i, emptySlot());
+    setCatSlotMap((prev) => {
+      const next: Record<string, number> = {};
+      for (const [k, v] of Object.entries(prev)) if (v !== i) next[k] = v; // このスロットを指す横断選択は削除（→activeSlotへフォールバック）
+      return next;
+    });
+    flash(`スロット${i + 1}の中身をクリアしました（適用済みの反映は解除していません）`);
+  }, [updateSlot, flash]);
+
   // ♻ 🕘履歴からの「再利用」：参照画像（サムネ）＋抽出13カテゴリをピッカーへ流し込み、開く。
   // token が変わるたびに再実行（同一レコードの再利用も拾う）。適用はユーザーが従来どおり押す＝適用ロジック不変。
   useEffect(() => {
@@ -562,6 +576,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     const slot = slots[i] ?? emptySlot();
     const active = i === activeSlot;
     const busy = slot.extracting || slot.autoSelecting;
+    const hasContent = !!slot.image || Object.values(slot.fields).some((v) => (v ?? "").trim().length > 0);
     return (
       <div
         key={i}
@@ -571,11 +586,18 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
           active ? "border-violet-400/60 ring-1 ring-violet-400/30" : "border-bg-border",
         ].join(" ")}
       >
-        {/* カラムヘッダ（スロット番号・貼り付け先インジケータ） */}
+        {/* カラムヘッダ（スロット番号・貼り付け先インジケータ・中身をクリア） */}
         <div className="shrink-0 flex items-center gap-1.5 mb-1.5">
           <span className="text-[12px] font-bold text-text-base">スロット{i + 1}</span>
           {active && <span title="Ctrl+V の貼り付け先" className="text-[9px] px-1 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-200 leading-none">貼付先</span>}
           {busy && <span className="w-1.5 h-1.5 rounded-full bg-violet-200 animate-pulse" />}
+          {hasContent && (
+            <button type="button" onClick={(e) => { e.stopPropagation(); clearSlot(i); }}
+              title="このカラムの画像・抽出結果・要素選択をまるごと空にします（適用済みの反映は解除しません）"
+              className="ml-auto text-[9px] px-1.5 py-0.5 rounded border border-rose-400/40 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition leading-none">
+              🧹 中身をクリア
+            </button>
+          )}
         </div>
 
         {/* 取り込みエリア（左）＋抽出操作（右）を横並び（このカラム＝スロットに対して動作） */}
