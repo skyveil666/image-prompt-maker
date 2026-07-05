@@ -141,16 +141,15 @@ interface Props {
   onReuseConsumed?: () => void;
 }
 
-export function ReferenceImportPanel({ visible, protections, activeScopes, appliedNote, onApply, onClearAll, onContextChange, onOpenCompare, reuseSeed, onReuseConsumed }: Props) {
+export function ReferenceImportPanel({ visible, protections, activeScopes, appliedNote, onApply, onContextChange, onOpenCompare, reuseSeed, onReuseConsumed }: Props) {
   const [open, setOpen] = useState(false);
-  // 🖼 段階1：最大3スロット（画像/抽出結果/抽出中フラグを配列化）。
-  const [slots, setSlots] = useState<RefSlot[]>([emptySlot()]);
+  // 🖼 段階3：カラム＝スロットの1対1（常に3固定）。空カラムに画像を落とせば埋まる（追加/削除ボタンは廃止）。
+  const [slots, setSlots] = useState<RefSlot[]>(() => Array.from({ length: MAX_REF_SLOTS }, () => emptySlot()));
+  // 段階3：activeSlot は「Ctrl+V の貼り付け先／📁ファイル選択先」＝最後にクリック/操作したカラム。
   const [activeSlot, setActiveSlot] = useState(0);
   // 🖼 段階2：要素ごとの横断選択。catKey → どのスロットindexから取るか（未指定＝activeSlotへフォールバック）。
   const [catSlotMap, setCatSlotMap] = useState<Record<string, number>>({});
-  // 段階2：チェックボックス選択はカテゴリ単位の概念（スロットに紐付かない）＝トップレベルへ昇格。
-  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
-  const [dragOver, setDragOver] = useState(false);
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null); // 段階3：どのカラムにドラッグ中か
   const [note, setNote] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState(false);
   const [showJson, setShowJson] = useState(false);
@@ -158,10 +157,11 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const fileTargetRef = useRef(0); // 段階3：共有 file input がどのカラム（スロット）向けか
 
-  // アクティブスロットの値を既存の変数名で導出（下の関数群・JSXは単一画像時代とほぼ同じコードのまま動く）。
+  // アクティブスロット（貼り付け先）の image/fields を導出（拡大表示・Compare通知に使用）。
   const current = slots[activeSlot] ?? emptySlot();
-  const { image, fields, extracting, extractError, autoSelecting } = current;
+  const { image, fields } = current;
   // 段階3：抽出完了時に recordId を最新値で読むための ref（自動保存の非同期完了と抽出のタイミングが
   // 前後してもレースなく正しいレコードへ追記できるようにする）。
   const slotsRef = useLatestRef(slots);
@@ -184,35 +184,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     setSlots((prev) => prev.map((s, i) => (i === index ? { ...s, ...(typeof patch === "function" ? patch(s) : patch) } : s)));
   }, []);
 
-  /** スロットを追加（最大3）。追加したスロットをアクティブにする。 */
-  const addSlot = useCallback(() => {
-    setSlots((prev) => {
-      if (prev.length >= MAX_REF_SLOTS) return prev;
-      const next = [...prev, emptySlot()];
-      setActiveSlot(next.length - 1);
-      return next;
-    });
-  }, []);
-
-  /** スロットを削除（最小1）。削除後もアクティブ index・横断選択マップが範囲内に収まるよう調整する。 */
-  const removeSlot = useCallback((index: number) => {
-    setSlots((prev) => {
-      if (prev.length <= 1) return prev;
-      const next = prev.filter((_, i) => i !== index);
-      setActiveSlot((cur) => Math.min(cur > index ? cur - 1 : cur, next.length - 1));
-      return next;
-    });
-    // 段階2：削除したindexを指していた横断選択はactiveSlotへフォールバック（削除）。
-    // 削除indexより後ろを指していた分は配列シフトに合わせて1つ詰める。
-    setCatSlotMap((prev) => {
-      const next: Record<string, number> = {};
-      for (const [k, v] of Object.entries(prev)) {
-        if (v === index) continue;
-        next[k] = v > index ? v - 1 : v;
-      }
-      return next;
-    });
-  }, []);
+  // 段階3：カラム＝スロット3固定にしたため addSlot/removeSlot は廃止（カラム単位クリアはコミット3で clearSlot として実装）。
 
   // 段階2：JSON確認/コピーは「実際に適用される組み合わせ」＝各カテゴリの解決済みテキストを表示する。
   const currentJson = REFERENCE_CATEGORIES.reduce<Record<string, string>>((acc, c) => {
@@ -245,11 +217,15 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     // 履歴は単一画像レコード（段階1）＝スロットを1件にリセットして流し込む。
     // recordId は紐付けない（reuseSeed.image はサムネであり元画像と contentHash が一致しない場合があるため、
     // 再度お気に入り登録すれば新規レコードとして安全に保存される＝データ破壊なし）。
-    setSlots([{ image: reuseSeed.image, fields: next, extracting: false, extractError: null, autoSelecting: false, recordId: null }]);
+    // 段階3：常に3カラム固定。slot0 へ流し込み、slot1/2 は空でパディング。
+    setSlots([
+      { image: reuseSeed.image, fields: next, extracting: false, extractError: null, autoSelecting: false, recordId: null },
+      emptySlot(),
+      emptySlot(),
+    ]);
     setActiveSlot(0);
-    // 段階2：単一スロットへ戻すため、古い横断選択マップ・チェック選択はリセット（既定＝スロット1）。
+    // 段階3：単一スロットへ戻すため、古い横断選択マップはリセット（既定＝スロット1）。
     setCatSlotMap({});
-    setSelectedCats(new Set());
     setOpen(true);
     flash("♻ 履歴から再利用しました。内容を確認し「適用」で反映してください。");
     onReuseConsumed?.(); // 親が seed を null に戻す＝再マウント時の二重注入防止
@@ -276,14 +252,14 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     }
   }, [updateSlot]);
 
-  const loadFile = useCallback((file: File) => {
+  const loadFile = useCallback((file: File, slotIndex: number = activeSlot) => {
     if (!file.type.startsWith("image/")) { flash("画像ファイルを入れてください"); return; }
-    // 取り込んだ画像は「アクティブスロット」へ入る（スロット・ストリップで切り替えて別スロットへ入れる）。
+    // 段階3：取り込んだ画像は指定カラム（スロット）へ。省略時はアクティブカラム（＝貼り付け先）。
     readFileAsDataUrl(file)
       .then((url) => {
-        updateSlot(activeSlot, { image: url, recordId: null }); // 新しい画像＝前の recordId はリセット
+        updateSlot(slotIndex, { image: url, recordId: null }); // 新しい画像＝前の recordId はリセット
         setOpen(true);
-        void autoSaveSlotImage(activeSlot, url); // 入れた瞬間に自動保存（段階3）
+        void autoSaveSlotImage(slotIndex, url); // 入れた瞬間に自動保存（段階3）
       })
       .catch(() => flash("画像の読み込みに失敗しました"));
   }, [flash, activeSlot, updateSlot, autoSaveSlotImage]);
@@ -348,55 +324,12 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     }
   }, [loadFile, flash]);
 
-  // 段階2：編集は「そのカテゴリの解決済みソーススロット」へ書き込む（activeSlotではない場合がある）。
-  const setField = (k: string, v: string) => {
-    const slotIndex = resolveCatSlotIndex(k);
+  // 段階3：編集は「そのカラム（スロット）」へ直接書き込む（転置レイアウト＝カラムがスロット）。
+  const setFieldAt = (slotIndex: number, k: string, v: string) =>
     updateSlot(slotIndex, (s) => ({ fields: { ...s.fields, [k]: v } }));
-  };
-  const toggleSel = (k: string) => setSelectedCats((p) => {
-    const n = new Set(p);
-    n.has(k) ? n.delete(k) : n.add(k);
-    return n;
-  });
-
-  /** 1カテゴリを適用（空文字・ロック時はスキップ）。適用できたら true。
-   *  段階2：text の出所は「そのカテゴリに選ばれたスロット」の抽出結果（resolveCatText）。
-   *  ★handleApplyReference(catKey, text) のシグネチャ・安全経路は不変＝出所が増えるだけ。 */
-  const applyOne = useCallback((catKey: string): boolean => {
-    const cat = REFERENCE_CATEGORIES.find((c) => c.key === catKey);
-    if (!cat) return false;
-    const text = resolveCatText(catKey);
-    if (!text) { flash(`「${cat.label}」に内容がありません`); return false; }
-    if (referenceLockReason(cat, protections)) { flash(referenceLockReason(cat, protections)!); return false; }
-    return onApply(catKey, text);
-  }, [resolveCatText, protections, onApply, flash]);
-
-  const applySelected = useCallback(() => {
-    const keys = REFERENCE_CATEGORIES.filter((c) => selectedCats.has(c.key)).map((c) => c.key);
-    if (keys.length === 0) { flash("適用する項目を選択してください"); return; }
-    let n = 0;
-    for (const k of keys) if (applyOne(k)) n++;
-    flash(n > 0 ? `${n}件を適用しました` : "適用できる項目がありませんでした");
-  }, [selectedCats, applyOne, flash]);
-
-  /** text 有り・非ロックの全カテゴリへ一括適用（適用は既存 applyOne を再利用＝適用ロジック不変）。
-   *  段階2：各カテゴリは選ばれたスロットのテキストで判定・適用される。 */
-  const applyAll = useCallback(() => {
-    const keys = REFERENCE_CATEGORIES
-      .filter((c) => resolveCatText(c.key) && !referenceLockReason(c, protections))
-      .map((c) => c.key);
-    if (keys.length === 0) { flash("適用できる項目がありません"); return; }
-    let n = 0;
-    for (const k of keys) if (applyOne(k)) n++;
-    flash(n > 0 ? `${n}件をすべて適用しました` : "適用できる項目がありませんでした");
-  }, [resolveCatText, protections, applyOne, flash]);
-
-  const clearAll = useCallback(() => {
-    updateSlot(activeSlot, { fields: {} });
-    setSelectedCats(new Set());
-    onClearAll();
-    flash("参照反映を全解除しました");
-  }, [activeSlot, updateSlot, onClearAll, flash]);
+  // 段階3：一括適用(applyOne/applyAll/applySelected)・全解除(clearAll)・チェック選択(toggleSelAt)は
+  // 共有バー撤去に伴い廃止。適用は各セルの「◯◯に適用」＝onApply(catKey,text) 直呼び、
+  // 解除は 📡反映状態バーの 🖼参照画像バッジ「× 解除」で行う（onClearAll/handleClearReference は温存）。
 
   /** 現在の13カテゴリ欄を JSON にしてコピー（抽出結果の比較・共有用・段階2＝解決済みの組み合わせ） */
   const copyJson = useCallback(() => {
@@ -417,8 +350,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
    *  画像は入れた瞬間（loadFile→autoSaveSlotImage）に既に自動保存済み＝ここでは favorite:true を立てるだけ。
    *  自動保存がまだ完了していない稀なケース（極端に速い操作）はその場で保存してから favorite を立てる。
    *  既存の favorite 機構（CompareModeView の toggleFavorite と同じ updateReferenceRecord）を再利用。 */
-  const markActiveSlotFavorite = useCallback(async () => {
-    const slotIndex = activeSlot;
+  const markSlotFavorite = useCallback(async (slotIndex: number = activeSlot) => {
     const slot = slotsRef.current[slotIndex];
     if (!slot?.image || saving) return;
     setSaving(true);
@@ -449,8 +381,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
   /** Gemini Vision で「アクティブスロット」の参照画像を解析し、そのスロットの13カテゴリ欄を実抽出結果で埋める。
    *  slotIndex は呼び出し時（＝ボタン押下時）に確定するため、実行中にユーザーが別スロットへ切り替えても
    *  結果は元のスロットへ正しく反映される（他スロットの独立抽出と混線しない・各スロット1回=1呼び出し）。 */
-  const runExtract = useCallback(async () => {
-    const slotIndex = activeSlot;
+  const runExtract = useCallback(async (slotIndex: number = activeSlot) => {
     const slot = slots[slotIndex];
     if (!slot?.image) { flash("先に参照画像を貼ってください"); return; }
     const img = slot.image;
@@ -521,8 +452,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
   /** 🎯 一発：「アクティブスロット」の参照画像→変更対象を自動セット。未抽出なら内部で抽出してから（真の一発・spinner・連打防止）。
    *  失敗時は scope 不変でトースト通知（フォールバック）。§4(referenceExtract)・§3データ層 不触・既存 API を呼ぶのみ。
    *  slotIndex は呼び出し時に確定＝実行中に別スロットへ切り替えても結果は元のスロットへ正しく反映される。 */
-  const handleAutoSelectFromReference = useCallback(async () => {
-    const slotIndex = activeSlot;
+  const handleAutoSelectFromReference = useCallback(async (slotIndex: number = activeSlot) => {
     const slot = slots[slotIndex];
     if (!slot?.image) { flash("先に参照画像を貼ってください"); return; }
     if (slot.autoSelecting || slot.extracting) return;
@@ -554,19 +484,15 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
   const priorityCats = REFERENCE_CATEGORIES.filter((c) => PRIORITY_KEYS.includes(c.key));
   const otherCats = REFERENCE_CATEGORIES.filter((c) => !PRIORITY_KEYS.includes(c.key));
 
-  /** 抽出済みだが未適用（text有り・未適用・非ロック）＝「適用押し忘れ」候補。段階2：解決済みテキストで判定。 */
-  const unappliedCats = REFERENCE_CATEGORIES.filter(
-    (c) => resolveCatText(c.key) && appliedNote[c.key] == null && !referenceLockReason(c, protections),
-  );
-
-  /** カテゴリ別カード（状態バッジ：未適用/適用済み/保護で適用不可）。
-   *  段階2：スロットが2枚以上ある時だけ「どのスロットから取るか」の小セレクタを表示する。 */
-  const renderCard = (cat: ReferenceCategory) => {
-    const srcSlotIndex = resolveCatSlotIndex(cat.key);
-    const text = resolveCatText(cat.key);
+  /** 段階3：転置セル＝カラム（スロット slotIndex）の1カテゴリを描く。
+   *  ★適用は onApply(catKey, text) のまま（安全経路不変）。適用時に catSlotMap[cat]=slotIndex を設定＝
+   *  「このカラムから適用」＝横断選択が押した瞬間に暗黙設定される。 */
+  const renderCell = (slotIndex: number, cat: ReferenceCategory) => {
+    const text = (slots[slotIndex]?.fields[cat.key] ?? "").trim();
     const lockReason = referenceLockReason(cat, protections);
     const hasText = text.length > 0;
-    const applied = appliedNote[cat.key] != null;
+    const isSource = resolveCatSlotIndex(cat.key) === slotIndex; // このカラムが現在の適用元か
+    const applied = appliedNote[cat.key] != null && isSource;    // 適用済みは「適用元カラム」だけに表示
     const scopeOn = cat.scope != null && activeScopes.includes(cat.scope);
     const status = lockReason
       ? { text: "🔒 保護で適用不可", cls: "border-bg-border bg-bg-base/40 text-text-muted/60" }
@@ -575,6 +501,16 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
       : hasText
       ? { text: "⚠ 未適用", cls: "border-amber-400/55 bg-amber-400/15 text-amber-100 font-bold" }
       : { text: "— 空", cls: "border-bg-border bg-bg-base/40 text-text-muted/55" };
+    // このカラムから適用：適用元をこのカラムに設定し、onApply へこのカラムの text を直接渡す
+    // （applyOne は resolveCatText を読むため、直後だと catSlotMap 反映待ちで旧スロットを読む＝直呼びで回避）。
+    // ★安全経路（catKey, text 文字列のみ）は不変。
+    const applyFromHere = () => {
+      if (lockReason) { flash(lockReason); return; }
+      if (!text) { flash(`「${cat.label}」に内容がありません`); return; }
+      setCatSlotMap((prev) => ({ ...prev, [cat.key]: slotIndex }));
+      const ok = onApply(cat.key, text);
+      flash(ok ? `「${cat.label}」をスロット${slotIndex + 1}から適用しました` : `「${cat.label}」を適用できませんでした`);
+    };
     return (
       <div key={cat.key} className={[
         "rounded-lg border px-2.5 py-2 space-y-1.5",
@@ -585,40 +521,124 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
           : "border-bg-border bg-bg-base/40",
       ].join(" ")}>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <input type="checkbox" checked={selectedCats.has(cat.key)} onChange={() => toggleSel(cat.key)}
-            disabled={!!lockReason} className="accent-violet-400 disabled:opacity-40" />
           <span className="text-[12px] font-bold text-text-base">{cat.label}</span>
           <span className={["text-[9px] px-1.5 py-0.5 rounded-full border leading-none", status.cls].join(" ")}>{status.text}</span>
           {cat.scope && scopeOn && (
             <span className="text-[9px] px-1 py-0.5 rounded-full border border-emerald-400/40 bg-emerald-400/10 text-emerald-200 leading-none">変更対象ON</span>
           )}
-          {slots.length > 1 && (
-            <select
-              value={srcSlotIndex}
-              onChange={(e) => setCatSlotMap((prev) => ({ ...prev, [cat.key]: Number(e.target.value) }))}
-              title={`「${cat.label}」をどのスロット（画像）から取るか`}
-              className="ml-auto text-[9px] px-1 py-0.5 rounded border border-sky-400/40 bg-sky-500/10 text-sky-100"
-            >
-              {slots.map((s, i) => (
-                <option key={i} value={i}>
-                  スロット{i + 1}{(s.fields[cat.key] ?? "").trim() ? "" : "（空）"}
-                </option>
-              ))}
-            </select>
+          {isSource && hasText && !lockReason && (
+            <span title="このカテゴリの適用元カラム" className="ml-auto text-[9px] px-1 py-0.5 rounded-full border border-bg-border text-text-muted/70 leading-none">◎ 適用元</span>
           )}
         </div>
         <AutoTextarea
           value={text}
-          onChange={(v) => setField(cat.key, v)}
+          onChange={(v) => setFieldAt(slotIndex, cat.key, v)}
           placeholder={cat.placeholder}
           minRows={["background", "outfit", "pose"].includes(cat.key) ? 6 : 4}
         />
         <div className="flex items-center justify-end">
-          <button type="button" onClick={() => applyOne(cat.key)} disabled={!!lockReason}
-            title={lockReason ?? `${cat.label}を変更対象に反映`}
+          <button type="button" onClick={applyFromHere} disabled={!!lockReason}
+            title={lockReason ?? `${cat.label}をこのカラム（スロット${slotIndex + 1}）から変更対象に反映`}
             className="text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-violet-400/50 bg-violet-500/15 text-violet-100 hover:bg-violet-500/25 transition disabled:opacity-40 disabled:cursor-not-allowed">
             {cat.label}に適用
           </button>
+        </div>
+      </div>
+    );
+  };
+
+  /** 段階3：1カラム＝1スロット（画像取り込み＋抽出操作＋そのスロットの13カテゴリ）。
+   *  取り込み/抽出/自動セット/お気に入りは全てこのカラムの slotIndex を対象に動作（混線しない）。 */
+  const renderColumn = (i: number) => {
+    const slot = slots[i] ?? emptySlot();
+    const active = i === activeSlot;
+    const busy = slot.extracting || slot.autoSelecting;
+    return (
+      <div
+        key={i}
+        onClick={() => setActiveSlot(i)}
+        className={[
+          "flex flex-col min-h-0 rounded-xl border p-2 lg:overflow-hidden transition",
+          active ? "border-violet-400/60 ring-1 ring-violet-400/30" : "border-bg-border",
+        ].join(" ")}
+      >
+        {/* カラムヘッダ（スロット番号・貼り付け先インジケータ） */}
+        <div className="shrink-0 flex items-center gap-1.5 mb-1.5">
+          <span className="text-[12px] font-bold text-text-base">スロット{i + 1}</span>
+          {active && <span title="Ctrl+V の貼り付け先" className="text-[9px] px-1 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-200 leading-none">貼付先</span>}
+          {busy && <span className="w-1.5 h-1.5 rounded-full bg-violet-200 animate-pulse" />}
+        </div>
+
+        {/* 取り込みエリア（左）＋抽出操作（右）を横並び（このカラム＝スロットに対して動作） */}
+        <div className="shrink-0 flex items-start gap-2">
+          <div
+            onContextMenu={(e) => { e.preventDefault(); setActiveSlot(i); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
+            onDragOver={(e) => { e.preventDefault(); setDragOverSlot(i); }}
+            onDragLeave={() => setDragOverSlot((cur) => (cur === i ? null : cur))}
+            onDrop={(e) => { e.preventDefault(); setDragOverSlot(null); const f = e.dataTransfer.files?.[0]; if (f) loadFile(f, i); }}
+            className={[
+              "flex-1 min-w-0 rounded-lg border border-dashed px-2 py-2 text-center transition",
+              dragOverSlot === i ? "border-violet-400 bg-violet-500/10" : "border-bg-border bg-bg-base/40",
+            ].join(" ")}
+          >
+            {slot.image ? (
+              <img src={slot.image} alt="参照" onClick={(e) => { e.stopPropagation(); setActiveSlot(i); setLightbox(true); }} title="クリックで拡大"
+                className="max-h-44 w-full rounded border border-bg-border object-contain cursor-zoom-in" />
+            ) : (
+              <div className="space-y-1.5">
+                <p className="text-[11px] text-text-base font-semibold">画像をドラッグ＆ドロップ</p>
+                <p className="text-[10px] text-text-muted/80 leading-snug">
+                  または <kbd className="px-1 rounded bg-white/10">Ctrl/⌘+V</kbd>
+                </p>
+                <button type="button" onClick={(e) => { e.stopPropagation(); fileTargetRef.current = i; fileRef.current?.click(); }}
+                  className="mt-1 text-[10.5px] px-2 py-1 rounded-lg border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition">
+                  📁 ファイルを選択
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="w-32 shrink-0 space-y-1.5">
+            <button type="button" disabled={!slot.image || busy}
+              onClick={(e) => { e.stopPropagation(); void runExtract(i); }}
+              title={slot.image ? "Gemini Vision で参照画像を解析し各欄を埋める" : "先に参照画像を貼ってください"}
+              className="w-full text-[11px] leading-tight font-bold px-2 py-1.5 rounded-lg border border-violet-400/55 bg-violet-500/18 text-violet-50 hover:bg-violet-500/28 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1 text-center">
+              {slot.extracting ? (<><span className="w-1.5 h-1.5 rounded-full bg-violet-200 animate-pulse" />解析中…</>) : "✨ 画像から要素抽出"}
+            </button>
+            <button type="button" disabled={!slot.image || busy}
+              onClick={(e) => { e.stopPropagation(); void handleAutoSelectFromReference(i); }}
+              title={slot.image ? "参照画像を解析し、変更対象を優先度順に最大5個ONにします（未解析なら自動で解析）。元画像の設定は変更しません。" : "先に参照画像を貼ってください"}
+              className="w-full text-[10.5px] leading-tight font-bold px-2 py-1.5 rounded-lg border border-sky-400/55 bg-sky-500/18 text-sky-50 hover:bg-sky-500/28 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1 text-center">
+              {slot.autoSelecting ? (<><span className="w-1.5 h-1.5 rounded-full bg-sky-200 animate-pulse" />自動セット中…</>) : "🎯 変更対象を自動セット"}
+            </button>
+            <button type="button" disabled={!slot.image || saving}
+              onClick={(e) => { e.stopPropagation(); void markSlotFavorite(i); }}
+              title={slot.image ? "このスロットの参照をお気に入り登録（画像は自動保存済み・お気に入りは上限から保護）" : "先に参照画像を貼ってください"}
+              className="w-full text-[10.5px] leading-tight font-semibold px-2 py-1 rounded border border-amber-400/45 bg-amber-500/12 text-amber-100 hover:bg-amber-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed">
+              {saving ? "登録中…" : "⭐ お気に入りに登録"}
+            </button>
+            {slot.image && (
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={(e) => { e.stopPropagation(); fileTargetRef.current = i; fileRef.current?.click(); }}
+                  className="flex-1 text-[10.5px] px-1 py-0.5 rounded border border-bg-border bg-bg-panel text-text-muted hover:text-text-base transition">画像を変更</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); updateSlot(i, { image: null }); }}
+                  className="flex-1 text-[10.5px] px-1 py-0.5 rounded border border-rose-400/35 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition">画像を外す</button>
+              </div>
+            )}
+          </div>
+        </div>
+        {slot.extractError && (
+          <p className="shrink-0 mt-1 text-[10px] text-rose-300/90 leading-snug">⚠ {slot.extractError}</p>
+        )}
+
+        {/* このスロットの抽出要素（lg で独立縦スクロール） */}
+        <div className="mt-2 space-y-2 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pr-0.5">
+          {priorityCats.map((cat) => renderCell(i, cat))}
+          <button type="button" onClick={(e) => { e.stopPropagation(); setOthersOpen((v) => !v); }}
+            className="w-full text-left text-[11px] font-semibold text-text-muted/80 hover:text-text-base px-1 py-1 transition">
+            {othersOpen ? "▲" : "▼"} その他（色味・小物・前景・世界観・質感・雰囲気）
+          </button>
+          {othersOpen && otherCats.map((cat) => renderCell(i, cat))}
         </div>
       </div>
     );
@@ -680,184 +700,17 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 py-2.5">
-        <div className="lg:grid lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-3 lg:items-start">
-        {/* ── 左カラム：参照画像＋抽出操作（広い画面では sticky） ── */}
-        <div className="space-y-3 lg:sticky lg:top-0">
-        {/* 反映済みサマリ（appliedNote がある時のみ・反映が分かる表示） */}
-        {Object.keys(appliedNote).length > 0 && (
-          <div className="rounded-lg border border-violet-400/45 bg-violet-500/12 px-2.5 py-1.5 text-[11px] text-violet-100 leading-snug">
-            ✅ 反映中：{REFERENCE_CATEGORIES.filter((c) => appliedNote[c.key]).map((c) => c.label).join("・")}
-            （{Object.keys(appliedNote).length}件）
-            <span className="text-violet-200/70"> ／「プロンプトを生成」で効きます</span>
-          </div>
-        )}
-        {/* 抽出済みだが「適用」未押下の軸を目立たせる＋ワンクリック全適用（適用押し忘れ対策） */}
-        {unappliedCats.length > 0 && (
-          <div className="rounded-lg border border-amber-400/50 bg-amber-400/10 px-2.5 py-2 text-[11px] text-amber-100 leading-snug flex items-center gap-2 flex-wrap">
-            <span className="flex-1 min-w-0">⚠ 抽出済み・未適用：{unappliedCats.map((c) => c.label).join("・")}（{unappliedCats.length}件）— <b>「適用」を押すまで反映されません</b></span>
-            <button type="button" onClick={applyAll}
-              title="抽出済みで未適用の軸をまとめて反映する"
-              className="shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-lg border border-amber-400/60 bg-amber-500/20 text-amber-50 hover:bg-amber-500/30 transition">
-              ✨ 全適用
-            </button>
-          </div>
-        )}
-        {/* 🖼 スロット・ストリップ（段階1：最大3・追加/削除・サムネ・抽出中インジケータ）。
-            クリックでアクティブスロットを切り替え、下の取り込みエリア／抽出ボタンはアクティブスロットに対して動作する。 */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {slots.map((s, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => setActiveSlot(i)}
-              title={`スロット${i + 1}${s.image ? "" : "（空）"}${i === activeSlot ? "・選択中" : ""}`}
-              className={[
-                "relative w-11 h-11 rounded-lg border overflow-hidden shrink-0 transition",
-                i === activeSlot ? "border-violet-400 ring-2 ring-violet-400/50" : "border-bg-border hover:border-violet-400/40",
-              ].join(" ")}
-            >
-              {s.image ? (
-                <img src={s.image} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="flex items-center justify-center w-full h-full text-[11px] text-text-muted/55 bg-bg-base/40">{i + 1}</span>
-              )}
-              {(s.extracting || s.autoSelecting) && (
-                <span className="absolute inset-0 flex items-center justify-center bg-black/45">
-                  <span className="w-2 h-2 rounded-full bg-violet-200 animate-pulse" />
-                </span>
-              )}
-              {slots.length > 1 && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => { e.stopPropagation(); removeSlot(i); }}
-                  title="このスロットを削除"
-                  className="absolute top-0 right-0 w-3.5 h-3.5 flex items-center justify-center bg-black/65 text-white text-[9px] leading-none rounded-bl hover:bg-rose-500/80 transition"
-                >✕</span>
-              )}
-            </button>
-          ))}
-          {slots.length < MAX_REF_SLOTS && (
-            <button
-              type="button"
-              onClick={addSlot}
-              title="参照画像スロットを追加（最大3）"
-              className="w-11 h-11 rounded-lg border border-dashed border-bg-border flex items-center justify-center text-[16px] text-text-muted/55 hover:text-text-base hover:border-violet-400/50 transition shrink-0"
-            >＋</button>
-          )}
-          {slots.length > 1 && (
-            <span className="text-[10px] text-text-muted/60 leading-tight">
-              スロット{activeSlot + 1}/{slots.length}を編集中・各スロットは個別に抽出します（{slots.length}枚なら{slots.length}回のAPI呼び出し）
-            </span>
-          )}
+      {/* 本体：3カラム（スロット別・lg で各カラム独立縦スクロール）。共有バー（反映状況・一括操作・注記）は撤去。 */}
+      <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden lg:flex lg:flex-col px-3 py-2.5">
+
+        {/* 3カラム（スロット別）。lg 未満は縦積み・lg で3等分＋各カラム独立縦スクロール。 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:flex-1 lg:min-h-0">
+          {[0, 1, 2].map((i) => renderColumn(i))}
         </div>
 
-        {/* 取り込みエリア（アクティブスロットに対して動作） */}
-        <div
-          onContextMenu={(e) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY }); }}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) loadFile(f); }}
-          className={[
-            "rounded-lg border border-dashed px-3 py-3 text-center transition",
-            dragOver ? "border-violet-400 bg-violet-500/10" : "border-bg-border bg-bg-base/40",
-          ].join(" ")}
-        >
-          {image ? (
-            <div className="space-y-2">
-              <img src={image} alt="参照" onClick={() => setLightbox(true)} title="クリックで拡大"
-                className="max-h-72 w-auto mx-auto rounded border border-bg-border object-contain cursor-zoom-in" />
-              <div className="flex items-center justify-center gap-2">
-                <button type="button" onClick={() => fileRef.current?.click()}
-                  className="text-[11px] px-2 py-0.5 rounded border border-bg-border bg-bg-panel text-text-muted hover:text-text-base transition">画像を変更</button>
-                <button type="button" onClick={() => updateSlot(activeSlot, { image: null })}
-                  className="text-[11px] px-2 py-0.5 rounded border border-rose-400/35 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition">画像を外す</button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              <p className="text-[12px] text-text-base font-semibold">画像をドラッグ＆ドロップ</p>
-              <p className="text-[10.5px] text-text-muted/80 leading-snug">
-                または <kbd className="px-1 rounded bg-white/10">Ctrl/⌘+V</kbd> で貼り付け（スクショ可）
-              </p>
-              <button type="button" onClick={() => fileRef.current?.click()}
-                className="mt-1 text-[11px] px-2.5 py-1 rounded-lg border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition">
-                📁 ファイルを選択
-              </button>
-            </div>
-          )}
-          <input ref={fileRef} type="file" accept="image/*" className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) loadFile(f); if (fileRef.current) fileRef.current.value = ""; }} />
-        </div>
-
-        {/* 抽出ボタン（Gemini Vision で参照画像を実解析） */}
-        <div className="rounded-lg border border-bg-border bg-bg-base/30 px-2.5 py-2">
-          <button type="button" disabled={!image || extracting || autoSelecting}
-            onClick={() => { void runExtract(); }}
-            title={image ? "Gemini Vision で参照画像を解析し各欄を埋める" : "先に参照画像を貼ってください"}
-            className="w-full text-[12px] font-bold px-2.5 py-1.5 rounded-lg border border-violet-400/55 bg-violet-500/18 text-violet-50 hover:bg-violet-500/28 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
-            {extracting ? (<><span className="w-1.5 h-1.5 rounded-full bg-violet-200 animate-pulse" />解析中…</>) : "✨ 画像から要素抽出"}
-          </button>
-          {extractError && (
-            <p className="text-[10px] text-rose-300/90 leading-snug pt-1.5">⚠ {extractError}</p>
-          )}
-          <button type="button" onClick={copyJson}
-            title="現在の13カテゴリ欄をJSONでコピー（抽出結果の確認・共有用）"
-            className="mt-1.5 w-full text-[11px] px-2 py-1 rounded border border-bg-border bg-bg-panel text-text-muted hover:text-text-base transition">
-            📋 抽出JSONをコピー
-          </button>
-          <button type="button" disabled={!image || saving}
-            onClick={() => { void markActiveSlotFavorite(); }}
-            title={image ? "このスロットの参照を「Reference Picker履歴」でお気に入り登録します（画像は入れた時点で自動保存済み・お気に入りは上限から保護されます）" : "先に参照画像を貼ってください"}
-            className="mt-1.5 w-full text-[11px] font-semibold px-2 py-1 rounded border border-amber-400/45 bg-amber-500/12 text-amber-100 hover:bg-amber-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed">
-            {saving ? "登録中…" : "⭐ お気に入りに登録"}
-          </button>
-          <p className="text-[10px] text-text-muted/65 leading-snug pt-1.5">
-            ※ 参照画像に実際に見える要素だけを抽出します（無い要素を足しません）。
-            顔・同一性・表情・体型は抽出せず、人物そのものは複製しません。手入力で上書きも可。
-          </p>
-        </div>
-
-        {/* 🎯 一発：参照画像→変更対象(scope)を自動セット（案B・UNION追加＋note注入・details/place 不触＝温室回避） */}
-        <div className="rounded-lg border border-sky-400/30 bg-sky-500/8 px-2.5 py-2">
-          <button type="button" disabled={!image || extracting || autoSelecting}
-            onClick={() => { void handleAutoSelectFromReference(); }}
-            title={image ? "参照画像を解析し、変更対象（背景/衣装/ポーズ等）を優先度順に最大5個ONにします（未解析なら自動で解析）。元画像の設定（背景の場所等）は変更しません。" : "先に参照画像を貼ってください"}
-            className="w-full text-[12px] font-bold px-2.5 py-2 rounded-lg border border-sky-400/55 bg-sky-500/18 text-sky-50 hover:bg-sky-500/28 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5">
-            {autoSelecting ? (<><span className="w-1.5 h-1.5 rounded-full bg-sky-200 animate-pulse" />解析して自動セット中…</>) : "🎯 画像から変更対象を自動セット"}
-          </button>
-          <p className="text-[10px] text-text-muted/65 leading-snug pt-1.5">
-            ※ 変更対象（背景/衣装/ポーズ等）を優先度順に最大5個ONにします。未解析なら自動で解析。元画像の設定（背景の場所など）は変更しません。
-          </p>
-        </div>
-
-        {/* 一括操作 */}
-        <div className="flex flex-wrap gap-1">
-          <BulkBtn label="背景だけ適用"  onClick={() => { applyOne("background"); }} />
-          <BulkBtn label="衣装だけ適用"  onClick={() => { applyOne("outfit"); }} />
-          <BulkBtn label="ポーズだけ適用" onClick={() => { applyOne("pose"); }} />
-          <BulkBtn label="構図だけ適用"  onClick={() => { applyOne("composition"); }} />
-          <BulkBtn label="光だけ適用"    onClick={() => { applyOne("lighting"); }} />
-          <BulkBtn label="色味だけ適用"  onClick={() => { applyOne("color"); }} />
-          <BulkBtn label="✨ 全適用" onClick={applyAll} accent />
-          <BulkBtn label="選択項目だけ適用" onClick={applySelected} />
-          <BulkBtn label="全解除" onClick={clearAll} danger />
-        </div>
-        </div>{/* /左カラム */}
-
-        {/* ── 右カラム：抽出結果（カテゴリ別）。優先6は常時展開、その他は折りたたみ ── */}
-        <div className="space-y-2 mt-3 lg:mt-0">
-          <p className="text-[11px] font-bold text-text-muted/80">参照画像から抽出された要素</p>
-          {priorityCats.map(renderCard)}
-
-          <button type="button" onClick={() => setOthersOpen((v) => !v)}
-            className="w-full text-left text-[11px] font-semibold text-text-muted/80 hover:text-text-base px-1 py-1 transition">
-            {othersOpen ? "▲" : "▼"} その他（色味・小物・前景・世界観・質感・雰囲気）
-          </button>
-          {othersOpen && otherCats.map(renderCard)}
-        </div>
-        </div>{/* /grid */}
+        {/* 共有 file input（📁ファイル選択・fileTargetRef で対象カラムを判定） */}
+        <input ref={fileRef} type="file" accept="image/*" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) loadFile(f, fileTargetRef.current); if (fileRef.current) fileRef.current.value = ""; }} />
       </div>
 
       {/* フッタ通知 */}
@@ -893,19 +746,5 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
         </>
       )}
     </aside>
-  );
-}
-
-function BulkBtn({ label, onClick, accent, danger }: { label: string; onClick: () => void; accent?: boolean; danger?: boolean }) {
-  const cls = danger
-    ? "border-rose-400/35 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16"
-    : accent
-    ? "border-violet-400/55 bg-violet-500/18 text-violet-50 hover:bg-violet-500/28"
-    : "border-bg-border bg-bg-panel text-text-muted hover:text-text-base";
-  return (
-    <button type="button" onClick={onClick}
-      className={["text-[10.5px] px-2 py-0.5 rounded border transition leading-none", cls].join(" ")}>
-      {label}
-    </button>
   );
 }
