@@ -217,6 +217,11 @@ export default function App() {
   /** 解除関数（deps非依存の useCallback）から最新の scopes / 参照由来 scope を参照するための ref。 */
   const scopesRef = useLatestRef(scopes);
   const refAppliedScopesRef = useLatestRef(refAppliedScopes);
+  /** 参照解除（handleUnapplyReference）の1対多判定用：background scope は参照カテゴリ以外にも
+   *  「背景を2D/非写実に」「斬新背景プリセット」が同じ scope をゲートとして共有する（ReflectionStatusBar の
+   *  bgStylizeActive/bgFires と同じ条件）。これらが有効な間は background 解除で巻き添えOFFにしない。 */
+  const avoidRealBackgroundRef = useLatestRef(avoidRealBackground);
+  const bgPresetNoteRef = useLatestRef(bgPresetNote);
   /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（生成しなくても残す）。
    *  生成時の自動保存（下記 runGenerate 内）と同じデータ源（referenceContextRef＝画像+抽出 /
    *  referenceNote＝適用）を使う追加経路。kind:"picker" / batchId:"" で記録（生成バッチ無し）。
@@ -1260,10 +1265,14 @@ export default function App() {
     const scope = REFERENCE_CATEGORIES.find((c) => c.key === catKey)?.scope;
     if (scope && refAppliedScopesRef.current.includes(scope)) {
       // 同じ scope を使う「他の」適用済み要素が残っていれば scope は維持（解除する catKey は除外して判定）
-      const stillUsed = REFERENCE_CATEGORIES.some(
+      const stillUsedByOtherRef = REFERENCE_CATEGORIES.some(
         (c) => c.key !== catKey && c.scope === scope && referenceNoteRef.current[c.key] != null,
       );
-      if (!stillUsed) {
+      // ★1対多：background は参照カテゴリ以外にも「背景2D化」「斬新背景プリセット」が同じ scope を
+      // 効かせるゲートとして共有する。これらが有効なら background 解除の巻き添えでOFFにしない。
+      const stillUsedByBgFeatures = scope === "background"
+        && (avoidRealBackgroundRef.current || bgPresetNoteRef.current.trim().length > 0);
+      if (!stillUsedByOtherRef && !stillUsedByBgFeatures) {
         setScopes((prev) => prev.filter((s) => s !== scope));
         setRefAppliedScopes((rec) => rec.filter((s) => s !== scope));
       }
