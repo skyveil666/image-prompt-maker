@@ -231,11 +231,17 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
     updateSlot(i, emptySlot());
     setCatSlotMap((prev) => {
       const next: Record<string, number> = {};
-      for (const [k, v] of Object.entries(prev)) if (v !== i) next[k] = v; // このスロットを指す横断選択は削除（→activeSlotへフォールバック）
+      for (const [k, v] of Object.entries(prev)) {
+        if (v !== i) { next[k] = v; continue; }
+        // v === i：このスロットが適用元だった catKey。適用済み（appliedNote）ならポインタを残す
+        // （落とすと resolveCatSlotIndex が activeSlot へフォールバックし、無関係なカラムへ
+        //  「適用済み／赤枠」表示が誤って移ってしまう＝宙吊り対策）。未適用（抽出のみ）なら素直に外す。
+        if (appliedNote[k] != null) next[k] = v;
+      }
       return next;
     });
     flash(`スロット${i + 1}の中身をクリアしました（適用済みの反映は解除していません）`);
-  }, [updateSlot, flash]);
+  }, [updateSlot, flash, appliedNote]);
 
   // ♻ 🕘履歴からの「再利用」：参照画像（サムネ）＋抽出13カテゴリをピッカーへ流し込み、開く。
   // token が変わるたびに再実行（同一レコードの再利用も拾う）。適用はユーザーが従来どおり押す＝適用ロジック不変。
@@ -613,7 +619,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
           {active && <span title="Ctrl+V の貼り付け先" className="text-[9px] px-1 py-0.5 rounded-full border border-violet-400/40 bg-violet-500/10 text-violet-200 leading-none">貼付先</span>}
           {busy && <span className="w-1.5 h-1.5 rounded-full bg-violet-200 animate-pulse" />}
           {hasContent && (
-            <button type="button" onClick={(e) => { e.stopPropagation(); clearSlot(i); }}
+            <button type="button" onClick={(e) => { e.stopPropagation(); setActiveSlot(i); clearSlot(i); }}
               title="このカラムの画像・抽出結果・要素選択をまるごと空にします（適用済みの反映は解除しません）"
               className="ml-auto text-[9px] px-1.5 py-0.5 rounded border border-rose-400/40 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition leading-none">
               🧹 中身をクリア
@@ -642,7 +648,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
                 <p className="text-[10px] text-text-muted/80 leading-snug">
                   または <kbd className="px-1 rounded bg-white/10">Ctrl/⌘+V</kbd>
                 </p>
-                <button type="button" onClick={(e) => { e.stopPropagation(); fileTargetRef.current = i; fileRef.current?.click(); }}
+                <button type="button" onClick={(e) => { e.stopPropagation(); setActiveSlot(i); fileTargetRef.current = i; fileRef.current?.click(); }}
                   className="mt-1 text-[10.5px] px-2 py-1 rounded-lg border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/22 transition">
                   📁 ファイルを選択
                 </button>
@@ -652,28 +658,28 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
 
           <div className="w-32 shrink-0 space-y-1.5">
             <button type="button" disabled={!slot.image || busy}
-              onClick={(e) => { e.stopPropagation(); void runExtract(i); }}
+              onClick={(e) => { e.stopPropagation(); setActiveSlot(i); void runExtract(i); }}
               title={slot.image ? "Gemini Vision で参照画像を解析し各欄を埋める" : "先に参照画像を貼ってください"}
               className="w-full text-[11px] leading-tight font-bold px-2 py-1.5 rounded-lg border border-violet-400/55 bg-violet-500/18 text-violet-50 hover:bg-violet-500/28 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1 text-center">
               {slot.extracting ? (<><span className="w-1.5 h-1.5 rounded-full bg-violet-200 animate-pulse" />解析中…</>) : "✨ 画像から要素抽出"}
             </button>
             <button type="button" disabled={!slot.image || busy}
-              onClick={(e) => { e.stopPropagation(); void handleAutoSelectFromReference(i); }}
+              onClick={(e) => { e.stopPropagation(); setActiveSlot(i); void handleAutoSelectFromReference(i); }}
               title={slot.image ? "参照画像を解析し、変更対象を優先度順に最大5個ONにします（未解析なら自動で解析）。元画像の設定は変更しません。" : "先に参照画像を貼ってください"}
               className="w-full text-[10.5px] leading-tight font-bold px-2 py-1.5 rounded-lg border border-sky-400/55 bg-sky-500/18 text-sky-50 hover:bg-sky-500/28 transition disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1 text-center">
               {slot.autoSelecting ? (<><span className="w-1.5 h-1.5 rounded-full bg-sky-200 animate-pulse" />自動セット中…</>) : "🎯 変更対象を自動セット"}
             </button>
             <button type="button" disabled={!slot.image || saving}
-              onClick={(e) => { e.stopPropagation(); void markSlotFavorite(i); }}
+              onClick={(e) => { e.stopPropagation(); setActiveSlot(i); void markSlotFavorite(i); }}
               title={slot.image ? "このスロットの参照をお気に入り登録（画像は自動保存済み・お気に入りは上限から保護）" : "先に参照画像を貼ってください"}
               className="w-full text-[10.5px] leading-tight font-semibold px-2 py-1 rounded border border-amber-400/45 bg-amber-500/12 text-amber-100 hover:bg-amber-500/22 transition disabled:opacity-40 disabled:cursor-not-allowed">
               {saving ? "登録中…" : "⭐ お気に入りに登録"}
             </button>
             {slot.image && (
               <div className="flex items-center gap-1">
-                <button type="button" onClick={(e) => { e.stopPropagation(); fileTargetRef.current = i; fileRef.current?.click(); }}
+                <button type="button" onClick={(e) => { e.stopPropagation(); setActiveSlot(i); fileTargetRef.current = i; fileRef.current?.click(); }}
                   className="flex-1 text-[10.5px] px-1 py-0.5 rounded border border-bg-border bg-bg-panel text-text-muted hover:text-text-base transition">画像を変更</button>
-                <button type="button" onClick={(e) => { e.stopPropagation(); updateSlot(i, { image: null }); }}
+                <button type="button" onClick={(e) => { e.stopPropagation(); setActiveSlot(i); updateSlot(i, { image: null }); }}
                   className="flex-1 text-[10.5px] px-1 py-0.5 rounded border border-rose-400/35 bg-rose-400/8 text-rose-200/85 hover:bg-rose-400/16 transition">画像を外す</button>
               </div>
             )}
@@ -686,7 +692,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
         {/* このスロットの抽出要素（lg で独立縦スクロール） */}
         <div className="mt-2 space-y-2 lg:flex-1 lg:min-h-0 lg:overflow-y-auto pr-0.5">
           {priorityCats.map((cat) => renderCell(i, cat))}
-          <button type="button" onClick={(e) => { e.stopPropagation(); setOthersOpen((v) => !v); }}
+          <button type="button" onClick={(e) => { e.stopPropagation(); setActiveSlot(i); setOthersOpen((v) => !v); }}
             className="w-full text-left text-[11px] font-semibold text-text-muted/80 hover:text-text-base px-1 py-1 transition">
             {othersOpen ? "▲" : "▼"} その他（色味・小物・前景・世界観・質感・雰囲気）
           </button>
