@@ -269,7 +269,7 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
   /** 段階3：画像をスロットへセットした直後に「Reference Picker履歴」へ自動保存する（入れた瞬間の自動保存）。
    *  contentHash で dedup（同じ画像を入れ直しても新規レコードを作らない・saveReferenceRecord側で判定）。
    *  抽出前のため extracted は空で保存し、抽出が完了したら同じレコードへ追記する（runExtract/handleAutoSelectFromReference）。
-   *  失敗してもピッカーの操作は妨げない（ベストエフォート・トースト無し＝自動保存は静かに行う）。 */
+   *  失敗してもピッカーの操作は妨げない（ベストエフォート）。保存成功時のみ控えめなトーストで知らせる。 */
   const autoSaveSlotImage = useCallback(async (slotIndex: number, image: string) => {
     try {
       const [refThumb, contentHash] = await Promise.all([makeThumbnail(image), imageContentHash(image)]);
@@ -282,10 +282,11 @@ export function ReferenceImportPanel({ visible, protections, activeScopes, appli
         kind: "picker",
       });
       updateSlot(slotIndex, { recordId: id });
+      if (id) flash(`スロット${slotIndex + 1}：画像を保存しました`);
     } catch {
       /* 自動保存の失敗はピッカー操作を止めない */
     }
-  }, [updateSlot]);
+  }, [updateSlot, flash]);
 
   const loadFile = useCallback((file: File, slotIndex: number = activeSlot) => {
     if (!file.type.startsWith("image/")) { flash("画像ファイルを入れてください"); return; }
