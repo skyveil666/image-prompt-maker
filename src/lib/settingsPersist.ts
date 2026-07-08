@@ -216,6 +216,9 @@ export function loadSettings(): PersistedSettings {
     // 旧保存データに customInstructionItems が無く customInstruction が非空なら、その全文を
     // 「1項目（未分割・status:applied）」として1回だけ変換する（★再分割はしない＝挙動を変えない）。
     // 新規の複数項目分割は今後の入力からのみ発生する。
+    // ★移行後はドラフト欄(customInstruction)を空にする：残したままだと、ユーザーがそのまま
+    //   Enter/➕で追加した時に「全文項目（移行分）」と「分割項目（追加分）」が二重に残ってしまう
+    //   （2026-07-08 実機で確認された不具合の再発防止）。
     try {
       const ITEMS_MIGRATE_KEY = "ipm_custom_items_migrate_v1";
       if (!localStorage.getItem(ITEMS_MIGRATE_KEY)) {
@@ -223,6 +226,7 @@ export function loadSettings(): PersistedSettings {
           loaded.customInstructionItems = [
             { id: `ci_${Date.now()}_000000`, text: loaded.customInstruction, status: "applied" },
           ];
+          loaded.customInstruction = "";
           saveSettings(loaded);
         }
         localStorage.setItem(ITEMS_MIGRATE_KEY, "1");
