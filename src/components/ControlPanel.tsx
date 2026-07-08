@@ -19,10 +19,11 @@
  * └──────────────────────────────────────────────────────────┘
  */
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import type { Expression, Scope } from "../types";
-import { splitIntoItems } from "../lib/customInstructionItems";
+import type { CustomInstructionItem } from "../lib/customInstructionItems";
+import { appendItemsFromText, toggleItemStatus, removeItem } from "../lib/customInstructionItems";
 
 // 守るもの行：体型/ポーズ・色味/雰囲気・元画像構図 の保護チップは UI 非表示（hide-not-delete）。
 //   state（bodyPoseLock/colorMoodLock/compositionLock）は既定 true のまま dormant 据え置き＝保護ON継続・
@@ -130,9 +131,12 @@ interface Props {
   // 変更範囲
   scopes: Scope[];
   onScopesChange: (v: Scope[]) => void;
-  /** ✏ 指示（自由文・任意）：変更対象まわりの単一フリー欄。非空なら全案へ注入＋§5バッジ（軸非依存）。 */
+  /** ✏ 指示（自由文・任意）：ドラフト入力欄（下書き）。「➕ 項目に追加」/Enterで確定した分だけitems[]に追記される。 */
   customInstruction?: string;
   onCustomInstructionChange?: (v: string) => void;
+  /** ✏ 指示の項目一覧（段階2＝実データ）。applied項目だけが全案へ注入＋§5バッジ発火（軸非依存）。 */
+  customInstructionItems?: CustomInstructionItem[];
+  onCustomInstructionItemsChange?: (items: CustomInstructionItem[]) => void;
   /** 変更対象（scopes）だけリセット */
   onScopesReset: () => void;
   /** 変更範囲＋ブースト＋お気に入り＋ZOZO まですべてリセット（守るものは維持） */
@@ -175,6 +179,7 @@ interface Props {
 export function ControlPanel({
   scopes, onScopesChange,
   customInstruction = "", onCustomInstructionChange,
+  customInstructionItems = [], onCustomInstructionItemsChange,
   onScopesReset, onResetAll,
   boostArea,
   scopeFlashKey = 0,
@@ -190,10 +195,14 @@ export function ControlPanel({
   const compConflict    = scopes.includes("camera") || scopes.includes("aspect_ratio");
   const glossDimDisabled = textureDisabled || textureOriginal;
 
-  // ✏ 指示欄の項目分割プレビュー（段階1・表示は仮＝読み取り専用）。入力欄そのものの値からその場で
-  // 導出するだけで、customInstructionItems（永続state）には書き込まない。buildInputs/§5バッジは
-  // customInstruction のまま不変＝ここは見た目だけの先行表示。
-  const customInstructionPreview = useMemo(() => splitIntoItems(customInstruction), [customInstruction]);
+  // ✏ 指示欄の項目化（段階2）：ドラフト欄(customInstruction)と項目一覧(customInstructionItems)は別実体。
+  // ドラフトへの入力はここでは items[] を書き換えない＝保留中の項目が打ち足しのたびに消えるのを防ぐ。
+  // 「➕ 項目に追加」/Enter で確定した分だけ末尾に追記し、ドラフト欄を空に戻す。
+  const handleAddDraftToItems = () => {
+    if (!customInstruction.trim()) return;
+    onCustomInstructionItemsChange?.(appendItemsFromText(customInstructionItems, customInstruction));
+    onCustomInstructionChange?.("");
+  };
 
   // 詳細設定（強度・質感）の折りたたみ
   const [detailOpen, setDetailOpen] = useState(false);
@@ -324,22 +333,63 @@ export function ControlPanel({
           <textarea
             value={customInstruction}
             onChange={(e) => onCustomInstructionChange?.(e.target.value)}
-            placeholder="例）右手を顎に、背景はデジタル風に…（この方向を最優先で反映。安全・NG指定には常に従う）"
-            rows={2}
+            onKeyDown={(e) => {
+              // Enterで項目に追加（Shift+Enterは改行のまま・誤確定防止）
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleAddDraftToItems();
+              }
+            }}
+            placeholder="例）右手を顎に、背景はデジタル風に…（Enterで項目に追加。安全・NG指定には常に従う）"
+            rows={5}
             className="w-full px-2.5 py-2 rounded-lg border border-bg-border bg-bg-base text-[12px] text-text-base placeholder:text-text-muted/45 outline-none focus:border-violet-400/50 transition resize-none"
           />
-          {/* ✏ 項目分割プレビュー（段階1・表示のみ・操作不可＝適用/保留/削除UIは段階2）。 */}
-          {customInstructionPreview.length > 1 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {customInstructionPreview.map((text, i) => (
-                <span
-                  key={i}
-                  title={text}
-                  className="max-w-[220px] truncate text-[10px] px-1.5 py-0.5 rounded border border-bg-border bg-bg-panel text-text-muted/80"
-                >
-                  {text}
-                </span>
-              ))}
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <span className="text-[10px] text-text-muted/60 select-none">Enterで項目に追加（Shift+Enterで改行）</span>
+            <button
+              type="button"
+              onClick={handleAddDraftToItems}
+              disabled={!customInstruction.trim()}
+              className="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-violet-400/40 bg-violet-400/10 text-violet-200/90 hover:bg-violet-400/20 disabled:opacity-35 disabled:cursor-not-allowed transition"
+            >
+              ➕ 項目に追加
+            </button>
+          </div>
+          {/* ✏ 項目一覧（段階2）：ダブルクリックで適用⇔保留トグル、×で削除（破壊的操作は独立ボタン）。 */}
+          {customInstructionItems.length > 0 && (
+            <div className="mt-1.5 flex flex-col gap-1">
+              {customInstructionItems.map((item) => {
+                const applied = item.status === "applied";
+                return (
+                  <div
+                    key={item.id}
+                    onDoubleClick={() =>
+                      onCustomInstructionItemsChange?.(toggleItemStatus(customInstructionItems, item.id))
+                    }
+                    onMouseDown={(e) => { if (e.detail > 1) e.preventDefault(); }}
+                    title={applied ? "適用中：今プロンプトに入っています（ダブルクリックで保留にする）" : "保留中：ダブルクリックで適用に戻す"}
+                    className={[
+                      "flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px] select-none cursor-pointer transition",
+                      applied
+                        ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25"
+                        : "border-bg-border bg-bg-base/40 text-text-muted/55 hover:bg-bg-base/60",
+                    ].join(" ")}
+                  >
+                    {!applied && (
+                      <span className="shrink-0 text-[10px] font-semibold text-text-muted/70 select-none">⏸保留中</span>
+                    )}
+                    <span className="flex-1 truncate">{item.text}</span>
+                    <button
+                      type="button"
+                      onClick={() => onCustomInstructionItemsChange?.(removeItem(customInstructionItems, item.id))}
+                      title="この項目を削除（元に戻せません）"
+                      className="shrink-0 w-4 h-4 flex items-center justify-center rounded text-text-muted/60 hover:text-rose-200 hover:bg-rose-500/20 transition leading-none"
+                    >
+                      ×
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

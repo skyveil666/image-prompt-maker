@@ -43,3 +43,19 @@ export function joinAppliedItemsText(items: CustomInstructionItem[]): string {
     .map((i) => i.text)
     .join("\n");
 }
+
+/** 指定IDの項目の適用/保留を切り替える（ダブルクリック用・他の項目は変更しない）。 */
+export function toggleItemStatus(items: CustomInstructionItem[], id: string): CustomInstructionItem[] {
+  return items.map((i) => (i.id === id ? { ...i, status: i.status === "applied" ? "held" : "applied" } : i));
+}
+
+/** 指定IDの項目を完全に削除する（保留と違い元に戻せない・UI側は独立ボタンにすること）。 */
+export function removeItem(items: CustomInstructionItem[], id: string): CustomInstructionItem[] {
+  return items.filter((i) => i.id !== id);
+}
+
+/** ドラフト欄の生テキストを分割し、新規applied項目として既存items[]の末尾に追記する。
+ *  既存項目のstatusには触れない＝保留中の項目が入力の打ち足しで消えたり復活したりしない。 */
+export function appendItemsFromText(items: CustomInstructionItem[], raw: string): CustomInstructionItem[] {
+  return [...items, ...itemsFromText(raw)];
+}

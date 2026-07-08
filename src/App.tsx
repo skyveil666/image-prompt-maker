@@ -33,6 +33,7 @@ import {
 } from "./lib/quickActions";
 import { buildOutfitColorfulNote, buildOutfitColorVarietyNote } from "./lib/outfitColorNotes";
 import { buildCustomInstructionNote, type MemoBadge } from "./lib/axisMemoNote";
+import { joinAppliedItemsText } from "./lib/customInstructionItems";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
 import { analyzeFullHistory, filterRecentWindow, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
 import { ReferenceImportPanel, REFERENCE_CATEGORIES, referenceLockReason } from "./components/ReferenceImportPanel";
@@ -127,6 +128,7 @@ export default function App() {
     details, setDetails,
     extraInstructions, setExtraInstructions,
     customInstruction, setCustomInstruction,
+    customInstructionItems, setCustomInstructionItems,
     ngList, setNgList,
     tagNg, setTagNg,
     bodyPoseLock, setBodyPoseLock,
@@ -541,10 +543,14 @@ export default function App() {
         (scopes.includes("outfit") && details.outfit.color === "auto" && !colorMoodLock
           && !(decorationColorLink && (details.outfit.decoration === "maximal" || details.outfit.decoration === "elaborate")))
           ? buildOutfitColorVarietyNote(count) : "",
-        // ✏ 指示（自由文・任意）：変更対象まわりの単一フリー欄。軸非依存＝非空なら全案へ強め注入。
+        // ✏ 指示（自由文・任意・段階2＝項目化後）：変更対象まわりの単一フリー欄。軸非依存＝非空なら全案へ強め注入。
         //   §4不触（extraInstructions 経由・サーバは【ユーザー追加指示】として verbatim 展開）。出力は既存
-        //   サニタイザが無条件に通す（証明済）。発火条件は §5 バッジと同一（customInstruction 非空）。
-        customInstruction.trim() ? buildCustomInstructionNote(customInstruction) : "",
+        //   サニタイザが無条件に通す（証明済）。発火条件は §5 バッジと同一（applied項目が1件以上）。
+        //   held の項目はここでは合流しない＝「一部だけ保留」で除外できる（customInstructionItems.ts参照）。
+        (() => {
+          const joined = joinAppliedItemsText(customInstructionItems);
+          return joined.trim() ? buildCustomInstructionNote(joined) : "";
+        })(),
         splitNg(ngList, forbiddenTokens).positiveGuidance,
       ].filter(Boolean).join("\n\n"),
       faceLock,
@@ -631,7 +637,7 @@ export default function App() {
       bgPresetNote,
       referenceNoteText,
       extraInstructions,
-      customInstruction,
+      customInstructionItems,
       ngList,
       forbiddenTokens,
       levels,
@@ -668,20 +674,24 @@ export default function App() {
   );
 
   // ✏ 「指示（自由文）」の §5「見えない支配」バッジ（メイン ReflectionStatusBar とアレンジ画面で共用）。
-  //   発火条件は buildInputs の注入ゲートと同一（customInstruction 非空）＝「効くのに見えない」を作らない。
+  //   発火条件は buildInputs の注入ゲートと同一（applied項目が1件以上）＝「効くのに見えない」を作らない。
   //   アレンジも buildInputs() 経由で extra へ焼き込まれるため、この単一集合で厳密一致する。
+  //   held のみ（全保留）の時は実際に何も注入されないためバッジも出さない。
   const memoBadges = useMemo<MemoBadge[]>(
-    () =>
-      customInstruction.trim()
+    () => {
+      const joined = joinAppliedItemsText(customInstructionItems);
+      return joined.trim()
         ? [{
             key: "custom",
             label: "✏ 指示反映中",
-            summary: customInstruction.trim(),
-            clearTitle: "この指示を全案から解除する（指示欄を空にします）",
-            onClear: () => setCustomInstruction(""),
+            summary: joined,
+            clearTitle: "この指示を全案から解除する（項目は削除せず、すべて保留にします）",
+            // 削除ではなく全項目を保留に戻す（データは残る＝誤って全消しにしない）。
+            onClear: () => setCustomInstructionItems((prev) => prev.map((i) => ({ ...i, status: "held" as const }))),
           }]
-        : [],
-    [customInstruction]
+        : [];
+    },
+    [customInstructionItems]
   );
 
   /**
@@ -2014,6 +2024,8 @@ export default function App() {
                 onScopesChange={setScopes}
                 customInstruction={customInstruction}
                 onCustomInstructionChange={setCustomInstruction}
+                customInstructionItems={customInstructionItems}
+                onCustomInstructionItemsChange={setCustomInstructionItems}
                 onScopesReset={() => setScopes([])}
                 onResetAll={() => {
                   handleResetAll();
