@@ -24,6 +24,7 @@ import type { ReactNode } from "react";
 import type { Expression, Scope } from "../types";
 import type { CustomInstructionItem } from "../lib/customInstructionItems";
 import { appendItemsFromText, toggleItemStatus, removeItem } from "../lib/customInstructionItems";
+import { useAutoResizeTextarea } from "../lib/useAutoResizeTextarea";
 
 // 守るもの行：体型/ポーズ・色味/雰囲気・元画像構図 の保護チップは UI 非表示（hide-not-delete）。
 //   state（bodyPoseLock/colorMoodLock/compositionLock）は既定 true のまま dormant 据え置き＝保護ON継続・
@@ -203,6 +204,8 @@ export function ControlPanel({
     onCustomInstructionItemsChange?.(appendItemsFromText(customInstructionItems, customInstruction));
     onCustomInstructionChange?.("");
   };
+  // 末尾入力欄はチップ列と同じ枠に同居させるため内容に合わせて高さを自動調整する
+  const draftInputRef = useAutoResizeTextarea(customInstruction, { minRows: 1 });
 
   // 詳細設定（強度・質感）の折りたたみ
   const [detailOpen, setDetailOpen] = useState(false);
@@ -330,68 +333,70 @@ export function ControlPanel({
             ✏ 指示（自由文・任意）
             <span className="text-[10px] font-normal text-text-desc">変更対象まわりの自由指示。全案に効きます</span>
           </label>
-          <textarea
-            value={customInstruction}
-            onChange={(e) => onCustomInstructionChange?.(e.target.value)}
-            onKeyDown={(e) => {
-              // Enterで項目に追加（Shift+Enterは改行のまま・誤確定防止）
-              if (e.key === "Enter" && !e.shiftKey) {
+          {/* ✏ SD風チップ入力：確定チップ(緑=applied/グレー=held)と末尾ドラフト入力を同一枠に同居させる。
+              枠自体は rounded-lg border bg-bg-base で旧textareaと同じ見た目。中身は flex-wrap で
+              チップ→末尾入力の順に並べ、溢れたら内部スクロール（枠は肥大しない）。 */}
+          <div
+            onClick={() => draftInputRef.current?.focus()}
+            className="flex flex-wrap items-center content-start gap-1.5 min-h-[84px] max-h-[180px] overflow-y-auto rounded-lg border border-bg-border bg-bg-base px-2.5 py-2 cursor-text focus-within:border-violet-400/50 transition"
+          >
+            {customInstructionItems.map((item) => {
+              const applied = item.status === "applied";
+              return (
+                <div
+                  key={item.id}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCustomInstructionItemsChange?.(toggleItemStatus(customInstructionItems, item.id));
+                  }}
+                  title={`${item.text}\n（クリックで${applied ? "保留" : "適用"}にする）`}
+                  className={[
+                    "inline-flex items-center gap-1 max-w-[220px] pl-2 pr-1 py-1 rounded-full border text-[11px] select-none cursor-pointer transition",
+                    applied
+                      ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25"
+                      : "border-bg-border bg-bg-base/40 text-text-muted/55 hover:bg-bg-base/60",
+                  ].join(" ")}
+                >
+                  {!applied && (
+                    <span className="shrink-0 text-[10px]" aria-hidden>⏸</span>
+                  )}
+                  <span className="truncate">{item.text}</span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCustomInstructionItemsChange?.(removeItem(customInstructionItems, item.id));
+                    }}
+                    title="この項目を削除（元に戻せません）"
+                    className="shrink-0 w-3.5 h-3.5 flex items-center justify-center rounded-full text-text-muted/60 hover:text-rose-200 hover:bg-rose-500/25 transition leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+            <textarea
+              ref={draftInputRef}
+              value={customInstruction}
+              onChange={(e) => onCustomInstructionChange?.(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || e.shiftKey) return;
+                // IME変換確定のEnterでは項目化しない（isComposing＋keyCode 229 の両方でガード）
+                if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                 e.preventDefault();
                 handleAddDraftToItems();
+              }}
+              onClick={(e) => e.stopPropagation()}
+              placeholder={
+                customInstructionItems.length === 0
+                  ? "例）右手を顎に、背景はデジタル風に…（Enterで項目に追加。安全・NG指定には常に従う）"
+                  : ""
               }
-            }}
-            placeholder="例）右手を顎に、背景はデジタル風に…（Enterで項目に追加。安全・NG指定には常に従う）"
-            rows={5}
-            className="w-full px-2.5 py-2 rounded-lg border border-bg-border bg-bg-base text-[12px] text-text-base placeholder:text-text-muted/45 outline-none focus:border-violet-400/50 transition resize-none"
-          />
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <span className="text-[10px] text-text-muted/60 select-none">Enterで項目に追加（Shift+Enterで改行）</span>
-            <button
-              type="button"
-              onClick={handleAddDraftToItems}
-              disabled={!customInstruction.trim()}
-              className="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-violet-400/40 bg-violet-400/10 text-violet-200/90 hover:bg-violet-400/20 disabled:opacity-35 disabled:cursor-not-allowed transition"
-            >
-              ➕ 項目に追加
-            </button>
+              rows={1}
+              className="flex-1 min-w-[120px] bg-transparent border-none outline-none resize-none overflow-hidden text-[12px] text-text-base placeholder:text-text-muted/45 py-0.5"
+            />
           </div>
-          {/* ✏ 項目一覧（段階2）：ダブルクリックで適用⇔保留トグル、×で削除（破壊的操作は独立ボタン）。 */}
-          {customInstructionItems.length > 0 && (
-            <div className="mt-1.5 flex flex-col gap-1">
-              {customInstructionItems.map((item) => {
-                const applied = item.status === "applied";
-                return (
-                  <div
-                    key={item.id}
-                    onDoubleClick={() =>
-                      onCustomInstructionItemsChange?.(toggleItemStatus(customInstructionItems, item.id))
-                    }
-                    onMouseDown={(e) => { if (e.detail > 1) e.preventDefault(); }}
-                    title={applied ? "適用中：今プロンプトに入っています（ダブルクリックで保留にする）" : "保留中：ダブルクリックで適用に戻す"}
-                    className={[
-                      "flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[11px] select-none cursor-pointer transition",
-                      applied
-                        ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25"
-                        : "border-bg-border bg-bg-base/40 text-text-muted/55 hover:bg-bg-base/60",
-                    ].join(" ")}
-                  >
-                    {!applied && (
-                      <span className="shrink-0 text-[10px] font-semibold text-text-muted/70 select-none">⏸保留中</span>
-                    )}
-                    <span className="flex-1 truncate">{item.text}</span>
-                    <button
-                      type="button"
-                      onClick={() => onCustomInstructionItemsChange?.(removeItem(customInstructionItems, item.id))}
-                      title="この項目を削除（元に戻せません）"
-                      className="shrink-0 w-4 h-4 flex items-center justify-center rounded text-text-muted/60 hover:text-rose-200 hover:bg-rose-500/20 transition leading-none"
-                    >
-                      ×
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          <p className="mt-1 text-[10px] text-text-muted/50 select-none">Enterで項目に追加（Shift+Enterで改行）・クリックで適用⇔保留・×で削除</p>
         </div>
       </div>
 
