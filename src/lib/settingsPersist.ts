@@ -20,6 +20,7 @@ import type {
 import { DEFAULT_DETAILS } from "../types";
 import type { ZozoTrend } from "./zozoTrend";
 import { stripViralImageNote } from "./viralNote";
+import type { CustomInstructionItem } from "./customInstructionItems";
 
 // ─── 定数 ─────────────────────────────────────────────────────────────────────
 
@@ -34,8 +35,13 @@ export interface PersistedSettings {
   count:              Count;
   details:            DetailSettings;
   extraInstructions:  string;
-  /** ✏ 指示（自由文・任意）：変更対象まわりの単一フリー欄。非空なら全案へ注入。 */
+  /** ✏ 指示（自由文・任意）：変更対象まわりの単一フリー欄。非空なら全案へ注入。
+   *  ★段階1(項目分割)以降は customInstructionItems が実体。本フィールドは入力欄の生テキストとして
+   *  hide-not-delete で温存（旧バージョン互換・移行元）。 */
   customInstruction:  string;
+  /** ✏ 指示欄の項目分割（段階1・optional＝後方互換）。未設定の旧保存データは loadSettings() が
+   *  customInstruction を1項目として一度だけ変換する（旧データの再分割はしない＝挙動保持）。 */
+  customInstructionItems?: CustomInstructionItem[];
   ngList:             string;
   /** タグ個別NG："category.field:value" 形式。送信ゲートで en 語へ解決し【NG】(ngList)へ合流する。*/
   tagNg:              string[];
@@ -93,6 +99,7 @@ export const SETTINGS_DEFAULTS: PersistedSettings = {
   details:            DEFAULT_DETAILS,
   extraInstructions:  "",
   customInstruction:  "",
+  customInstructionItems: [],
   ngList:             "",
   tagNg:              [],
   viralMode:          false,
@@ -201,6 +208,24 @@ export function loadSettings(): PersistedSettings {
         }
         saveSettings(loaded);                                        // 結果を永続化（リロードしても維持）
         localStorage.setItem(RESTORE_KEY, "1");
+      }
+    } catch {
+      // localStorage 不可環境では移行をスキップ
+    }
+    // ── 一度きりの移行：customInstruction(単一string) → customInstructionItems(段階1) ─────
+    // 旧保存データに customInstructionItems が無く customInstruction が非空なら、その全文を
+    // 「1項目（未分割・status:applied）」として1回だけ変換する（★再分割はしない＝挙動を変えない）。
+    // 新規の複数項目分割は今後の入力からのみ発生する。
+    try {
+      const ITEMS_MIGRATE_KEY = "ipm_custom_items_migrate_v1";
+      if (!localStorage.getItem(ITEMS_MIGRATE_KEY)) {
+        if ((!loaded.customInstructionItems || loaded.customInstructionItems.length === 0) && loaded.customInstruction.trim()) {
+          loaded.customInstructionItems = [
+            { id: `ci_${Date.now()}_000000`, text: loaded.customInstruction, status: "applied" },
+          ];
+          saveSettings(loaded);
+        }
+        localStorage.setItem(ITEMS_MIGRATE_KEY, "1");
       }
     } catch {
       // localStorage 不可環境では移行をスキップ

@@ -12,6 +12,7 @@ import type {
 } from "../types";
 import type { ZozoTrend } from "./zozoTrend";
 import { loadSettings, saveSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY, type PersistedSettings } from "./settingsPersist";
+import type { CustomInstructionItem } from "./customInstructionItems";
 
 /**
  * 永続設定（PersistedSettings の30項目）の state 群を集約するフック。
@@ -36,6 +37,9 @@ export function usePersistedSettings() {
   const [details, setDetails] = useState<DetailSettings>(s0.details);
   const [extraInstructions, setExtraInstructions] = useState(s0.extraInstructions);
   const [customInstruction, setCustomInstruction] = useState<string>(s0.customInstruction ?? "");
+  /** ✏ 指示欄の項目分割（段階1）。commit1時点ではloadSettings()の一度きり移行でのみ書き込まれる
+   *  （表示は仮＝App/ControlPanelはまだ本stateを消費しない・buildInputs/§5は customInstruction のまま不変）。 */
+  const [customInstructionItems, setCustomInstructionItems] = useState<CustomInstructionItem[]>(s0.customInstructionItems ?? []);
   const [ngList, setNgList] = useState(s0.ngList);
   const [tagNg, setTagNg] = useState<string[]>(s0.tagNg ?? []);
   const [bodyPoseLock, setBodyPoseLock] = useState(s0.bodyPoseLock);
@@ -81,7 +85,7 @@ export function usePersistedSettings() {
   useEffect(() => {
     saveSettings({
       scopes, moods, autoMoodCategories, count, details,
-      extraInstructions, customInstruction, ngList, tagNg, viralMode, strength, glossLevel,
+      extraInstructions, customInstruction, customInstructionItems, ngList, tagNg, viralMode, strength, glossLevel,
       dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
       promptTarget, avoidCliche, avoidRealBackground,
       bodyPoseLock, colorMoodLock, compositionLock,
@@ -93,7 +97,7 @@ export function usePersistedSettings() {
     });
   }, [
     scopes, moods, autoMoodCategories, count, details,
-    extraInstructions, customInstruction, ngList, tagNg, viralMode, strength, glossLevel,
+    extraInstructions, customInstruction, customInstructionItems, ngList, tagNg, viralMode, strength, glossLevel,
     dimensionLevel, realismLevel, realismType, textureOriginal, textureDisabled,
     promptTarget, avoidCliche, avoidRealBackground,
     bodyPoseLock, colorMoodLock, compositionLock,
@@ -116,6 +120,7 @@ export function usePersistedSettings() {
       setDetails(next.details);
       setExtraInstructions(next.extraInstructions);
       setCustomInstruction(next.customInstruction ?? "");
+      setCustomInstructionItems(next.customInstructionItems ?? []);
       setNgList(next.ngList);
       setTagNg(next.tagNg);
       setViralMode(next.viralMode);
@@ -155,6 +160,7 @@ export function usePersistedSettings() {
     details, setDetails,
     extraInstructions, setExtraInstructions,
     customInstruction, setCustomInstruction,
+    customInstructionItems, setCustomInstructionItems,
     ngList, setNgList,
     tagNg, setTagNg,
     bodyPoseLock, setBodyPoseLock,

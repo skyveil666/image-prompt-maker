@@ -19,9 +19,10 @@
  * └──────────────────────────────────────────────────────────┘
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import type { ReactNode } from "react";
 import type { Expression, Scope } from "../types";
+import { splitIntoItems } from "../lib/customInstructionItems";
 
 // 守るもの行：体型/ポーズ・色味/雰囲気・元画像構図 の保護チップは UI 非表示（hide-not-delete）。
 //   state（bodyPoseLock/colorMoodLock/compositionLock）は既定 true のまま dormant 据え置き＝保護ON継続・
@@ -189,6 +190,11 @@ export function ControlPanel({
   const compConflict    = scopes.includes("camera") || scopes.includes("aspect_ratio");
   const glossDimDisabled = textureDisabled || textureOriginal;
 
+  // ✏ 指示欄の項目分割プレビュー（段階1・表示は仮＝読み取り専用）。入力欄そのものの値からその場で
+  // 導出するだけで、customInstructionItems（永続state）には書き込まない。buildInputs/§5バッジは
+  // customInstruction のまま不変＝ここは見た目だけの先行表示。
+  const customInstructionPreview = useMemo(() => splitIntoItems(customInstruction), [customInstruction]);
+
   // 詳細設定（強度・質感）の折りたたみ
   const [detailOpen, setDetailOpen] = useState(false);
 
@@ -310,7 +316,7 @@ export function ControlPanel({
         </div>
         {/* ✏ 指示（自由文・任意）：変更対象トグルの直下。軸非依存の単一フリー欄。
             extraInstructions 経由でサーバへ→出力は既存サニタイザが無条件に通す（§4不触・安全/NG優先）。 */}
-        <div className="mt-1.5">
+        <div className="mt-1.5 rounded-lg border border-bg-border bg-bg-base/30 px-2.5 py-2">
           <label className="flex items-center gap-1.5 text-[12px] font-semibold text-violet-200/90 mb-1 select-none">
             ✏ 指示（自由文・任意）
             <span className="text-[10px] font-normal text-text-desc">変更対象まわりの自由指示。全案に効きます</span>
@@ -322,6 +328,20 @@ export function ControlPanel({
             rows={2}
             className="w-full px-2.5 py-2 rounded-lg border border-bg-border bg-bg-base text-[12px] text-text-base placeholder:text-text-muted/45 outline-none focus:border-violet-400/50 transition resize-none"
           />
+          {/* ✏ 項目分割プレビュー（段階1・表示のみ・操作不可＝適用/保留/削除UIは段階2）。 */}
+          {customInstructionPreview.length > 1 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {customInstructionPreview.map((text, i) => (
+                <span
+                  key={i}
+                  title={text}
+                  className="max-w-[220px] truncate text-[10px] px-1.5 py-0.5 rounded border border-bg-border bg-bg-panel text-text-muted/80"
+                >
+                  {text}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
