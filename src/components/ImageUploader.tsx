@@ -41,6 +41,14 @@ export function ImageUploader({ value, onChange }: Props) {
     }, 1200);
   }, [croppedResult]);
 
+  // ✂ トリミング結果を作業画像として使う（★明示ボタンを押した時だけ imageDataUrl を切り替える）。
+  // 保存(handleSaveCropped)とは独立＝保存せず使う・保存だけして使わない、どちらも可能。
+  const handleUseCropped = useCallback(() => {
+    if (!croppedResult) return;
+    onChange(croppedResult);
+    setCroppedResult(null);
+  }, [croppedResult, onChange]);
+
   const handleFile = useCallback(
     async (file: File | null | undefined) => {
       if (!file) return;
@@ -167,6 +175,15 @@ export function ImageUploader({ value, onChange }: Props) {
           <span className="flex-1 text-[11px] text-text-muted/80">
             {cropSaveState === "saved" ? "✓ 保存しました" : "トリミング結果（未保存）"}
           </span>
+          <button
+            type="button"
+            onClick={handleUseCropped}
+            disabled={cropSaveState !== "idle"}
+            title="元画像エリアの表示をこの結果に切り替える（ディスク上の元ファイルは無傷・フォルダー参照で入れ直せば戻せます）"
+            className="shrink-0 text-[11px] font-semibold px-2.5 py-1 rounded-lg border border-violet-400/45 bg-violet-500/12 text-violet-100 hover:bg-violet-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            この画像を使う
+          </button>
           <button
             type="button"
             onClick={() => void handleSaveCropped()}
