@@ -8,6 +8,7 @@
  *  - `imageFeatures`    : 画像特徴DB（id=履歴アイテムID, hash=dHash16進, dominantColors, analyzedAt 等）
  *  - `operationLog`     : skyveil好み学習の操作ログ（id, ts, type, detail）
  *  - `referenceRecords` : Reference Picker / Compare Mode の参照レコード（id, createdAt, refThumb, extracted, applied, batchId）
+ *  - `croppedImages`    : トリミング結果（id, createdAt, dataUrl(フルサイズ), thumb, favorite?）。上限50・favorite保護。
  *
  * migration 方針（v7〜）：onupgradeneeded で **objectStoreNames.contains() による「無ければ作成」の冪等 migration**。
  * createObjectStore は追加のみ＝既存ストア・既存データは破壊しない（clear/deleteDatabase は使わない）。
@@ -25,6 +26,7 @@ export const STORE_SELECTION = "selectionHistory";
 export const STORE_IMAGE_FEATURES = "imageFeatures";
 export const STORE_OPERATION_LOG = "operationLog";
 export const STORE_REFERENCE_RECORDS = "referenceRecords";
+export const STORE_CROPPED = "croppedImages";
 
 type StoreName =
   | typeof STORE_HISTORY
@@ -32,7 +34,8 @@ type StoreName =
   | typeof STORE_SELECTION
   | typeof STORE_IMAGE_FEATURES
   | typeof STORE_OPERATION_LOG
-  | typeof STORE_REFERENCE_RECORDS;
+  | typeof STORE_REFERENCE_RECORDS
+  | typeof STORE_CROPPED;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -40,6 +43,7 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 const EXPECTED_STORES: readonly string[] = [
   STORE_HISTORY, STORE_RECENT, STORE_SELECTION,
   STORE_IMAGE_FEATURES, STORE_OPERATION_LOG, STORE_REFERENCE_RECORDS,
+  STORE_CROPPED,
 ];
 
 /**
@@ -76,6 +80,11 @@ function ensureStores(db: IDBDatabase): void {
     // Reference Picker / Compare Mode：参照レコード（参照サムネ＋抽出＋適用→batchIdで生成へ紐付）
     const s = db.createObjectStore(STORE_REFERENCE_RECORDS, { keyPath: "id" });
     s.createIndex("batchId", "batchId", { unique: false });
+    s.createIndex("createdAt", "createdAt", { unique: false });
+  }
+  if (!db.objectStoreNames.contains(STORE_CROPPED)) {
+    // トリミング結果（フルサイズ保存・上限50・favorite保護）
+    const s = db.createObjectStore(STORE_CROPPED, { keyPath: "id" });
     s.createIndex("createdAt", "createdAt", { unique: false });
   }
 }
