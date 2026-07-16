@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { imageContentHash } from "../lib/imageThumb";
 import { readFileAsDataUrl } from "../lib/imageFile";
+import { ImageCropModal } from "./ImageCropModal";
 
 export interface UploadedMeta {
   fileName?: string;
@@ -20,6 +21,10 @@ interface Props {
 export function ImageUploader({ value, onChange }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // ✂ トリミング（段階1・非破壊）：元画像 state（value/onChange）には一切触れない。
+  // モーダルの結果はここで保持するだけ（保存は commit2・専用ストア予定）。
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [croppedResult, setCroppedResult] = useState<string | null>(null);
 
   const handleFile = useCallback(
     async (file: File | null | undefined) => {
@@ -123,7 +128,14 @@ export function ImageUploader({ value, onChange }: Props) {
         />
       </div>
       {value && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            className="btn text-sm"
+            onClick={() => setCropModalOpen(true)}
+          >
+            ✂ トリミング
+          </button>
           <button
             type="button"
             className="btn text-sm"
@@ -132,6 +144,28 @@ export function ImageUploader({ value, onChange }: Props) {
             画像をクリア
           </button>
         </div>
+      )}
+      {/* ✂ トリミング結果（段階1・未保存のその場保持のみ。専用フォルダ保存は次段階） */}
+      {croppedResult && (
+        <div className="flex items-center gap-2 rounded-lg border border-bg-border bg-bg-base/30 px-2.5 py-2">
+          <img src={croppedResult} alt="トリミング結果（未保存）" className="h-12 w-12 rounded-md object-cover border border-bg-border" />
+          <span className="flex-1 text-[11px] text-text-muted/80">トリミング結果（未保存・この場だけの保持です）</span>
+          <button
+            type="button"
+            onClick={() => setCroppedResult(null)}
+            title="この結果を消す"
+            className="shrink-0 text-[11px] px-2 py-1 rounded-lg border border-bg-border text-text-muted/70 hover:text-rose-200 hover:border-rose-400/40 hover:bg-rose-500/10 transition"
+          >
+            ×
+          </button>
+        </div>
+      )}
+      {cropModalOpen && value && (
+        <ImageCropModal
+          imageDataUrl={value}
+          onClose={() => setCropModalOpen(false)}
+          onCropped={(dataUrl) => setCroppedResult(dataUrl)}
+        />
       )}
     </div>
   );
