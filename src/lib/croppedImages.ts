@@ -31,6 +31,9 @@ const MAX_RECORDS = 50;
 /** ID 重複防止用の連番（同一 ms に複数保存されても衝突しない） */
 let seq = 0;
 
+/** 保存/削除/お気に入り切替のたびに発火（UI側の即時反映用・パネルの開閉に依存しない）。 */
+export const croppedImagesChanged = new EventTarget();
+
 /**
  * トリミング結果を1件保存する。失敗しても呼び出し元の操作を止めないためベストエフォート。
  * 戻り値：保存できた id（失敗時 null）。
@@ -46,6 +49,7 @@ export async function saveCroppedImage(dataUrl: string): Promise<string | null> 
     // ★毎回チェックする（参照履歴の「seq&0x0fで16件に1回」方式は、ページ再読み込みで
     //   seq がリセットされ発火漏れする既知の弱点があるため採用しない）。
     await pruneIfNeeded();
+    croppedImagesChanged.dispatchEvent(new Event("change"));
     return id;
   } catch {
     /* ローカル保存失敗は無視 */
@@ -78,6 +82,7 @@ export async function listCroppedImages(): Promise<CroppedImageRecord[]> {
 /** id 指定で1件削除（手動整理用）。 */
 export async function removeCroppedImage(id: string): Promise<void> {
   await remove(STORE_CROPPED, id);
+  croppedImagesChanged.dispatchEvent(new Event("change"));
 }
 
 /** favorite を切り替える（対象が無ければ何もしない）。 */
@@ -86,4 +91,5 @@ export async function toggleCroppedFavorite(id: string): Promise<void> {
   const cur = all.find((r) => r.id === id);
   if (!cur) return;
   await put(STORE_CROPPED, { ...cur, favorite: !cur.favorite });
+  croppedImagesChanged.dispatchEvent(new Event("change"));
 }

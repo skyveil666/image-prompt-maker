@@ -17,6 +17,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEscapeKey } from "../lib/useEscapeKey";
+import { croppedImagesChanged, listCroppedImages, removeCroppedImage, type CroppedImageRecord } from "../lib/croppedImages";
 import type { ExplorerFavorite, ExplorerImage, ExplorerSubfolder } from "../lib/miniExplorer";
 import {
   addExplorerFavorite,
@@ -559,6 +560,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
   const [showSort,     setShowSort]     = useState(false);
   const [query,        setQuery]        = useState("");      // ファイル名検索
   const [favOnly,      setFavOnly]      = useState(false);   // お気に入りのみ
+  const [croppedList,  setCroppedList]  = useState<CroppedImageRecord[]>([]); // ✂ トリミング画像（クイックアクセス直下）
 
   const sortRef     = useRef<HTMLDivElement>(null);
   const showTimer   = useRef<ReturnType<typeof setTimeout> | null>(null); // delay before showing hover
@@ -659,6 +661,16 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
       setCtxMenu(null);
     }
   }, [open, clearAllTimers]);
+
+  // ✂ トリミング画像一覧：マウント時に初回取得＋以後は保存/削除のたびにイベントで即時反映
+  // （パネルの開閉に依存しない＝開きっぱなしのままトリミング保存しても即座に一覧へ出る）
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => { void listCroppedImages().then((list) => { if (!cancelled) setCroppedList(list); }); };
+    refresh();
+    croppedImagesChanged.addEventListener("change", refresh);
+    return () => { cancelled = true; croppedImagesChanged.removeEventListener("change", refresh); };
+  }, []);
 
   // ── Load images ──────────────────────────────────────────────────────
   const loadImages = useCallback(async (handle: FileSystemDirectoryHandle) => {
@@ -778,6 +790,17 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
     } catch (err) { console.error(err); }
     finally { setSelecting(false); }
   }, [onSelectImage]);
+
+  // ✂ トリミング画像：クリックで即座に元画像エリアへ反映（フォルダー参照画像と同じ扱い）
+  const handleSelectCropped = useCallback((record: CroppedImageRecord) => {
+    onSelectImage(record.dataUrl);
+  }, [onSelectImage]);
+
+  /** ✂ トリミング画像を1件削除（一覧からも即座に外す） */
+  const handleRemoveCropped = useCallback(async (id: string) => {
+    await removeCroppedImage(id);
+    setCroppedList((prev) => prev.filter((r) => r.id !== id));
+  }, []);
 
   /** Double-click → pin the large preview (does NOT auto-select) */
   const handleDoubleClick = useCallback((img: ExplorerImage) => {
@@ -943,7 +966,8 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-1 mx-thin-scroll">
+            {/* 上半分：クイックアクセス＋フォルダツリー（独立スクロール） */}
+            <div className="flex-1 min-h-0 overflow-y-auto py-1 mx-thin-scroll">
               {recents.length > 0 && (
                 <div className="mb-1">
                   <div className="px-3 py-1 text-[12px] uppercase tracking-widest text-text-muted/90 font-bold select-none">
@@ -976,6 +1000,34 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
                 </div>
               )}
             </div>
+
+            {/* 下半分：✂トリミング画像（上のフォルダ関連と混ざらないよう独立区画・独立スクロール） */}
+            {croppedList.length > 0 && (
+              <div className="flex-1 min-h-0 flex flex-col border-t-2 border-bg-border bg-black/15">
+                <div className="shrink-0 px-3 py-1.5 text-[12px] uppercase tracking-widest text-text-muted/90 font-bold select-none">
+                  ✂ トリミング画像
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-3 content-start gap-1 px-3 pb-2 mx-thin-scroll">
+                  {croppedList.map((r) => (
+                    <div key={r.id} role="button" tabIndex={0}
+                      onClick={() => handleSelectCropped(r)}
+                      onKeyDown={(e) => e.key === "Enter" && handleSelectCropped(r)}
+                      title={new Date(r.createdAt).toLocaleString("ja-JP")}
+                      className="group relative aspect-square rounded-md overflow-hidden cursor-pointer select-none ring-1 ring-white/10 hover:ring-accent/50 transition"
+                    >
+                      <img src={r.thumb} alt="" className="w-full h-full object-cover" />
+                      <button type="button"
+                        onClick={(e) => { e.stopPropagation(); void handleRemoveCropped(r.id); }}
+                        title="削除"
+                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] bg-black/60 text-white/80 opacity-0 group-hover:opacity-100 hover:bg-rose-500/80 hover:text-white transition backdrop-blur-sm"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* ── Right: image grid ───────────────────────────────────── */}
