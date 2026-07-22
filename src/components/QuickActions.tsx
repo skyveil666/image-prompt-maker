@@ -213,6 +213,8 @@ export function QuickActions({
           <TagBtn label="🔟 数字世界" title="背景を無数の数字・数列（バイナリの雨）の斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("digit_world", e.shiftKey)} active={activeBgPresets.includes("digit_world")} variant="sky"    disabled={disabled} />
           <TagBtn label="🖌 漢字空間" title="背景を無数の漢字・墨字・古文書の文字の海の斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("kanji_space", e.shiftKey)} active={activeBgPresets.includes("kanji_space")} variant="amber"  disabled={disabled} />
           <TagBtn label="🔤 英字タイポ空間" title="背景を英字・タイポグラフィの羅列のエディトリアル斬新空間に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("typo_space", e.shiftKey)} active={activeBgPresets.includes("typo_space")} variant="violet" disabled={disabled} />
+          <TagBtn label="🔌 回路基板の街" title="背景を基板の配線が街並みになる斬新な世界に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("circuit_city", e.shiftKey)} active={activeBgPresets.includes("circuit_city")} variant="gold" disabled={disabled} />
+          <TagBtn label="🔺 ポリゴン・ワイヤーフレーム" title="背景を低ポリゴン・ワイヤーフレームの斬新な世界に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onBgPresetToggle("polygon_mesh", e.shiftKey)} active={activeBgPresets.includes("polygon_mesh")} variant="stone" disabled={disabled} />
           {activeBgPresets.length > 1 && (
             <span className="text-[11px] text-indigo-300/70 font-semibold self-center ml-1">
               {activeBgPresets.length}選択中

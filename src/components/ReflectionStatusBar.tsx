@@ -38,6 +38,7 @@ const WORLD_JP: Record<string, string> = {
 const BG_JP: Record<string, string> = {
   code_space: "🖥 コード空間", math_world: "🔢 数式世界",
   digit_world: "🔟 数字世界", kanji_space: "🖌 漢字空間", typo_space: "🔤 英字タイポ空間",
+  circuit_city: "🔌 回路基板の街", polygon_mesh: "🔺 ポリゴン・ワイヤーフレーム",
 };
 
 // ── Props ────────────────────────────────────────────────────────────────────

@@ -207,6 +207,8 @@ export const PW: Record<string, ScopeWeight> = {
   digit_world: { background: 10, lighting: 7, foreground: 6 },
   kanji_space: { background: 10, lighting: 6, foreground: 6 },
   typo_space:  { background: 10, lighting: 7, foreground: 6 },
+  circuit_city: { background: 10, lighting: 7, foreground: 6 },
+  polygon_mesh: { background: 10, lighting: 6, foreground: 6 },
 };
 
 
@@ -1903,7 +1905,7 @@ export function buildCombinedWorldInputs(
 //   - §4（promptSystem/scopeFilter/gemini）不触。details.background は REPLACE-on-apply。
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export type BgPreset = "code_space" | "math_world" | "digit_world" | "kanji_space" | "typo_space";
+export type BgPreset = "code_space" | "math_world" | "digit_world" | "kanji_space" | "typo_space" | "circuit_city" | "polygon_mesh";
 
 interface NovelBgDirection {
   label:    string;
@@ -2058,6 +2060,60 @@ const NOVEL_BG_DIRECTIONS: Record<BgPreset, NovelBgDirection> = {
       "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景の質感・空気・ライティングのみ）。",
     ].join("\n"),
   },
+  circuit_city: {
+    label:   "🔌 回路基板の街",
+    moods:   ["cool", "minimal"],
+    styles:  ["cyber", "digital"],
+    effects: ["geometric", "abstract_lines", "light_rays", "particles"],
+    colors:  ["green", "gold", "monochrome"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🔌 斬新背景：回路基板の街】",
+      "背景を「基板の配線が道路になり、実装部品が建物になった」未知の電子回路都市にする。緑や黒の基板地肌に金色・銀色の配線パターンが街路のように張り巡らされ、ICチップやコンデンサが摩天楼のように林立する。",
+      "実在の都市・看板・ロゴは使わず、どこにも存在しない回路の街として描く。",
+      "",
+      "▼ 奥行き：手前の配線・部品を大きく粗く、奥へ向かうほど細かい回路パターンを層状に重ね、遠近感のある深い奥行きにする（回路の街並みが奥まで続くスケール感）。",
+      "▼ 密度：画面を埋め尽くす配線・端子・部品の密集で情報量を最大にする（隙間のない基板の街）。",
+      "▼ 明るさ：明暗の幅を持たせる。発光する配線・LEDの点滅・グロー要素を散らし、暗がり一辺倒にしない。",
+      "▼ 馴染み：基板の光・配線の反射が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景の配線が人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  緑基板の街並み / 金の配線街路 / 発光するチップの摩天楼 / 銀色の回路網 / 部品が林立する電子都市",
+      "",
+      "▼ 守ること：",
+      "  × 顔の上に読める文字・ロゴを大きく重ねない（同一性を保つ）。配線・部品は背景・前景側に置く。",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
+  polygon_mesh: {
+    label:   "🔺 ポリゴン・ワイヤーフレーム",
+    moods:   ["cool", "clean"],
+    styles:  ["digital", "monochrome"],
+    effects: ["geometric", "abstract_lines", "light_rays"],
+    colors:  ["monochrome", "high_sat", "vivid"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🔺 斬新背景：ポリゴン・ワイヤーフレーム世界】",
+      "背景を「低ポリゴンの面とワイヤーフレームの線」だけで構成された、未知の幾何学世界にする。三角形・多角形のファセットが折り重なり、輪郭線が発光するワイヤーとして浮かび上がる。",
+      "実在の場所・建物は使わず、どこにも存在しないポリゴンの世界として描く。",
+      "",
+      "▼ 奥行き：手前のポリゴン面を大きく粗く、奥へ向かうほど細かいメッシュを層状に重ね、遠近感のある深い奥行きにする（近景は大きな面、遠景は細かい網目）。",
+      "▼ 密度：画面を埋め尽くす面・稜線・頂点の密集で情報量を最大にする（隙間のないメッシュの世界）。",
+      "▼ 明るさ：明暗の幅を持たせる。発光するワイヤー・面の陰影・グロー要素を散らし、暗がり一辺倒にしない。",
+      "▼ 馴染み：ワイヤーの光・面の反射が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景のメッシュが人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  発光するワイヤーフレーム / 低ポリの山脈状メッシュ / 折り重なるファセット面 / ネオン色の稜線 / 浮遊する多面体群",
+      "",
+      "▼ 守ること：",
+      "  × 顔の上に読めるワイヤーを大きく重ねない（同一性を保つ）。メッシュ・ワイヤーは背景・前景側に置く。",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（斬新化するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
 };
 
 /** 斬新背景用：背景(background)を必ず含め、残りを weighted で 1〜2 軸足す（総数 2〜3・背景系のみ）。 */
@@ -2121,6 +2177,8 @@ export const BG_PRESET_DISPLAY: Record<BgPreset, string> = {
   digit_world: "🔟 数字世界",
   kanji_space: "🖌 漢字空間",
   typo_space:  "🔤 英字タイポ空間",
+  circuit_city: "🔌 回路基板の街",
+  polygon_mesh: "🔺 ポリゴン・ワイヤーフレーム",
 };
 
 type BgPresetBuilder = (current: PromptInputs, memory: VariationMemory) => PromptInputs;
@@ -2130,6 +2188,8 @@ const BG_PRESET_BUILDERS: Record<BgPreset, BgPresetBuilder> = {
   digit_world: (c, m) => buildNovelBgInputs(c, m, "digit_world"),
   kanji_space: (c, m) => buildNovelBgInputs(c, m, "kanji_space"),
   typo_space:  (c, m) => buildNovelBgInputs(c, m, "typo_space"),
+  circuit_city: (c, m) => buildNovelBgInputs(c, m, "circuit_city"),
+  polygon_mesh: (c, m) => buildNovelBgInputs(c, m, "polygon_mesh"),
 };
 
 /**
