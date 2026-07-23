@@ -17,7 +17,7 @@
 import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEscapeKey } from "../lib/useEscapeKey";
-import { croppedImagesChanged, listCroppedImages, removeCroppedImage, type CroppedImageRecord } from "../lib/croppedImages";
+import { croppedImagesChanged, listCroppedImages, removeCroppedImage, toggleCroppedFavorite, type CroppedImageRecord } from "../lib/croppedImages";
 import type { ExplorerFavorite, ExplorerImage, ExplorerSubfolder } from "../lib/miniExplorer";
 import {
   addExplorerFavorite,
@@ -802,6 +802,12 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
     setCroppedList((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
+  /** ✂ トリミング画像の★お気に入りを切り替え（上限50件prune保護のON/OFF）。一覧にも即座に反映。 */
+  const handleToggleCroppedFavorite = useCallback(async (id: string) => {
+    await toggleCroppedFavorite(id);
+    setCroppedList((prev) => prev.map((r) => (r.id === id ? { ...r, favorite: !r.favorite } : r)));
+  }, []);
+
   /** Double-click → pin the large preview (does NOT auto-select) */
   const handleDoubleClick = useCallback((img: ExplorerImage) => {
     clearAllTimers();
@@ -1004,7 +1010,10 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
             {/* 下半分：✂トリミング画像（上のフォルダ関連と混ざらないよう独立区画・独立スクロール） */}
             {croppedList.length > 0 && (
               <div className="flex-1 min-h-0 flex flex-col border-t-2 border-bg-border bg-black/15">
-                <div className="shrink-0 px-3 py-1.5 text-[12px] uppercase tracking-widest text-text-muted/90 font-bold select-none">
+                <div
+                  className="shrink-0 px-3 py-1.5 text-[12px] uppercase tracking-widest text-text-muted/90 font-bold select-none"
+                  title="★お気に入りは上限50件のカウント・自動削除から保護されます"
+                >
                   ✂ トリミング画像
                 </div>
                 <div className="flex-1 min-h-0 overflow-y-auto grid grid-cols-3 content-start gap-1 px-3 pb-2 mx-thin-scroll">
@@ -1016,6 +1025,18 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
                       className="group relative aspect-square rounded-md overflow-hidden cursor-pointer select-none ring-1 ring-white/10 hover:ring-accent/50 transition"
                     >
                       <img src={r.thumb} alt="" className="w-full h-full object-cover" />
+                      <button type="button"
+                        onClick={(e) => { e.stopPropagation(); void handleToggleCroppedFavorite(r.id); }}
+                        title={r.favorite ? "お気に入りから外す（上限50件の保護対象から外れます）" : "お気に入りに追加（上限50件を超えても消えなくなります）"}
+                        className={[
+                          "absolute top-0.5 left-0.5 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] font-bold transition backdrop-blur-sm",
+                          r.favorite
+                            ? "bg-amber-400/90 text-amber-900 opacity-100"
+                            : "bg-black/60 text-white/70 opacity-0 group-hover:opacity-100 hover:bg-black/80 hover:text-amber-200",
+                        ].join(" ")}
+                      >
+                        {r.favorite ? "★" : "☆"}
+                      </button>
                       <button type="button"
                         onClick={(e) => { e.stopPropagation(); void handleRemoveCropped(r.id); }}
                         title="削除"
