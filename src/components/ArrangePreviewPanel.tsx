@@ -79,6 +79,10 @@ interface Props {
   bgPresetNote?:        string;
   /** 斬新背景の解除（App の activeBgPresets + bgPresetNote をクリア。scopes は世界観由来へ再計算で縮約・details は戻さない）。 */
   onClearBg?:           () => void;
+  /** 🖌 画法世界プリセット由来の追加指示（背景スコープ時のみ全案へ注入・通常は不可視）。非空かつ背景が変更対象なら支配バッジを出す。 */
+  artPresetNote?:       string;
+  /** 画法世界の解除（App の activeArtPresets + artPresetNote をクリア。scopes は世界観/斬新背景由来へ再計算で縮約・details は戻さない）。 */
+  onClearArt?:          () => void;
   /** 参照画像適用の解除（App の referenceNote をクリア）。 */
   onClearReference?:    () => void;
   /** タグ個別NG（per-tag NG）の現在値。非空なら「タグNG（候補除外・準備中）」バッジを出す（①でtagNgは【NG】非合流＝現在は生成に未反映・Step2で候補除外を実効化）。 */
@@ -523,6 +527,8 @@ export function ArrangePreviewPanel({
   onClearWorld = () => {},
   bgPresetNote = "",
   onClearBg = () => {},
+  artPresetNote = "",
+  onClearArt = () => {},
   onClearReference = () => {},
   tagNg = [],
   onClearTagNg = () => {},
@@ -542,11 +548,14 @@ export function ArrangePreviewPanel({
   // 🌌 斬新背景：bgPresetNote は buildInputs で「背景スコープ時のみ」注入＝発火条件もサーバ効果と厳密一致。
   const bgNote = bgPresetNote.trim();
   const bgFires = bgNote.length > 0 && selectedScopes.includes("background");
+  // 🖌 画法世界（斬新背景の姉妹カテゴリ）：artPresetNote も同じ発火条件（背景スコープ時のみ）。
+  const artNote = artPresetNote.trim();
+  const artFires = artNote.length > 0 && selectedScopes.includes("background");
   // 🚫 タグNGバッジは hide（hide-not-delete・2026-06）：メイン ReflectionStatusBar と同型で上部一覧を非表示。
   //    flag を true に戻せば一覧バッジ＋×全解除が復活（tagNg state・グリッドNG・背景候補除外は常時生きている）。
   const SHOW_TAGNG_BADGE: boolean = false;
   const tagNgLabels = tagNgToLabels(tagNg);
-  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && tagNg.length > 0) || memoBadges.length > 0;
+  const hasDominator = worldNote.length > 0 || bgFires || artFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && tagNg.length > 0) || memoBadges.length > 0;
 
   // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
@@ -708,6 +717,15 @@ export function ArrangePreviewPanel({
                     summaryTitle={bgPresetNote}
                     onClear={onClearBg}
                     clearTitle="この斬新背景を全案から解除する"
+                  />
+                )}
+                {artFires && (
+                  <DominatorBadge
+                    label="🖌 画法世界適用中"
+                    summary={summarizeNote(artNote)}
+                    summaryTitle={artPresetNote}
+                    onClear={onClearArt}
+                    clearTitle="この画法世界を全案から解除する"
                   />
                 )}
                 {refNote && (

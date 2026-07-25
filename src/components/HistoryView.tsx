@@ -60,6 +60,10 @@ interface Props {
   bgPresetNote?:        string;
   /** 斬新背景の解除（soft）。ArrangePreviewPanel へ中継。 */
   onClearBg?:           () => void;
+  /** 🖌 画法世界プリセット由来の追加指示（背景スコープ時のみ全案へ注入）。ArrangePreviewPanel へ中継。 */
+  artPresetNote?:       string;
+  /** 画法世界の解除（soft）。ArrangePreviewPanel へ中継。 */
+  onClearArt?:          () => void;
   /** 参照画像適用の解除。 */
   onClearReference?:    () => void;
   /** タグ個別NG（per-tag NG）の現在値。ArrangePreviewPanel へ中継（アレンジも全案に効く）。 */
@@ -113,6 +117,7 @@ export function HistoryView({
   avoidRealBackground, worldCombinedNote, referenceNoteText,
   onClearAvoidRealBg, onClearWorld, onClearReference,
   bgPresetNote, onClearBg,
+  artPresetNote, onClearArt,
   tagNg = [], onClearTagNg = () => {},
   memoBadges = [],
   onToast,
@@ -714,6 +719,8 @@ export function HistoryView({
               onClearWorld={onClearWorld}
               bgPresetNote={bgPresetNote}
               onClearBg={onClearBg}
+              artPresetNote={artPresetNote}
+              onClearArt={onClearArt}
               onClearReference={onClearReference}
               tagNg={tagNg}
               onClearTagNg={onClearTagNg}

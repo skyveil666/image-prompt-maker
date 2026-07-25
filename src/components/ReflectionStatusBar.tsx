@@ -41,6 +41,11 @@ const BG_JP: Record<string, string> = {
   circuit_city: "🔌 回路基板の街", polygon_mesh: "🔺 ポリゴン・ワイヤーフレーム",
 };
 
+const ART_JP: Record<string, string> = {
+  letterpress: "🖨 印刷物・活版", cubism: "🔷 キュビスム",
+  woodblock: "🪵 版画・木版", paper_cut: "🎭 切り絵・シルエット層",
+};
+
 // ── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   scopes: Scope[];
@@ -65,6 +70,12 @@ interface Props {
   bgPresetNote: string;
   /** 斬新背景の解除（bgPresetNote + activeBgPresets をクリア。scopes は世界観由来へ再計算で縮約・details は戻さない）。 */
   onClearBg: () => void;
+  /** 🖌 画法世界プリセットID（letterpress 等）。内部でラベル化する */
+  activeArtPresets: string[];
+  /** 画法世界プリセット由来の追加指示（背景スコープ時のみ全案へ注入・通常は不可視）。非空かつ背景が変更対象なら支配バッジを出す。 */
+  artPresetNote: string;
+  /** 画法世界の解除（artPresetNote + activeArtPresets をクリア。scopes は世界観/斬新背景由来へ再計算で縮約・details は戻さない）。 */
+  onClearArt: () => void;
   /** 参照画像適用の解除（referenceNote をクリア）。 */
   onClearReference: () => void;
   /** 🌆 背景を2D/非写実に（既定ON・非永続）。背景が変更対象の時だけ全案に効くが回避▼に埋もれて気付きにくい。 */
@@ -148,9 +159,13 @@ export function ReflectionStatusBar(p: Props) {
   //   発火条件もサーバ効果と厳密一致させる（bgPresetNote 非空 ∧ scopes.includes("background")）。
   const bgNote = p.bgPresetNote.trim();
   const bgFires = bgNote.length > 0 && p.scopes.includes("background");
-  const hasDominator = worldNote.length > 0 || bgFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive || (p.memoBadges?.length ?? 0) > 0;
+  // 🖌 画法世界（斬新背景の姉妹カテゴリ）：artPresetNote も同じ発火条件（背景スコープ時のみ）。
+  const artNote = p.artPresetNote.trim();
+  const artFires = artNote.length > 0 && p.scopes.includes("background");
+  const hasDominator = worldNote.length > 0 || bgFires || artFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive || (p.memoBadges?.length ?? 0) > 0;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
   const bgLabel = p.activeBgPresets.map((b) => BG_JP[b] ?? b).join(" × ") || "適用中";
+  const artLabel = p.activeArtPresets.map((a) => ART_JP[a] ?? a).join(" × ") || "適用中";
 
   return (
     <section className="rounded-lg border border-violet-400/25 bg-violet-500/5 overflow-hidden">
@@ -174,6 +189,15 @@ export function ReflectionStatusBar(p: Props) {
               summaryTitle={p.bgPresetNote}
               onClear={p.onClearBg}
               clearTitle="この斬新背景を全案から解除する"
+            />
+          )}
+          {artFires && (
+            <DominatorBadge
+              label={`🖌 画法世界：${artLabel}`}
+              summary={summarizeNote(artNote)}
+              summaryTitle={p.artPresetNote}
+              onClear={p.onClearArt}
+              clearTitle="この画法世界を全案から解除する"
             />
           )}
           {refNote && (

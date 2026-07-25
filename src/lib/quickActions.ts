@@ -209,6 +209,11 @@ export const PW: Record<string, ScopeWeight> = {
   typo_space:  { background: 10, lighting: 7, foreground: 6 },
   circuit_city: { background: 10, lighting: 7, foreground: 6 },
   polygon_mesh: { background: 10, lighting: 6, foreground: 6 },
+  // 🖌 画法世界：斬新背景と同型（背景を最優先、補助は前景・ライティングのみ）。
+  letterpress: { background: 10, lighting: 6, foreground: 6 },
+  cubism:      { background: 10, lighting: 7, foreground: 6 },
+  woodblock:   { background: 10, lighting: 6, foreground: 6 },
+  paper_cut:   { background: 10, lighting: 7, foreground: 6 },
 };
 
 
@@ -2235,6 +2240,251 @@ export function buildCombinedBgInputs(
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🖌 画法世界プリセット（斬新背景の姉妹カテゴリ・アナログな画法・質感の系統・Stage 1）
+//
+// 設計（Stage0で確定・斬新背景と同型の構造をそのまま複製）:
+//   - background スコープを forced 強制し、details.background の WIRED フィールド
+//     （style/effect/color/density/place）＋ extraInstructions 文章で「画法世界」を作る。
+//   - 文字背景フィールドは DEAD（設定しない・no-op）。人物・衣装・露出・構図は一切触らない。
+//   - §4（promptSystem/scopeFilter/gemini）不触。details.background は REPLACE-on-apply。
+//   - ★斬新背景との2枠50:50ミックスは commit3（ここでは単独選択＋同カテゴリ内コンボのみ）。
+// ═══════════════════════════════════════════════════════════════════════════════
 
+export type ArtPreset = "letterpress" | "cubism" | "woodblock" | "paper_cut";
+
+interface NovelArtDirection {
+  label:    string;
+  /** 中立ムードのみ（getMoodScopeBoosts で人物スコープを増やさない＝P8） */
+  moods:    Mood[];
+  /** 背景スタイル候補（WIRED enum のみ・案ごとに1つ抽選） */
+  styles:   BackgroundStyle[];
+  /** 空間効果候補（WIRED enum のみ・案ごとに1つ抽選） */
+  effects:  BackgroundEffect[];
+  /** 背景色候補（WIRED enum のみ・案ごとに1つ抽選。背景にのみ効く＝人物の配色は変えない） */
+  colors:   BackgroundColor[];
+  density:  BackgroundDensity;
+  /** 実在地名を使わない abstract（画法世界＝未知の世界を担保） */
+  place:    BackgroundPlace;
+  /** extraInstructions 文章（artPresetNote へ格納） */
+  note:     string;
+}
+
+const NOVEL_ART_DIRECTIONS: Record<ArtPreset, NovelArtDirection> = {
+  letterpress: {
+    label:   "🖨 印刷物・活版",
+    moods:   ["minimal", "clean"],
+    styles:  ["poster", "washi"],
+    effects: ["paper_texture", "canvas_texture", "collage", "handdrawn"],
+    colors:  ["beige", "earth", "monochrome"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🖨 画法世界：印刷物・活版】",
+      "背景を「活版印刷・古い刷り物」の質感で構成する。凸凹のある紙に、版ズレした文字・図版・インクのかすれと滲みが重なり合う、未知の印刷世界にする。",
+      "実在の書籍・雑誌・ブランドは使わず、どこにも存在しない刷り物の世界として描く。",
+      "",
+      "▼ 奥行き：手前に大きくインクの濃い版を、奥へ向かうほど薄く小さい版を層状に重ね、紙と紙の間にわずかな影を落として遠近感のある深い奥行きにする（前後の紙の層が重なって見える）。",
+      "▼ 密度：画面を埋め尽くす活字・罫線・図版の密集で情報量を最大にする（隙間のない刷り物の集積）。",
+      "▼ 明るさ：明暗の幅を持たせる。インクの濃淡・紙の陰影・かすれた光を織り交ぜ、暗がり一辺倒にも真っ白な平面にもしない。",
+      "▼ 馴染み：紙の質感の光・インクの陰影が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景の紙片が人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  版ズレした活字の重なり / 古い新聞紙の集積 / 凸版インクのかすれ / 罫線と図版の層 / 刷りムラの残る紙面",
+      "",
+      "▼ 守ること：",
+      "  × 顔の上に読める文字を大きく重ねない（同一性を保つ）。活字・紙片は背景・前景側に置く。",
+      "  × 実在の書籍・雑誌名・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（画法として表現するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
+  cubism: {
+    label:   "🔷 キュビスム",
+    moods:   ["cool", "clean"],
+    styles:  ["cubism", "abstract_art"],
+    effects: ["geometric", "color_planes", "abstract_lines", "collage"],
+    colors:  ["earth", "monochrome", "high_sat"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🔷 画法世界：キュビスム】",
+      "背景を「多視点が同時に存在する、分解された構図」のキュビスム絵画にする。面と面が斜めに切り分けられ、同じ対象を複数の角度から見た断片が同居する、未知の絵画世界にする。",
+      "実在の場所・建物は使わず、どこにも存在しない分解された絵画世界として描く。",
+      "",
+      "▼ 奥行き：手前の面を大きく粗く、奥へ向かうほど細かく切り分けられた面を層状に重ね、面と面の重なりで遠近感のある深い奥行きにする（前後の面がずれて折り重なるスケール感）。",
+      "▼ 密度：画面を埋め尽くす分解された面・稜線・断片の密集で情報量を最大にする（隙間のない分解構図）。",
+      "▼ 明るさ：明暗の幅を持たせる。面ごとの明暗差・陰影のコントラストを効かせ、暗がり一辺倒にも均一な塗りにもしない。",
+      "▼ 馴染み：面の陰影・輪郭線が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景の面が人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  多視点の分解構図 / 幾何学的な面の集積 / アースカラーの断片 / 色面が交差する構成 / 折り重なる稜線群",
+      "",
+      "▼ 守ること：",
+      "  × 顔そのものを分解・多視点化しない（同一性を保つ）。分解表現は背景・前景側に置く。",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（画法として表現するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
+  woodblock: {
+    label:   "🪵 版画・木版",
+    moods:   ["minimal", "clean"],
+    styles:  ["ink_wash", "monochrome"],
+    effects: ["brushstroke", "ink_bleed", "paper_texture", "collage"],
+    colors:  ["monochrome", "earth", "beige"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🪵 画法世界：版画・木版】",
+      "背景を「彫りと刷りの質感」を持つ木版画にする。板目の木目、彫刻刀の跡、限られた色数の重ね刷りが折り重なる、未知の版画世界にする。",
+      "実在の場所・建物は使わず、どこにも存在しない木版画の世界として描く。",
+      "",
+      "▼ 奥行き：手前に大きく彫りの深い版を、奥へ向かうほど細かい彫り目を層状に重ね、刷り色の版を前後にずらして遠近感のある深い奥行きにする（版と版が重なって見えるスケール感）。",
+      "▼ 密度：画面を埋め尽くす彫り目・木目・刷り模様の密集で情報量を最大にする（隙間のない版画の集積）。",
+      "▼ 明るさ：明暗の幅を持たせる。墨の濃淡・彫り跡の陰影・刷りムラの光を織り交ぜ、暗がり一辺倒にも平坦な塗りにもしない。",
+      "▼ 馴染み：版の質感の光・木目の陰影が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景の彫り目が人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  木目と彫り跡の重なり / 限られた色数の重ね刷り / 墨一色の濃淡 / 刷りムラの残る紙面 / 彫刻刀の線が折り重なる構図",
+      "",
+      "▼ 守ること：",
+      "  × 顔の上に読める彫り目を大きく重ねない（同一性を保つ）。彫り目・木目は背景・前景側に置く。",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（画法として表現するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
+  paper_cut: {
+    label:   "🎭 切り絵・シルエット層",
+    moods:   ["minimal", "clean"],
+    styles:  ["collage", "monochrome"],
+    effects: ["negative_space", "shadow_pattern", "paper_texture", "collage"],
+    colors:  ["monochrome", "black", "high_sat"],
+    density: "dense",
+    place:   "abstract",
+    note: [
+      "【🎭 画法世界：切り絵・シルエット層】",
+      "背景を「切り絵のシルエットが幾重にも重なる層」で構成する。手前から奥へ、色も濃さも異なる紙の切り絵が幕のように連なり、層そのもので奥行きを作る、未知の切り絵世界にする。",
+      "実在の場所・建物は使わず、どこにも存在しないシルエットの世界として描く。",
+      "",
+      "▼ 奥行き：手前に濃く大きなシルエット層を、奥へ向かうほど淡く小さいシルエット層を幾重にも重ね、各層の間に隙間と影を作って遠近感のある深い奥行きにする（切り絵の層が舞台の書割のように連なるスケール感）。",
+      "▼ 密度：画面を埋め尽くす切り絵の模様・輪郭・層の密集で情報量を最大にする（隙間なく重なるシルエットの集積）。",
+      "▼ 明るさ：明暗の幅を持たせる。層と層の間から漏れる光・シルエットの濃淡を織り交ぜ、暗がり一辺倒にも真っ黒な塗りにもしない。",
+      "▼ 馴染み：層の間の光・シルエットの陰影が人物の輪郭に自然に回り込み、人物が背景から浮かないようライティングを調和させる（前景の層が人物に薄くかかるのは可）。",
+      "",
+      "▼ 方向性（案ごとに差別化）：",
+      "  幾重にも重なる切り絵の幕 / 濃淡の異なるシルエット層 / 光が漏れる層の隙間 / 舞台の書割のような重なり / 色紙が積層するシルエット",
+      "",
+      "▼ 守ること：",
+      "  × 顔をシルエット化・切り絵化しない（同一性を保つ）。切り絵表現は背景・前景側に置く。",
+      "  × 実在の場所・ブランド・ロゴを出さない",
+      "【絶対維持】顔・表情・人物の同一性・体型・ポーズ・カメラ構図・衣装・露出は一切変更しない（画法として表現するのは背景の質感・空気・ライティングのみ）。",
+    ].join("\n"),
+  },
+};
+
+/** 画法世界用：背景(background)を必ず含め、残りを weighted で 1〜2 軸足す（総数 2〜3・背景系のみ）。 */
+function pickArtScopes(
+  base:       ScopeWeight,
+  moods:      readonly Mood[],
+  lastScopes: readonly string[],
+): Scope[] {
+  return pickScopesWeighted(base, moods, lastScopes, 2, 3, false, ["background"]);
+}
+
+/**
+ * 画法世界プリセットを 1 つビルドする（人物・衣装・露出・構図は触らない）。
+ * details.background の WIRED フィールドだけ差し替え（REPLACE-on-apply）。斬新背景の
+ * buildNovelBgInputs と完全に同型（コピペ改名）。
+ */
+function buildNovelArtInputs(
+  current: PromptInputs,
+  memory:  VariationMemory,
+  preset:  ArtPreset,
+): PromptInputs {
+  const dir    = NOVEL_ART_DIRECTIONS[preset];
+  const moods  = dir.moods;
+  const style  = dir.styles[Math.floor(Math.random()  * dir.styles.length)];
+  const effect = dir.effects[Math.floor(Math.random() * dir.effects.length)];
+  const color  = dir.colors[Math.floor(Math.random()  * dir.colors.length)];
+
+  return {
+    ...current,
+    scopes:             pickArtScopes(PW[preset], moods, memory.lastScopes),
+    moods,
+    faceLock:           true,
+    viralMode:          false,
+    autoMoodCategories: [],
+    extraInstructions:  dir.note,
+    details: {
+      ...current.details,
+      background: {
+        ...current.details.background,  // time/weather/depth/info・文字背景は現状維持（文字背景は DEAD・触らない）
+        style,
+        effect,
+        color,
+        density: dir.density,
+        place:   dir.place,
+      },
+    },
+  };
+}
+
+/** 画法世界プリセットのUI表示ラベル */
+export const ART_PRESET_DISPLAY: Record<ArtPreset, string> = {
+  letterpress: "🖨 印刷物・活版",
+  cubism:      "🔷 キュビスム",
+  woodblock:   "🪵 版画・木版",
+  paper_cut:   "🎭 切り絵・シルエット層",
+};
+
+type ArtPresetBuilder = (current: PromptInputs, memory: VariationMemory) => PromptInputs;
+const ART_PRESET_BUILDERS: Record<ArtPreset, ArtPresetBuilder> = {
+  letterpress: (c, m) => buildNovelArtInputs(c, m, "letterpress"),
+  cubism:      (c, m) => buildNovelArtInputs(c, m, "cubism"),
+  woodblock:   (c, m) => buildNovelArtInputs(c, m, "woodblock"),
+  paper_cut:   (c, m) => buildNovelArtInputs(c, m, "paper_cut"),
+};
+
+/**
+ * 複数の画法世界プリセットを融合してひとつの PromptInputs を生成する（斬新背景の
+ * buildCombinedBgInputs と完全に同型）。背景系スコープ・中立ムードのみマージ＝人物は触らない。
+ * details はコンボ時に触らない（単一選択時のみ background を差し替え）。
+ */
+export function buildCombinedArtInputs(
+  current: PromptInputs,
+  presets: ArtPreset[],
+  memory:  VariationMemory,
+): PromptInputs {
+  if (presets.length === 0) return current;
+  if (presets.length === 1) return ART_PRESET_BUILDERS[presets[0]](current, memory);
+
+  const built        = presets.map((p) => ART_PRESET_BUILDERS[p](current, memory));
+  const mergedScopes = [...new Set(built.flatMap((b) => b.scopes))] as Scope[];
+  const mergedMoods  = [...new Set(built.flatMap((b) => b.moods))].slice(0, 4) as Mood[];
+
+  const labels = presets.map((p) => ART_PRESET_DISPLAY[p]);
+  const combo  = labels.join(" × ");
+
+  const comboIntro = [
+    `【🖌 画法世界コンボ：${combo}】`,
+    `${labels.join("・")}を融合した、実在しない画法の世界を作ること。`,
+    "各画法の最も強い要素を自然に掛け合わせ、人物・衣装・構図は一切変えない（背景のみ）。",
+    "",
+  ].join("\n");
+
+  const combinedNotes = built
+    .map((b) => b.extraInstructions ?? "")
+    .filter(Boolean)
+    .join("\n\n");
+
+  return {
+    ...current,
+    scopes:             mergedScopes,
+    moods:              mergedMoods,
+    faceLock:           true,
+    viralMode:          false,
+    autoMoodCategories: [],
+    extraInstructions:  comboIntro + combinedNotes,
+  };
+}
 
 

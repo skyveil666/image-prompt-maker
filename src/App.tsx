@@ -30,6 +30,9 @@ import {
   buildCombinedBgInputs,
   BG_PRESET_DISPLAY,
   buildWorldBgBridgeNote,
+  buildCombinedArtInputs,
+  ART_PRESET_DISPLAY,
+  type ArtPreset,
 } from "./lib/quickActions";
 import { buildOutfitColorfulNote, buildOutfitColorVarietyNote } from "./lib/outfitColorNotes";
 import { buildCustomInstructionNote, type MemoBadge } from "./lib/axisMemoNote";
@@ -192,6 +195,11 @@ export default function App() {
    *  復元系（アレンジ/履歴復元/反映）では由来不能ゆえクリアし、次の preset toggle で再計算させる。 */
   const [worldScopes, setWorldScopes] = useState<Scope[]>([]);
   const [bgScopes, setBgScopes] = useState<Scope[]>([]);
+  /** 🖌 アクティブな画法世界プリセット（マルチセレクト、最大3・斬新背景のクローン） */
+  const [activeArtPresets, setActiveArtPresets] = useState<ArtPreset[]>([]);
+  /** 画法世界プリセット由来の指示文（bgPresetNote の兄弟・extraInstructions と分離して管理） */
+  const [artPresetNote, setArtPresetNote] = useState("");
+  const [artScopes, setArtScopes] = useState<Scope[]>([]);
   /** 参照画像から「適用」した軸タグ付き自由文（catKey → text）。生成時に extraInstructions へ統合。
    *  ※ 詳細 enum には自動反映しない（docs/23）。worldCombinedNote と同じ追加マージ方式。 */
   const [referenceNote, setReferenceNote] = useState<Record<string, string>>({});
@@ -224,6 +232,7 @@ export default function App() {
    *  bgStylizeActive/bgFires と同じ条件）。これらが有効な間は background 解除で巻き添えOFFにしない。 */
   const avoidRealBackgroundRef = useLatestRef(avoidRealBackground);
   const bgPresetNoteRef = useLatestRef(bgPresetNote);
+  const artPresetNoteRef = useLatestRef(artPresetNote);
   /** 📌 現在の参照画像＋抽出を「Reference Picker履歴」へ手動保存（生成しなくても残す）。
    *  生成時の自動保存（下記 runGenerate 内）と同じデータ源（referenceContextRef＝画像+抽出 /
    *  referenceNote＝適用）を使う追加経路。kind:"picker" / batchId:"" で記録（生成バッチ無し）。
@@ -532,6 +541,9 @@ export default function App() {
         (worldCombinedNote && bgPresetNote && scopes.includes("background")) ? buildWorldBgBridgeNote() : "",
         worldCombinedNote,
         (scopes.includes("background") ? bgPresetNote : ""),
+        // 🖌 画法世界ノートは斬新背景と同じ条件で注入（背景が変更対象の時だけ）。
+        //   ★斬新背景×画法世界の2枠50:50ミックス（ブリッジ文）は commit3 で追加＝ここでは単独注入のみ。
+        (scopes.includes("background") ? artPresetNote : ""),
         referenceNoteText,
         extraInstructions,
         // 衣装の色「カラフル」：1案の中で多色化（案間バラけと独立・color="auto"と併用可）。outfit が変更対象の時だけ。
@@ -635,6 +647,7 @@ export default function App() {
       decorationColorLink,
       worldCombinedNote,
       bgPresetNote,
+      artPresetNote,
       referenceNoteText,
       extraInstructions,
       customInstructionItems,
@@ -1281,7 +1294,7 @@ export default function App() {
       // ★1対多：background は参照カテゴリ以外にも「背景2D化」「斬新背景プリセット」が同じ scope を
       // 効かせるゲートとして共有する。これらが有効なら background 解除の巻き添えでOFFにしない。
       const stillUsedByBgFeatures = scope === "background"
-        && (avoidRealBackgroundRef.current || bgPresetNoteRef.current.trim().length > 0);
+        && (avoidRealBackgroundRef.current || bgPresetNoteRef.current.trim().length > 0 || artPresetNoteRef.current.trim().length > 0);
       if (!stillUsedByOtherRef && !stillUsedByBgFeatures) {
         setScopes((prev) => prev.filter((s) => s !== scope));
         setRefAppliedScopes((rec) => rec.filter((s) => s !== scope));
@@ -1323,7 +1336,7 @@ export default function App() {
     if (next.length === 0) {
       setWorldCombinedNote("");
       setWorldScopes([]);
-      setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes])]);  // 世界観解除→世界観 scope だけ外し、斬新背景＋手動 scope は残す（UNION 再計算・手動追加の巻き添え防止）
+      setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes, ...artScopes])]);  // 世界観解除→世界観 scope だけ外し、斬新背景/画法世界＋手動 scope は残す（UNION 再計算・手動追加の巻き添え防止）
       setScopeFlashKey((k) => k + 1);
       showPresetToast("世界観の設定をリセットしました");
       return;
@@ -1332,7 +1345,7 @@ export default function App() {
     const combined = buildCombinedWorldInputs(buildInputs(), next, variationMemory);
     const ws = combined.scopes;
     setWorldScopes(ws);
-    setScopes([...new Set([...ws, ...bgScopes])]);  // 世界観 ∪ 斬新背景（同時フル適用）
+    setScopes([...new Set([...ws, ...bgScopes, ...artScopes])]);  // 世界観 ∪ 斬新背景 ∪ 画法世界（同時フル適用）
     setMoods(combined.moods);
     setAutoMoodCategories(combined.autoMoodCategories ?? []);
     if (next.length === 1) setDetails(combined.details);
@@ -1354,7 +1367,7 @@ export default function App() {
       ? `${next.length}つの世界観を融合します`
       : APPLY_HINT;
     showPresetToast(msg, hint);
-  }, [activeWorldPresets, buildInputs, variationMemory, showPresetToast, bgScopes, worldScopes]);
+  }, [activeWorldPresets, buildInputs, variationMemory, showPresetToast, bgScopes, worldScopes, artScopes]);
 
   // 🌌 斬新背景プリセット（背景版）：handleWorldPresetToggle のクローン。
   // 背景系スコープ＋details.background＋bgPresetNote だけ更新し、人物・衣装・露出は触らない。
@@ -1377,7 +1390,7 @@ export default function App() {
     if (next.length === 0) {
       setBgPresetNote("");
       setBgScopes([]);
-      setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes])]);  // 斬新背景解除→斬新背景 scope だけ外し、世界観＋手動 scope は残す（UNION 再計算・手動追加の巻き添え防止）
+      setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes, ...artScopes])]);  // 斬新背景解除→斬新背景 scope だけ外し、世界観/画法世界＋手動 scope は残す（UNION 再計算・手動追加の巻き添え防止）
       setScopeFlashKey((k) => k + 1);
       showPresetToast("斬新背景の設定をリセットしました");
       return;
@@ -1386,7 +1399,7 @@ export default function App() {
     const combined = buildCombinedBgInputs(buildInputs(), next, variationMemory);
     const bs = combined.scopes;
     setBgScopes(bs);
-    setScopes([...new Set([...worldScopes, ...bs])]);  // 世界観 ∪ 斬新背景（同時フル適用）
+    setScopes([...new Set([...worldScopes, ...bs, ...artScopes])]);  // 世界観 ∪ 斬新背景 ∪ 画法世界（同時フル適用）
     setMoods(combined.moods);
     setAutoMoodCategories(combined.autoMoodCategories ?? []);
     if (next.length === 1) setDetails(combined.details);
@@ -1407,7 +1420,62 @@ export default function App() {
       ? `${next.length}つの斬新背景を融合します`
       : APPLY_HINT;
     showPresetToast(msg, hint);
-  }, [activeBgPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes]);
+  }, [activeBgPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes, artScopes]);
+
+  // 🖌 画法世界プリセット：handleBgPresetToggle のクローン。
+  // 背景系スコープ＋details.background＋artPresetNote だけ更新し、人物・衣装・露出は触らない。
+  // ★斬新背景×画法世界の2枠50:50ミックス時の setDetails 排他条件は commit3 で追加（ここでは
+  //   bg版と同型のまま＝単独選択時は無条件で setDetails する）。
+  const handleArtPresetToggle = useCallback((preset: ArtPreset, additive = false) => {
+    const prev = activeArtPresets;
+    let next: ArtPreset[];
+    if (additive) {
+      if (prev.includes(preset)) {
+        next = prev.filter((p) => p !== preset);
+      } else if (prev.length >= 3) {
+        next = [...prev.slice(1), preset];
+      } else {
+        next = [...prev, preset];
+      }
+    } else {
+      next = prev.length === 1 && prev[0] === preset ? [] : [preset];
+    }
+    setActiveArtPresets(next);
+
+    if (next.length === 0) {
+      setArtPresetNote("");
+      setArtScopes([]);
+      setScopes((prev) => [...new Set([...prev.filter((s) => !artScopes.includes(s)), ...worldScopes, ...bgScopes])]);  // 画法世界解除→画法世界 scope だけ外し、世界観/斬新背景＋手動 scope は残す（UNION 再計算・手動追加の巻き添え防止）
+      setScopeFlashKey((k) => k + 1);
+      showPresetToast("画法世界の設定をリセットしました");
+      return;
+    }
+
+    const combined = buildCombinedArtInputs(buildInputs(), next, variationMemory);
+    const as = combined.scopes;
+    setArtScopes(as);
+    setScopes([...new Set([...worldScopes, ...bgScopes, ...as])]);  // 世界観 ∪ 斬新背景 ∪ 画法世界（同時フル適用）
+    setMoods(combined.moods);
+    setAutoMoodCategories(combined.autoMoodCategories ?? []);
+    if (next.length === 1) setDetails(combined.details);
+    setViralMode(false);
+    // 画法世界ノートは専用 state に格納（extraInstructions・worldCombinedNote・bgPresetNote は上書きしない）
+    setArtPresetNote(combined.extraInstructions ?? "");
+    setScopeFlashKey((k) => k + 1);
+    setVariationMemory((prev) => updateMemory(prev, {
+      moods:  combined.moods,
+      scopes: combined.scopes,
+    }));
+
+    const labels = next.map((p) => ART_PRESET_DISPLAY[p]);
+    const msg = next.length === 1
+      ? `${labels[0]} 画法世界を適用しました`
+      : `🖌 画法コンボ：${labels.join(" × ")}`;
+    const hint = next.length > 1
+      ? `${next.length}つの画法世界を融合します`
+      : APPLY_HINT;
+    showPresetToast(msg, hint);
+  }, [activeArtPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes, artScopes]);
 
   // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
   // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
@@ -1863,9 +1931,11 @@ export default function App() {
             worldCombinedNote={worldCombinedNote}
             referenceNoteText={referenceNoteText}
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
-            onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes])]); }}
+            onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes, ...artScopes])]); }}
             bgPresetNote={bgPresetNote}
-            onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes])]); }}
+            onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes, ...artScopes])]); }}
+            artPresetNote={artPresetNote}
+            onClearArt={() => { setActiveArtPresets([]); setArtPresetNote(""); setArtScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !artScopes.includes(s)), ...worldScopes, ...bgScopes])]); }}
             onClearReference={handleClearReference}
             tagNg={tagNg}
             onClearTagNg={() => setTagNg([])}
@@ -1981,10 +2051,13 @@ export default function App() {
                 onResetAll={handleResetAll}
                 worldCombinedNote={worldCombinedNote}
                 referenceNoteText={referenceNoteText}
-                onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes])]); }}
+                onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes, ...artScopes])]); }}
                 activeBgPresets={activeBgPresets}
                 bgPresetNote={bgPresetNote}
-                onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes])]); }}
+                onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes, ...artScopes])]); }}
+                activeArtPresets={activeArtPresets}
+                artPresetNote={artPresetNote}
+                onClearArt={() => { setActiveArtPresets([]); setArtPresetNote(""); setArtScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !artScopes.includes(s)), ...worldScopes, ...bgScopes])]); }}
                 onClearReference={handleClearReference}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
@@ -2008,6 +2081,8 @@ export default function App() {
                 onWorldPresetToggle={handleWorldPresetToggle}
                 activeBgPresets={activeBgPresets}
                 onBgPresetToggle={handleBgPresetToggle}
+                activeArtPresets={activeArtPresets}
+                onArtPresetToggle={handleArtPresetToggle}
                 avoidCliche={avoidCliche}
                 onAvoidClicheChange={setAvoidCliche}
                 avoidRealBackground={avoidRealBackground}

@@ -13,9 +13,9 @@
 
 import { useState } from "react";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
-import type { WorldPreset, BgPreset } from "../lib/quickActions";
+import type { WorldPreset, BgPreset, ArtPreset } from "../lib/quickActions";
 
-export type { WorldPreset, BgPreset };
+export type { WorldPreset, BgPreset, ArtPreset };
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
@@ -29,6 +29,9 @@ interface QuickActionsProps {
   /** 🌌 斬新背景プリセット（背景版・最大3コンボ） */
   activeBgPresets?:    BgPreset[];
   onBgPresetToggle?:   (preset: BgPreset, additive?: boolean) => void;
+  /** 🖌 画法世界プリセット（アナログな画法・質感の系統・最大3コンボ） */
+  activeArtPresets?:   ArtPreset[];
+  onArtPresetToggle?:  (preset: ArtPreset, additive?: boolean) => void;
   /** 量産回避（avoidCliche・サーバ側 cliche 回避ブロック。既定ON） */
   avoidCliche?:        boolean;
   onAvoidClicheChange?: (v: boolean) => void;
@@ -135,6 +138,8 @@ export function QuickActions({
   onWorldPresetToggle,
   activeBgPresets     = [],
   onBgPresetToggle,
+  activeArtPresets    = [],
+  onArtPresetToggle,
   avoidCliche = true, onAvoidClicheChange,
   avoidRealBackground = true, onAvoidRealBackgroundChange,
 }: QuickActionsProps) {
@@ -218,6 +223,22 @@ export function QuickActions({
           {activeBgPresets.length > 1 && (
             <span className="text-[11px] text-indigo-300/70 font-semibold self-center ml-1">
               {activeBgPresets.length}選択中
+            </span>
+          )}
+        </CategoryRow>
+      )}
+
+      {/* ══════ 画法世界（斬新背景の姉妹カテゴリ・アナログな画法/質感の系統） ══════ */}
+      {onArtPresetToggle && (
+        <CategoryRow label="画法世界">
+          <span className="w-full text-[10px] text-text-desc leading-snug mb-0.5">背景だけを「アナログな画法・質感」の世界に置き換える（人物・衣装・構図は変えない / クリック=単独選択・Shift+クリック=コンボ）</span>
+          <TagBtn label="🖨 印刷物・活版" title="背景を活版印刷・古い刷り物の質感の世界に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onArtPresetToggle("letterpress", e.shiftKey)} active={activeArtPresets.includes("letterpress")} variant="amber" disabled={disabled} />
+          <TagBtn label="🔷 キュビスム" title="背景を多視点が同居するキュビスムの世界に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onArtPresetToggle("cubism", e.shiftKey)} active={activeArtPresets.includes("cubism")} variant="sky" disabled={disabled} />
+          <TagBtn label="🪵 版画・木版" title="背景を彫りと刷りの質感を持つ木版画の世界に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onArtPresetToggle("woodblock", e.shiftKey)} active={activeArtPresets.includes("woodblock")} variant="stone" disabled={disabled} />
+          <TagBtn label="🎭 切り絵・シルエット層" title="背景を切り絵のシルエットが幾重にも重なる世界に。人物・衣装・構図は変えない（クリック=単独選択 / Shift+クリック=コンボ）" onClick={(e) => onArtPresetToggle("paper_cut", e.shiftKey)} active={activeArtPresets.includes("paper_cut")} variant="violet" disabled={disabled} />
+          {activeArtPresets.length > 1 && (
+            <span className="text-[11px] text-indigo-300/70 font-semibold self-center ml-1">
+              {activeArtPresets.length}選択中
             </span>
           )}
         </CategoryRow>
