@@ -13,6 +13,7 @@ import type {
 import type { ZozoTrend } from "./zozoTrend";
 import { loadSettings, saveSettings, STORAGE_KEY as SETTINGS_STORAGE_KEY, type PersistedSettings } from "./settingsPersist";
 import type { CustomInstructionItem } from "./customInstructionItems";
+import type { ColorDominance } from "./colorDominanceNote";
 
 /**
  * 永続設定（PersistedSettings の30項目）の state 群を集約するフック。
@@ -69,6 +70,8 @@ export function usePersistedSettings() {
   const [windLevel, setWindLevel] = useState<number>(s0.windLevel);
   /** ✨派手さ→配色 連動（既定ON）。×解除をセッション跨ぎで保持（非永続だとリロードで連動が勝手に復活する不具合の防止）。 */
   const [decorationColorLink, setDecorationColorLink] = useState<boolean>(s0.decorationColorLink ?? true);
+  /** 配色の主従（null = 設定なし）。×解除をセッション跨ぎで保持。 */
+  const [colorDominance, setColorDominance] = useState<ColorDominance | null>(s0.colorDominance ?? null);
 
   // ── 永続化 effect（App分割 Phase4b でここへ集約。挙動は App 時代と同一）──────────
 
@@ -93,7 +96,7 @@ export function usePersistedSettings() {
       faceLock, expression,
       artStyle, defaultAspectRatio,
       favoriteLearnEnabled, favoriteStrength,
-      zozoApplied, activeBoosts, windLevel, decorationColorLink,
+      zozoApplied, activeBoosts, windLevel, decorationColorLink, colorDominance,
     });
   }, [
     scopes, moods, autoMoodCategories, count, details,
@@ -105,7 +108,7 @@ export function usePersistedSettings() {
     faceLock, expression,
     artStyle, defaultAspectRatio,
     favoriteLearnEnabled, favoriteStrength,
-    zozoApplied, activeBoosts, windLevel, decorationColorLink,
+    zozoApplied, activeBoosts, windLevel, decorationColorLink, colorDominance,
   ]);
 
   // 他タブの設定変更を storage イベントで受け取り UI に反映（マルチタブ相互上書き対策）
@@ -147,6 +150,7 @@ export function usePersistedSettings() {
       setActiveBoosts(next.activeBoosts);
       setWindLevel(next.windLevel);
       setDecorationColorLink(next.decorationColorLink ?? true);
+      setColorDominance(next.colorDominance ?? null);
     };
     window.addEventListener("storage", handler);
     return () => window.removeEventListener("storage", handler);
@@ -188,5 +192,6 @@ export function usePersistedSettings() {
     activeBoosts, setActiveBoosts,
     windLevel, setWindLevel,
     decorationColorLink, setDecorationColorLink,
+    colorDominance, setColorDominance,
   };
 }

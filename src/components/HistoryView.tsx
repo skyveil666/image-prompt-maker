@@ -64,6 +64,10 @@ interface Props {
   artPresetNote?:       string;
   /** 画法世界の解除（soft）。ArrangePreviewPanel へ中継。 */
   onClearArt?:          () => void;
+  /** 🎨 配色の主従（null = 設定なし）。ArrangePreviewPanel へ中継。 */
+  colorDominance?:      import("../lib/colorDominanceNote").ColorDominance | null;
+  /** 配色の主従の解除（soft）。ArrangePreviewPanel へ中継。 */
+  onClearColorDominance?: () => void;
   /** 参照画像適用の解除。 */
   onClearReference?:    () => void;
   /** タグ個別NG（per-tag NG）の現在値。ArrangePreviewPanel へ中継（アレンジも全案に効く）。 */
@@ -118,6 +122,7 @@ export function HistoryView({
   onClearAvoidRealBg, onClearWorld, onClearReference,
   bgPresetNote, onClearBg,
   artPresetNote, onClearArt,
+  colorDominance, onClearColorDominance,
   tagNg = [], onClearTagNg = () => {},
   memoBadges = [],
   onToast,
@@ -721,6 +726,8 @@ export function HistoryView({
               onClearBg={onClearBg}
               artPresetNote={artPresetNote}
               onClearArt={onClearArt}
+              colorDominance={colorDominance}
+              onClearColorDominance={onClearColorDominance}
               onClearReference={onClearReference}
               tagNg={tagNg}
               onClearTagNg={onClearTagNg}

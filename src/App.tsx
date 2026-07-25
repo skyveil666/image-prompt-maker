@@ -35,6 +35,7 @@ import {
   type ArtPreset,
 } from "./lib/quickActions";
 import { buildOutfitColorfulNote, buildOutfitColorVarietyNote } from "./lib/outfitColorNotes";
+import { buildColorDominanceNote } from "./lib/colorDominanceNote";
 import { buildCustomInstructionNote, type MemoBadge } from "./lib/axisMemoNote";
 import { joinAppliedItemsText } from "./lib/customInstructionItems";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
@@ -158,6 +159,7 @@ export default function App() {
     activeBoosts, setActiveBoosts,
     windLevel, setWindLevel,
     decorationColorLink, setDecorationColorLink,
+    colorDominance, setColorDominance,
   } = usePersistedSettings();
 
   // per-tag NG（タグ個別NG）：タグのダブルクリックで tagNg をトグル（DetailsCard 側）。tagNg は永続。
@@ -544,6 +546,9 @@ export default function App() {
         // 🖌 画法世界ノートは斬新背景と同じ条件で注入（背景が変更対象の時だけ）。
         //   ★斬新背景×画法世界の2枠50:50ミックス（ブリッジ文）は commit3 で追加＝ここでは単独注入のみ。
         (scopes.includes("background") ? artPresetNote : ""),
+        // 🎨 配色の主従：衣装・背景のどちらかが変更対象の時だけ注入（両方とも対象外なら無意味な指示になるため）。
+        (colorDominance && (scopes.includes("outfit") || scopes.includes("background")))
+          ? buildColorDominanceNote(colorDominance) : "",
         referenceNoteText,
         extraInstructions,
         // 衣装の色「カラフル」：1案の中で多色化（案間バラけと独立・color="auto"と併用可）。outfit が変更対象の時だけ。
@@ -648,6 +653,7 @@ export default function App() {
       worldCombinedNote,
       bgPresetNote,
       artPresetNote,
+      colorDominance,
       referenceNoteText,
       extraInstructions,
       customInstructionItems,
@@ -1936,6 +1942,8 @@ export default function App() {
             onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes, ...artScopes])]); }}
             artPresetNote={artPresetNote}
             onClearArt={() => { setActiveArtPresets([]); setArtPresetNote(""); setArtScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !artScopes.includes(s)), ...worldScopes, ...bgScopes])]); }}
+            colorDominance={colorDominance}
+            onClearColorDominance={() => setColorDominance(null)}
             onClearReference={handleClearReference}
             tagNg={tagNg}
             onClearTagNg={() => setTagNg([])}
@@ -2058,6 +2066,8 @@ export default function App() {
                 activeArtPresets={activeArtPresets}
                 artPresetNote={artPresetNote}
                 onClearArt={() => { setActiveArtPresets([]); setArtPresetNote(""); setArtScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !artScopes.includes(s)), ...worldScopes, ...bgScopes])]); }}
+                colorDominance={colorDominance}
+                onClearColorDominance={() => setColorDominance(null)}
                 onClearReference={handleClearReference}
                 avoidRealBackground={avoidRealBackground}
                 onClearAvoidRealBg={() => setAvoidRealBackground(false)}
@@ -2083,6 +2093,8 @@ export default function App() {
                 onBgPresetToggle={handleBgPresetToggle}
                 activeArtPresets={activeArtPresets}
                 onArtPresetToggle={handleArtPresetToggle}
+                colorDominance={colorDominance}
+                onColorDominanceChange={setColorDominance}
                 avoidCliche={avoidCliche}
                 onAvoidClicheChange={setAvoidCliche}
                 avoidRealBackground={avoidRealBackground}

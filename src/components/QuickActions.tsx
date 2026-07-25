@@ -14,6 +14,7 @@
 import { useState } from "react";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
 import type { WorldPreset, BgPreset, ArtPreset } from "../lib/quickActions";
+import type { ColorDominance } from "../lib/colorDominanceNote";
 
 export type { WorldPreset, BgPreset, ArtPreset };
 
@@ -32,6 +33,9 @@ interface QuickActionsProps {
   /** 🖌 画法世界プリセット（アナログな画法・質感の系統・最大3コンボ） */
   activeArtPresets?:   ArtPreset[];
   onArtPresetToggle?:  (preset: ArtPreset, additive?: boolean) => void;
+  /** 🎨 配色の主従（衣装/背景どちらを主役にするか・単一選択・null=設定なし） */
+  colorDominance?:        ColorDominance | null;
+  onColorDominanceChange?: (v: ColorDominance | null) => void;
   /** 量産回避（avoidCliche・サーバ側 cliche 回避ブロック。既定ON） */
   avoidCliche?:        boolean;
   onAvoidClicheChange?: (v: boolean) => void;
@@ -140,6 +144,7 @@ export function QuickActions({
   onBgPresetToggle,
   activeArtPresets    = [],
   onArtPresetToggle,
+  colorDominance = null, onColorDominanceChange,
   avoidCliche = true, onAvoidClicheChange,
   avoidRealBackground = true, onAvoidRealBackgroundChange,
 }: QuickActionsProps) {
@@ -241,6 +246,16 @@ export function QuickActions({
               {activeArtPresets.length}選択中
             </span>
           )}
+        </CategoryRow>
+      )}
+
+      {/* ══════ 配色の主従（衣装/背景どちらを主役にするか・単一選択） ══════ */}
+      {onColorDominanceChange && (
+        <CategoryRow label="配色主従">
+          <span className="w-full text-[10px] text-text-desc leading-snug mb-0.5">衣装と背景、どちらの配色を主役にするか（クリックで選択・もう一度クリックで解除）</span>
+          <TagBtn label="👗 衣装主役" title="背景の配色は無彩色〜低彩度に抑え、衣装だけが彩度を持つようにする" onClick={() => onColorDominanceChange(colorDominance === "outfit" ? null : "outfit")} active={colorDominance === "outfit"} variant="pink" disabled={disabled} />
+          <TagBtn label="🖼 背景主役" title="衣装の配色はモノトーン〜控えめに抑え、背景の方が色で主張するようにする" onClick={() => onColorDominanceChange(colorDominance === "background" ? null : "background")} active={colorDominance === "background"} variant="sky" disabled={disabled} />
+          <TagBtn label="⚡ 対比" title="衣装と背景を反対方向の配色に振り分け、コントラストを強める" onClick={() => onColorDominanceChange(colorDominance === "contrast" ? null : "contrast")} active={colorDominance === "contrast"} variant="gold" disabled={disabled} />
         </CategoryRow>
       )}
 

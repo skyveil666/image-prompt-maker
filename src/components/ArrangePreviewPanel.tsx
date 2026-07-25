@@ -15,6 +15,7 @@ import { WithImagePreview } from "./ImagePreviewTooltip";
 import { DominatorBadge, summarizeNote } from "./DominatorBadge";
 import type { MemoBadge } from "../lib/axisMemoNote";
 import { tagNgToLabels } from "../data/tagNgOptions";
+import { buildColorDominanceNote, type ColorDominance } from "../lib/colorDominanceNote";
 import {
   MAX_RESULT_IMAGES, RATING_LABELS,
   AXIS_RATING_META, type RatingAxisKey,
@@ -83,6 +84,10 @@ interface Props {
   artPresetNote?:       string;
   /** 画法世界の解除（App の activeArtPresets + artPresetNote をクリア。scopes は世界観/斬新背景由来へ再計算で縮約・details は戻さない）。 */
   onClearArt?:          () => void;
+  /** 🎨 配色の主従（null = 設定なし）。衣装/背景のどちらかが変更対象の時だけ支配バッジを出す。 */
+  colorDominance?:      ColorDominance | null;
+  /** 配色の主従の解除（App の colorDominance を null に）。 */
+  onClearColorDominance?: () => void;
   /** 参照画像適用の解除（App の referenceNote をクリア）。 */
   onClearReference?:    () => void;
   /** タグ個別NG（per-tag NG）の現在値。非空なら「タグNG（候補除外・準備中）」バッジを出す（①でtagNgは【NG】非合流＝現在は生成に未反映・Step2で候補除外を実効化）。 */
@@ -529,6 +534,8 @@ export function ArrangePreviewPanel({
   onClearBg = () => {},
   artPresetNote = "",
   onClearArt = () => {},
+  colorDominance = null,
+  onClearColorDominance = () => {},
   onClearReference = () => {},
   tagNg = [],
   onClearTagNg = () => {},
@@ -551,11 +558,14 @@ export function ArrangePreviewPanel({
   // 🖌 画法世界（斬新背景の姉妹カテゴリ）：artPresetNote も同じ発火条件（背景スコープ時のみ）。
   const artNote = artPresetNote.trim();
   const artFires = artNote.length > 0 && selectedScopes.includes("background");
+  // 🎨 配色の主従：衣装・背景のどちらかが変更対象の時だけ発火（メイン ReflectionStatusBar と同条件）。
+  const dominanceNote = colorDominance ? buildColorDominanceNote(colorDominance) : "";
+  const dominanceFires = colorDominance !== null && (selectedScopes.includes("outfit") || selectedScopes.includes("background"));
   // 🚫 タグNGバッジは hide（hide-not-delete・2026-06）：メイン ReflectionStatusBar と同型で上部一覧を非表示。
   //    flag を true に戻せば一覧バッジ＋×全解除が復活（tagNg state・グリッドNG・背景候補除外は常時生きている）。
   const SHOW_TAGNG_BADGE: boolean = false;
   const tagNgLabels = tagNgToLabels(tagNg);
-  const hasDominator = worldNote.length > 0 || bgFires || artFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && tagNg.length > 0) || memoBadges.length > 0;
+  const hasDominator = worldNote.length > 0 || bgFires || artFires || dominanceFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && tagNg.length > 0) || memoBadges.length > 0;
 
   // 案ごとのローカル state（画像・評価）。result が変わっても貼付け済みの内容は引き継ぐ。
   const [proposalStates, setProposalStates] = useState<ProposalLocalState[]>([]);
@@ -726,6 +736,15 @@ export function ArrangePreviewPanel({
                     summaryTitle={artPresetNote}
                     onClear={onClearArt}
                     clearTitle="この画法世界を全案から解除する"
+                  />
+                )}
+                {dominanceFires && (
+                  <DominatorBadge
+                    label="🎨 配色主従適用中"
+                    summary={summarizeNote(dominanceNote)}
+                    summaryTitle={dominanceNote}
+                    onClear={onClearColorDominance}
+                    clearTitle="配色の主従を全案から解除する"
                   />
                 )}
                 {refNote && (

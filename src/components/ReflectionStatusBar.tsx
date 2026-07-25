@@ -14,6 +14,7 @@ import type { Scope } from "../types";
 import type { MemoBadge } from "../lib/axisMemoNote";
 import { DominatorBadge, summarizeNote } from "./DominatorBadge";
 import { tagNgToLabels } from "../data/tagNgOptions";
+import { buildColorDominanceNote, type ColorDominance } from "../lib/colorDominanceNote";
 
 // ── ラベル ──────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,10 @@ const ART_JP: Record<string, string> = {
   woodblock: "🪵 版画・木版", paper_cut: "🎭 切り絵・シルエット層",
 };
 
+const DOMINANCE_JP: Record<string, string> = {
+  outfit: "👗 衣装主役", background: "🖼 背景主役", contrast: "⚡ 対比",
+};
+
 // ── Props ────────────────────────────────────────────────────────────────────
 interface Props {
   scopes: Scope[];
@@ -76,6 +81,10 @@ interface Props {
   artPresetNote: string;
   /** 画法世界の解除（artPresetNote + activeArtPresets をクリア。scopes は世界観/斬新背景由来へ再計算で縮約・details は戻さない）。 */
   onClearArt: () => void;
+  /** 🎨 配色の主従（null = 設定なし）。衣装/背景のどちらかが変更対象の時だけ支配バッジを出す。 */
+  colorDominance: ColorDominance | null;
+  /** 配色の主従の解除（colorDominance を null に）。 */
+  onClearColorDominance: () => void;
   /** 参照画像適用の解除（referenceNote をクリア）。 */
   onClearReference: () => void;
   /** 🌆 背景を2D/非写実に（既定ON・非永続）。背景が変更対象の時だけ全案に効くが回避▼に埋もれて気付きにくい。 */
@@ -162,7 +171,10 @@ export function ReflectionStatusBar(p: Props) {
   // 🖌 画法世界（斬新背景の姉妹カテゴリ）：artPresetNote も同じ発火条件（背景スコープ時のみ）。
   const artNote = p.artPresetNote.trim();
   const artFires = artNote.length > 0 && p.scopes.includes("background");
-  const hasDominator = worldNote.length > 0 || bgFires || artFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive || (p.memoBadges?.length ?? 0) > 0;
+  // 🎨 配色の主従：衣装・背景のどちらかが変更対象の時だけ発火（両方対象外なら無意味な指示になるため）。
+  const dominanceNote = p.colorDominance ? buildColorDominanceNote(p.colorDominance) : "";
+  const dominanceFires = p.colorDominance !== null && (p.scopes.includes("outfit") || p.scopes.includes("background"));
+  const hasDominator = worldNote.length > 0 || bgFires || artFires || dominanceFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive || (p.memoBadges?.length ?? 0) > 0;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
   const bgLabel = p.activeBgPresets.map((b) => BG_JP[b] ?? b).join(" × ") || "適用中";
   const artLabel = p.activeArtPresets.map((a) => ART_JP[a] ?? a).join(" × ") || "適用中";
@@ -198,6 +210,15 @@ export function ReflectionStatusBar(p: Props) {
               summaryTitle={p.artPresetNote}
               onClear={p.onClearArt}
               clearTitle="この画法世界を全案から解除する"
+            />
+          )}
+          {dominanceFires && p.colorDominance && (
+            <DominatorBadge
+              label={`🎨 配色主従：${DOMINANCE_JP[p.colorDominance] ?? p.colorDominance}`}
+              summary={summarizeNote(dominanceNote)}
+              summaryTitle={dominanceNote}
+              onClear={p.onClearColorDominance}
+              clearTitle="配色の主従を全案から解除する"
             />
           )}
           {refNote && (
