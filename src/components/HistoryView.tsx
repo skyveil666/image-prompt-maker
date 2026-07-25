@@ -8,6 +8,7 @@ import { ArrangePreviewPanel } from "./ArrangePreviewPanel";
 import { HistoryMiniExplorer } from "./HistoryMiniExplorer";
 import type { FavoriteProfile } from "../lib/favoriteProfile";
 import type { MemoBadge } from "../lib/axisMemoNote";
+import type { BgPreset, ArtPreset } from "../lib/quickActions";
 import {
   runAutoCleanup,
   getAutoCleanupEnabled,
@@ -56,10 +57,14 @@ interface Props {
   onClearAvoidRealBg?:  () => void;
   /** 世界観の解除。 */
   onClearWorld?:        () => void;
+  /** 🌌 アクティブな斬新背景プリセットID。ArrangePreviewPanel へ中継（commit3：bg×art融合バッジの判定に使用）。 */
+  activeBgPresets?:     BgPreset[];
   /** 🌌 斬新背景プリセット由来の追加指示（背景スコープ時のみ全案へ注入）。ArrangePreviewPanel へ中継。 */
   bgPresetNote?:        string;
   /** 斬新背景の解除（soft）。ArrangePreviewPanel へ中継。 */
   onClearBg?:           () => void;
+  /** 🖌 アクティブな画法世界プリセットID。ArrangePreviewPanel へ中継（commit3：bg×art融合バッジの判定に使用）。 */
+  activeArtPresets?:    ArtPreset[];
   /** 🖌 画法世界プリセット由来の追加指示（背景スコープ時のみ全案へ注入）。ArrangePreviewPanel へ中継。 */
   artPresetNote?:       string;
   /** 画法世界の解除（soft）。ArrangePreviewPanel へ中継。 */
@@ -120,8 +125,8 @@ export function HistoryView({
   favoriteProfile = null, favoriteLearnEnabled = false, recoverySlot,
   avoidRealBackground, worldCombinedNote, referenceNoteText,
   onClearAvoidRealBg, onClearWorld, onClearReference,
-  bgPresetNote, onClearBg,
-  artPresetNote, onClearArt,
+  activeBgPresets = [], bgPresetNote, onClearBg,
+  activeArtPresets = [], artPresetNote, onClearArt,
   colorDominance, onClearColorDominance,
   tagNg = [], onClearTagNg = () => {},
   memoBadges = [],
@@ -722,8 +727,10 @@ export function HistoryView({
               referenceNoteText={referenceNoteText}
               onClearAvoidRealBg={onClearAvoidRealBg}
               onClearWorld={onClearWorld}
+              activeBgPresets={activeBgPresets}
               bgPresetNote={bgPresetNote}
               onClearBg={onClearBg}
+              activeArtPresets={activeArtPresets}
               artPresetNote={artPresetNote}
               onClearArt={onClearArt}
               colorDominance={colorDominance}

@@ -32,6 +32,7 @@ import {
   buildWorldBgBridgeNote,
   buildCombinedArtInputs,
   ART_PRESET_DISPLAY,
+  buildBgArtBridgeNote,
   type ArtPreset,
 } from "./lib/quickActions";
 import { buildOutfitColorfulNote, buildOutfitColorVarietyNote } from "./lib/outfitColorNotes";
@@ -541,10 +542,14 @@ export default function App() {
       //   （worldCombinedNote∧bgPresetNote∧背景scope）と厳密一致＝activeWorldPresets/activeBgPresets と等価かつ復元エッジに安全。
       extraInstructions: [
         (worldCombinedNote && bgPresetNote && scopes.includes("background")) ? buildWorldBgBridgeNote() : "",
+        // 🌌×🖌 斬新背景×画法世界の融合ブリッジ（commit3）：それぞれ「ちょうど1つ」選択中かつ
+        //   背景が変更対象の時だけ注入。bgPresetNote/artPresetNote（下記）は差し替えず「加えて」注入
+        //   する＝世界観×斬新背景ブリッジと同じ方式（個別ノートは温存し、先頭に融合指示を追加するだけ）。
+        (activeBgPresets.length === 1 && activeArtPresets.length === 1 && scopes.includes("background"))
+          ? buildBgArtBridgeNote(activeBgPresets[0], activeArtPresets[0]) : "",
         worldCombinedNote,
         (scopes.includes("background") ? bgPresetNote : ""),
         // 🖌 画法世界ノートは斬新背景と同じ条件で注入（背景が変更対象の時だけ）。
-        //   ★斬新背景×画法世界の2枠50:50ミックス（ブリッジ文）は commit3 で追加＝ここでは単独注入のみ。
         (scopes.includes("background") ? artPresetNote : ""),
         // 🎨 配色の主従：衣装・背景のどちらかが変更対象の時だけ注入（両方とも対象外なら無意味な指示になるため）。
         (colorDominance && (scopes.includes("outfit") || scopes.includes("background")))
@@ -653,6 +658,8 @@ export default function App() {
       worldCombinedNote,
       bgPresetNote,
       artPresetNote,
+      activeBgPresets,
+      activeArtPresets,
       colorDominance,
       referenceNoteText,
       extraInstructions,
@@ -1408,7 +1415,10 @@ export default function App() {
     setScopes([...new Set([...worldScopes, ...bs, ...artScopes])]);  // 世界観 ∪ 斬新背景 ∪ 画法世界（同時フル適用）
     setMoods(combined.moods);
     setAutoMoodCategories(combined.autoMoodCategories ?? []);
-    if (next.length === 1) setDetails(combined.details);
+    // ★commit3：画法世界が同時に選ばれている間は details.background を上書きしない
+    //   （50:50融合中は一方の WIRED 値に固定せず、融合の表現は buildBgArtBridgeNote 側に委ねる）。
+    //   片方だけ（画法世界0件）の時は従来どおり setDetails する＝既存の単独選択挙動は不変。
+    if (next.length === 1 && activeArtPresets.length === 0) setDetails(combined.details);
     setViralMode(false);
     // 斬新背景ノートは専用 state に格納（extraInstructions・worldCombinedNote は上書きしない）
     setBgPresetNote(combined.extraInstructions ?? "");
@@ -1426,12 +1436,10 @@ export default function App() {
       ? `${next.length}つの斬新背景を融合します`
       : APPLY_HINT;
     showPresetToast(msg, hint);
-  }, [activeBgPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes, artScopes]);
+  }, [activeBgPresets, activeArtPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes, artScopes]);
 
   // 🖌 画法世界プリセット：handleBgPresetToggle のクローン。
   // 背景系スコープ＋details.background＋artPresetNote だけ更新し、人物・衣装・露出は触らない。
-  // ★斬新背景×画法世界の2枠50:50ミックス時の setDetails 排他条件は commit3 で追加（ここでは
-  //   bg版と同型のまま＝単独選択時は無条件で setDetails する）。
   const handleArtPresetToggle = useCallback((preset: ArtPreset, additive = false) => {
     const prev = activeArtPresets;
     let next: ArtPreset[];
@@ -1463,7 +1471,10 @@ export default function App() {
     setScopes([...new Set([...worldScopes, ...bgScopes, ...as])]);  // 世界観 ∪ 斬新背景 ∪ 画法世界（同時フル適用）
     setMoods(combined.moods);
     setAutoMoodCategories(combined.autoMoodCategories ?? []);
-    if (next.length === 1) setDetails(combined.details);
+    // ★commit3：斬新背景が同時に選ばれている間は details.background を上書きしない
+    //   （50:50融合中は一方の WIRED 値に固定せず、融合の表現は buildBgArtBridgeNote 側に委ねる）。
+    //   片方だけ（斬新背景0件）の時は従来どおり setDetails する＝既存の単独選択挙動は不変。
+    if (next.length === 1 && activeBgPresets.length === 0) setDetails(combined.details);
     setViralMode(false);
     // 画法世界ノートは専用 state に格納（extraInstructions・worldCombinedNote・bgPresetNote は上書きしない）
     setArtPresetNote(combined.extraInstructions ?? "");
@@ -1481,7 +1492,7 @@ export default function App() {
       ? `${next.length}つの画法世界を融合します`
       : APPLY_HINT;
     showPresetToast(msg, hint);
-  }, [activeArtPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes, artScopes]);
+  }, [activeArtPresets, activeBgPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes, artScopes]);
 
   // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
   // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
@@ -1938,8 +1949,10 @@ export default function App() {
             referenceNoteText={referenceNoteText}
             onClearAvoidRealBg={() => setAvoidRealBackground(false)}
             onClearWorld={() => { setActiveWorldPresets([]); setWorldCombinedNote(""); setWorldScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !worldScopes.includes(s)), ...bgScopes, ...artScopes])]); }}
+            activeBgPresets={activeBgPresets}
             bgPresetNote={bgPresetNote}
             onClearBg={() => { setActiveBgPresets([]); setBgPresetNote(""); setBgScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !bgScopes.includes(s)), ...worldScopes, ...artScopes])]); }}
+            activeArtPresets={activeArtPresets}
             artPresetNote={artPresetNote}
             onClearArt={() => { setActiveArtPresets([]); setArtPresetNote(""); setArtScopes([]); setScopes((prev) => [...new Set([...prev.filter((s) => !artScopes.includes(s)), ...worldScopes, ...bgScopes])]); }}
             colorDominance={colorDominance}

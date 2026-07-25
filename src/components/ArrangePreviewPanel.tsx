@@ -16,6 +16,7 @@ import { DominatorBadge, summarizeNote } from "./DominatorBadge";
 import type { MemoBadge } from "../lib/axisMemoNote";
 import { tagNgToLabels } from "../data/tagNgOptions";
 import { buildColorDominanceNote, type ColorDominance } from "../lib/colorDominanceNote";
+import { buildBgArtBridgeNote, BG_PRESET_DISPLAY, ART_PRESET_DISPLAY, type BgPreset, type ArtPreset } from "../lib/quickActions";
 import {
   MAX_RESULT_IMAGES, RATING_LABELS,
   AXIS_RATING_META, type RatingAxisKey,
@@ -76,10 +77,14 @@ interface Props {
   onClearAvoidRealBg?:  () => void;
   /** 世界観の解除（App の activeWorldPresets + worldCombinedNote をクリア）。 */
   onClearWorld?:        () => void;
+  /** 🌌 アクティブな斬新背景プリセットID（commit3：bg×art融合バッジの判定・ラベルに使用。ちょうど1件の時だけ融合バッジが出る）。 */
+  activeBgPresets?:     BgPreset[];
   /** 🌌 斬新背景プリセット由来の追加指示（背景スコープ時のみ全案へ注入・通常は不可視）。非空かつ背景が変更対象なら支配バッジを出す。 */
   bgPresetNote?:        string;
   /** 斬新背景の解除（App の activeBgPresets + bgPresetNote をクリア。scopes は世界観由来へ再計算で縮約・details は戻さない）。 */
   onClearBg?:           () => void;
+  /** 🖌 アクティブな画法世界プリセットID（commit3：bg×art融合バッジの判定・ラベルに使用。ちょうど1件の時だけ融合バッジが出る）。 */
+  activeArtPresets?:    ArtPreset[];
   /** 🖌 画法世界プリセット由来の追加指示（背景スコープ時のみ全案へ注入・通常は不可視）。非空かつ背景が変更対象なら支配バッジを出す。 */
   artPresetNote?:       string;
   /** 画法世界の解除（App の activeArtPresets + artPresetNote をクリア。scopes は世界観/斬新背景由来へ再計算で縮約・details は戻さない）。 */
@@ -530,8 +535,10 @@ export function ArrangePreviewPanel({
   referenceNoteText = "",
   onClearAvoidRealBg = () => {},
   onClearWorld = () => {},
+  activeBgPresets = [],
   bgPresetNote = "",
   onClearBg = () => {},
+  activeArtPresets = [],
   artPresetNote = "",
   onClearArt = () => {},
   colorDominance = null,
@@ -558,6 +565,10 @@ export function ArrangePreviewPanel({
   // 🖌 画法世界（斬新背景の姉妹カテゴリ）：artPresetNote も同じ発火条件（背景スコープ時のみ）。
   const artNote = artPresetNote.trim();
   const artFires = artNote.length > 0 && selectedScopes.includes("background");
+  // 🌌×🖌 commit3：斬新背景×画法世界がそれぞれ「ちょうど1つ」＋背景が変更対象の時だけ、
+  //   個別バッジ2つの代わりに融合バッジ1つを出す（App.tsx の注入ゲートと厳密一致）。
+  const bgArtBridgeFires = activeBgPresets.length === 1 && activeArtPresets.length === 1 && selectedScopes.includes("background");
+  const bgArtBridgeNote = bgArtBridgeFires ? buildBgArtBridgeNote(activeBgPresets[0], activeArtPresets[0]) : "";
   // 🎨 配色の主従：衣装・背景のどちらかが変更対象の時だけ発火（メイン ReflectionStatusBar と同条件）。
   const dominanceNote = colorDominance ? buildColorDominanceNote(colorDominance) : "";
   const dominanceFires = colorDominance !== null && (selectedScopes.includes("outfit") || selectedScopes.includes("background"));
@@ -720,23 +731,35 @@ export function ArrangePreviewPanel({
                     clearTitle="この世界観を全案から解除する"
                   />
                 )}
-                {bgFires && (
+                {bgArtBridgeFires ? (
                   <DominatorBadge
-                    label="🌌 斬新背景適用中"
-                    summary={summarizeNote(bgNote)}
-                    summaryTitle={bgPresetNote}
-                    onClear={onClearBg}
-                    clearTitle="この斬新背景を全案から解除する"
+                    label={`🎨 ${BG_PRESET_DISPLAY[activeBgPresets[0]]} × ${ART_PRESET_DISPLAY[activeArtPresets[0]]}（約半々で融合）`}
+                    summary={summarizeNote(bgArtBridgeNote)}
+                    summaryTitle={bgArtBridgeNote}
+                    onClear={() => { onClearBg(); onClearArt(); }}
+                    clearTitle="この背景×画法の融合を全案から解除する（両方解除）"
                   />
-                )}
-                {artFires && (
-                  <DominatorBadge
-                    label="🖌 画法世界適用中"
-                    summary={summarizeNote(artNote)}
-                    summaryTitle={artPresetNote}
-                    onClear={onClearArt}
-                    clearTitle="この画法世界を全案から解除する"
-                  />
+                ) : (
+                  <>
+                    {bgFires && (
+                      <DominatorBadge
+                        label="🌌 斬新背景適用中"
+                        summary={summarizeNote(bgNote)}
+                        summaryTitle={bgPresetNote}
+                        onClear={onClearBg}
+                        clearTitle="この斬新背景を全案から解除する"
+                      />
+                    )}
+                    {artFires && (
+                      <DominatorBadge
+                        label="🖌 画法世界適用中"
+                        summary={summarizeNote(artNote)}
+                        summaryTitle={artPresetNote}
+                        onClear={onClearArt}
+                        clearTitle="この画法世界を全案から解除する"
+                      />
+                    )}
+                  </>
                 )}
                 {dominanceFires && (
                   <DominatorBadge
