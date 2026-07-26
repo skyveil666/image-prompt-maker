@@ -523,11 +523,14 @@ export default function App() {
       //   衣装色が未指定(skip/auto/inherit) の時だけ、送信payload上で color をビビッド化する。
       //   state(details.outfit.color)は不変＝明示選択した色は最優先で上書きしない。decorationColorLink=false で無効。
       //   maximal→gradient（グラデーション配色）／elaborate→accent_color（差し色）。色は既存経路 promptSystem:1252 で出力。
+      //   ★commit2（配色主従との調停）：colorDominance が非null（衣装主役/背景主役/対比のいずれか選択中）の間は
+      //   この色連動を抑止する（衣装色を勝手にビビッド化すると配色主従のnoteと逆方向を指示し打ち消し合うため）。
+      //   派手さの他の効果（風/露出/decoration自体の質感表現）はここでは触らない＝色連動部分のみの抑止。
       details: (() => {
         const o = details.outfit;
         const unset = o.color === "skip" || o.color === "auto" || o.color === "inherit";
         const linkColor = o.decoration === "maximal" ? "gradient" : o.decoration === "elaborate" ? "accent_color" : null;
-        if (decorationColorLink && scopes.includes("outfit") && unset && linkColor) {
+        if (decorationColorLink && scopes.includes("outfit") && unset && linkColor && colorDominance === null) {
           return { ...details, outfit: { ...o, color: linkColor } };
         }
         return details;

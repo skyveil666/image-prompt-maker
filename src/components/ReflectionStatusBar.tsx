@@ -164,7 +164,12 @@ export function ReflectionStatusBar(p: Props) {
   // ✨派手さ→配色 連動（buildInputs と同条件で導出）：outfit が変更対象 ∧ 派手さ高(elaborate/maximal) ∧ color未指定 ∧ 連動ON
   const colorUnset = p.outfitColor === "skip" || p.outfitColor === "auto" || p.outfitColor === "inherit";
   const decoLinkColor = p.outfitDecoration === "maximal" ? "gradient" : p.outfitDecoration === "elaborate" ? "accent_color" : null;
-  const colorLinkActive = p.decorationColorLink && p.scopes.includes("outfit") && colorUnset && decoLinkColor !== null;
+  // ★commit2（配色主従との調停）：上記の条件が揃っていても colorDominance 選択中は buildInputs 側で
+  //   実際の色連動を止めている＝バッジの発火条件もそれに厳密一致させる（「効いてないのに効いてるように
+  //   見える」バッジを残さない）。抑制中は「停止中」の別バッジで理由を可視化する（非表示にはしない）。
+  const colorLinkWouldFire = p.decorationColorLink && p.scopes.includes("outfit") && colorUnset && decoLinkColor !== null;
+  const colorLinkActive = colorLinkWouldFire && p.colorDominance === null;
+  const colorLinkSuppressedByDominance = colorLinkWouldFire && p.colorDominance !== null;
   // 🌌 斬新背景（背景版プリセット）：bgPresetNote は buildInputs で「背景スコープ時のみ」注入されるため、
   //   発火条件もサーバ効果と厳密一致させる（bgPresetNote 非空 ∧ scopes.includes("background")）。
   const bgNote = p.bgPresetNote.trim();
@@ -179,7 +184,7 @@ export function ReflectionStatusBar(p: Props) {
   // 🎨 配色の主従：衣装・背景のどちらかが変更対象の時だけ発火（両方対象外なら無意味な指示になるため）。
   const dominanceNote = p.colorDominance ? buildColorDominanceNote(p.colorDominance) : "";
   const dominanceFires = p.colorDominance !== null && (p.scopes.includes("outfit") || p.scopes.includes("background"));
-  const hasDominator = worldNote.length > 0 || bgFires || artFires || dominanceFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive || (p.memoBadges?.length ?? 0) > 0;
+  const hasDominator = worldNote.length > 0 || bgFires || artFires || dominanceFires || refNote.length > 0 || bgStylizeActive || (SHOW_TAGNG_BADGE && p.tagNg.length > 0) || colorLinkActive || colorLinkSuppressedByDominance || (p.memoBadges?.length ?? 0) > 0;
   const worldLabel = p.activeWorldPresets.map((w) => WORLD_JP[w] ?? w).join(" × ") || "適用中";
   const bgLabel = p.activeBgPresets.map((b) => BG_JP[b] ?? b).join(" × ") || "適用中";
   const artLabel = p.activeArtPresets.map((a) => ART_JP[a] ?? a).join(" × ") || "適用中";
@@ -275,6 +280,15 @@ export function ReflectionStatusBar(p: Props) {
               summaryTitle="「派手さ」が高く衣装色が未指定のため、生成時に配色を自動でビビッド化します（色を明示選択すると自動解除）。衣装色の state は変更しません。"
               onClear={p.onClearDecorationColorLink}
               clearTitle="派手さ→配色の自動連動をオフにする（衣装色は未指定のまま）"
+            />
+          )}
+          {colorLinkSuppressedByDominance && (
+            <DominatorBadge
+              label="✨ 派手さ→配色（配色主従が優先中のため停止）"
+              summary="配色の主従を解除すると自動連動が復活します"
+              summaryTitle="「派手さ」による配色の自動連動は本来なら発火する条件ですが、配色の主従（衣装主役/背景主役/対比）と逆方向の指示になり打ち消し合うため、主従を選択中は一時停止しています。主従を解除すると自動で復活します。"
+              onClear={p.onClearDecorationColorLink}
+              clearTitle="派手さ→配色の自動連動そのものをオフにする（配色主従を解除しても復活しなくなる）"
             />
           )}
           {/* ✏ 軸ごとカスタム指示メモ（ポーズ等）：全案に効くのに折りたたみで見えなくなるため常時バッジ化。 */}
