@@ -588,12 +588,13 @@ export function buildY2kInputs(current: PromptInputs, memory: VariationMemory): 
       },
       outfit: {
         style:      dir.outfitStyle,
-        color:      dir.outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: dir.outfitSilhouette,
         decoration: dir.outfitDecoration,
         luxury:     dir.outfitLuxury,
         exposure:   current.details.outfit.exposure,
-        material:   dir.outfitMaterial,
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       props: {
@@ -623,13 +624,6 @@ const Y3K_MOOD_SUB: Mood[] = [
 const Y3K_OUTFIT_STYLES: OutfitStyle[] = [
   "future_dress", "techwear", "runway", "mode", "cyber",
 ];
-const Y3K_OUTFIT_COLORS: OutfitColor[] = [
-  "silver", "white", "black", "gold", "gradient",
-  "pink", "purple", "red", "green", "light_blue", "accent_color",
-];
-const Y3K_OUTFIT_MATERIALS: OutfitMaterial[] = [
-  "transparent", "pvc", "metal", "nylon", "leather", "enamel", "velvet",
-];
 const Y3K_GLOW_COLORS: CyberGlowColor[] = [
   "cyan", "purple", "pink", "white", "gold", "green", "rainbow", "blue",
 ];
@@ -658,10 +652,8 @@ export function buildY3kInputs(current: PromptInputs, memory: VariationMemory): 
   );
   const moods: Mood[] = [...corePick, ...subPick].slice(0, 3 + Math.floor(Math.random() * 2));
 
-  // ── 衣装（直近スタイルを避ける）
+  // ── 衣装（直近スタイルを避ける・色/素材は世界観で固定しないため抽選しない）
   const outfitStyle    = pickAvoidingRecent(Y3K_OUTFIT_STYLES,    memory.recentOutfits);
-  const outfitColor    = Y3K_OUTFIT_COLORS[Math.floor(Math.random() * Y3K_OUTFIT_COLORS.length)];
-  const outfitMaterial = Y3K_OUTFIT_MATERIALS[Math.floor(Math.random() * Y3K_OUTFIT_MATERIALS.length)];
 
   // ── サイバー発光色（青連発を避ける）
   const glowColor    = pickAvoidingRecent(Y3K_GLOW_COLORS,        memory.recentMoods) as CyberGlowColor;
@@ -711,12 +703,13 @@ export function buildY3kInputs(current: PromptInputs, memory: VariationMemory): 
       },
       outfit: {
         style:      outfitStyle,
-        color:      outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "auto",
         decoration: current.details.outfit.decoration,
         luxury:     "future_luxe",
         exposure:   current.details.outfit.exposure,
-        material:   outfitMaterial,
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       props: {
@@ -754,20 +747,10 @@ const STREET_BRIGHT_MOODS: Mood[] = [
   "clean", "sns_pop", "portrait", "instagram", "magazine_cover",
   "ad_visual", "bright", "art", "vivid",
 ];
-const STREET_BRIGHT_COLORS: OutfitColor[] = [
-  "white", "inherit", "gradient", "accent_color", "light_blue",
-  "red", "green", "purple", "pink", "gold",
-];
-const STREET_BRIGHT_MATERIALS: OutfitMaterial[] = [
-  "denim", "nylon", "cloth", "chiffon", "knit",
-];
-
 /** 20%使用 — アーバングランジ・ゴシックストリート（サイバーパンク固定は避ける） */
 const STREET_DARK_MOODS: Mood[] = [
   "dark", "cinematic", "monochrome", "street", "cool", "art", "contemporary",
 ];
-const STREET_DARK_COLORS: OutfitColor[] = ["black", "silver", "inherit"];
-const STREET_DARK_MATERIALS: OutfitMaterial[] = ["denim", "leather", "nylon"];
 
 /**
  * 🏙️ ストリート：ファッション誌・モデルスナップ・アーバンカジュアルが基本。
@@ -779,12 +762,8 @@ export function buildStreetInputs(current: PromptInputs, memory: VariationMemory
   const isDark = Math.random() < 0.20;
 
   const moodPool   = isDark ? STREET_DARK_MOODS     : STREET_BRIGHT_MOODS;
-  const colorPool  = isDark ? STREET_DARK_COLORS    : STREET_BRIGHT_COLORS;
-  const matPool    = isDark ? STREET_DARK_MATERIALS : STREET_BRIGHT_MATERIALS;
 
   const moods       = pickNAvoidingRecent(moodPool, memory.recentMoods, 3) as Mood[];
-  const outfitColor = colorPool[Math.floor(Math.random() * colorPool.length)] as OutfitColor;
-  const outfitMat   = matPool[Math.floor(Math.random() * matPool.length)] as OutfitMaterial;
 
   const streetNote = isDark
     ? [
@@ -816,12 +795,13 @@ export function buildStreetInputs(current: PromptInputs, memory: VariationMemory
       },
       outfit: {
         style:      "street",
-        color:      outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "oversized",
         decoration: "minimal",
         luxury:     "casual",
         exposure:   current.details.outfit.exposure,
-        material:   outfitMat,
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       props: {
@@ -1022,12 +1002,13 @@ export function buildWaFuuInputs(current: PromptInputs, memory: VariationMemory)
       ...current.details,
       outfit: {
         style:      dir.outfitStyle,
-        color:      dir.outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "auto",
         decoration: current.details.outfit.decoration,
         luxury:     "refined",
         exposure:   current.details.outfit.exposure,
-        material:   dir.outfitMaterial,
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       props: {
@@ -1139,12 +1120,13 @@ export function buildGothicInputs(current: PromptInputs, memory: VariationMemory
       ...current.details,
       outfit: {
         style:      dir.outfitStyle,
-        color:      dir.outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "auto",
         decoration: current.details.outfit.decoration,
         luxury:     "refined",
         exposure:   current.details.outfit.exposure,
-        material:   dir.outfitMaterial,
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       props: {
@@ -1262,12 +1244,13 @@ export function buildAdVisualInputs(current: PromptInputs, memory: VariationMemo
       ...current.details,
       outfit: {
         style:      dir.outfitStyle,
-        color:      dir.outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "auto",
         decoration: "minimal",
         luxury:     "luxe",
         exposure:   current.details.outfit.exposure,
-        material:   dir.outfitMaterial,
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       lighting: {
@@ -1376,12 +1359,13 @@ export function buildFantasyInputs(current: PromptInputs, memory: VariationMemor
       ...current.details,
       outfit: {
         style:      dir.outfitStyle,
-        color:      dir.outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "auto",
         decoration: current.details.outfit.decoration,
         luxury:     "refined",
         exposure:   current.details.outfit.exposure,
-        material:   "auto",
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       foreground: {
@@ -1507,12 +1491,13 @@ export function buildRetroInputs(current: PromptInputs, memory: VariationMemory)
       ...current.details,
       outfit: {
         style:      dir.outfitStyle,
-        color:      dir.outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "auto",
         decoration: current.details.outfit.decoration,
         luxury:     "refined",
         exposure:   current.details.outfit.exposure,
-        material:   dir.outfitMaterial,
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       lighting: {
@@ -1656,12 +1641,13 @@ export function buildJiraiInputs(current: PromptInputs, memory: VariationMemory)
       },
       outfit: {
         style:      dir.outfitStyle,
-        color:      dir.outfitColor,
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "layered",
         decoration: dir.outfitDecoration,
         luxury:     "refined",
         exposure:   current.details.outfit.exposure,
-        material:   dir.outfitMaterial,
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       props: {
@@ -1783,12 +1769,13 @@ export function buildSeikimatsuInputs(current: PromptInputs, memory: VariationMe
       ...current.details,
       outfit: {
         style:      dir.outfitStyle,
-        color:      "inherit",
+        // ★色・素材は世界観プリセットで固定しない（参照ピッカー/自由指示/おまかせを尊重・上書き除去）。
+        color:      current.details.outfit.color,
         silhouette: "layered",
         decoration: "moderate",
         luxury:     "casual",
         exposure:   current.details.outfit.exposure,
-        material:   "leather",
+        material:   current.details.outfit.material,
         season:     "skip",
       },
       lighting: {
