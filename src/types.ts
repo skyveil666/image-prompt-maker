@@ -1393,18 +1393,25 @@ export const DEFAULT_DETAILS: DetailSettings = {
     textLayout:  "skip",
     textTexture: "skip",
   },
+  // 前景演出は既定を「おまかせ」にする（初期状態・↺全リセット・アレンジで全項目おまかせ）。
+  //   skip=無指示に対し auto=「案ごとに異なる方向性で変化させる」＝毎回同じ演出に固まらない。
+  //   前景演出ブロック自体は scopes.includes("foreground") で囲まれているため、
+  //   「前景演出」を変更対象にしていない間は従来どおり何も注入されない。
+  //   ★visibility だけは "auto" にしない（AUTO_DETAILS と同じ組み合わせ）：
+  //     視認性には auto の選択肢が無く、promptSystem は skip 以外を無条件で固定扱いにするため、
+  //     "auto" を入れると「視認性：auto（固定）」という壊れた指示文になる。顔の保護も最優先。
   foreground: {
-    preset:      "skip",
-    effectType:  "skip",
-    swirlType:   "skip",
-    digitalType: "skip",
-    artType:     "skip",
-    position:    "skip",
-    density:     "skip",
-    motion:      "skip",
-    color:       "skip",
-    depth:       "skip",
-    visibility:  "skip",
+    preset:      "auto",
+    effectType:  "auto",
+    swirlType:   "auto",
+    digitalType: "auto",
+    artType:     "auto",
+    position:    "auto",
+    density:     "auto",
+    motion:      "auto",
+    color:       "auto",
+    depth:       "auto",
+    visibility:  "face_protected",  // おまかせ時も顔は必ず保護
   },
   pose: {
     type: "skip",
