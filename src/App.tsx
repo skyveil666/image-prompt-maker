@@ -1527,8 +1527,11 @@ export default function App() {
     setWorldCombinedNote("");
     setActiveBgPresets([]);
     setBgPresetNote("");
+    setActiveArtPresets([]);
+    setArtPresetNote("");
     setWorldScopes([]);
     setBgScopes([]);
+    setArtScopes([]);
     setReferenceNote({});      // 🖼 参照適用も完全クリア（逆residual解消＝全リセット後にバッジが残らない）
     setRefAppliedScopes([]);   // 参照由来 scope の記録もクリア（setScopes([]) と整合）
     setActiveGodModes([]);
@@ -1545,6 +1548,7 @@ export default function App() {
     // ── 詳細設定 ───────────────────────────────────────────────────────────────
     setDetails(DEFAULT_DETAILS);
     setDecorationColorLink(true);  // ✨派手さ→配色 連動を既定ON に戻す
+    setColorDominance(null);       // 配色主従（衣装主役/背景主役/対比）も解除
     // ── 好み反映 ───────────────────────────────────────────────────────────────
     setZozoApplied(null);
     setFavoriteLearnEnabled(false);
@@ -1594,7 +1598,7 @@ export default function App() {
       setView("main");
       const arrangeInputs = buildArrangeInputs(buildInputs(), sourceItem);
       setScopes(arrangeInputs.scopes);
-      setWorldScopes([]); setBgScopes([]);  // 復元系：由来不能ゆえクリア（次の preset toggle で正しく再計算）
+      setWorldScopes([]); setBgScopes([]); setArtScopes([]);  // 復元系：由来不能ゆえクリア（次の preset toggle で正しく再計算）
       setMoods(arrangeInputs.moods);
       setAutoMoodCategories(arrangeInputs.autoMoodCategories ?? []);
       setDetails(arrangeInputs.details);
@@ -1619,7 +1623,7 @@ export default function App() {
 
       // ── 基本設定（PromptHistoryItem に常にある） ─────────────────────────
       setScopes(item.scopes ?? []);
-      setWorldScopes([]); setBgScopes([]);  // 復元系：由来不能ゆえクリア
+      setWorldScopes([]); setBgScopes([]); setArtScopes([]);  // 復元系：由来不能ゆえクリア
       setMoods(item.moods ?? []);
       setDetails(item.details ?? ({} as import("./types").DetailSettings));
       setFaceLock(item.faceLock ?? false);
@@ -1879,8 +1883,10 @@ export default function App() {
     setActiveWorldPresets(nextWorldPresets);
     setWorldCombinedNote(nextWorldNote);
     setActiveBgPresets([]); setBgPresetNote("");  // BG-1(§5整合)：斬新背景も世界観と対称に解除（再試行後のバッジ残留＋次回手動生成への漏れを断つ）
+    setActiveArtPresets([]); setArtPresetNote("");  // 画法世界も同様に解除（バッジ残留防止）
+    setColorDominance(null);  // 配色主従も解除（再試行後の残留防止）
     setScopes(nextScopes);
-    setWorldScopes([]); setBgScopes([]);  // 反映：世界観・斬新背景クリア＋scope縮約ゆえ由来クリア（次の preset toggle で再計算）
+    setWorldScopes([]); setBgScopes([]); setArtScopes([]);  // 反映：世界観・斬新背景・画法世界クリア＋scope縮約ゆえ由来クリア（次の preset toggle で再計算）
     setRealismLevel(nextRealismLevel);
     setMoods(nextMoods);
     setNgList(nextNgList);
