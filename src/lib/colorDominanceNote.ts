@@ -13,6 +13,11 @@
 
 export type ColorDominance = "outfit" | "background" | "contrast";
 
+/** 表示用ラベル（§5バッジ・マイ保存の自動命名などUI側で共通利用）。 */
+export const DOMINANCE_LABELS: Record<ColorDominance, string> = {
+  outfit: "👗 衣装主役", background: "🖼 背景主役", contrast: "⚡ 対比",
+};
+
 export function buildColorDominanceNote(mode: ColorDominance): string {
   switch (mode) {
     case "outfit":

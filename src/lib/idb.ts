@@ -9,6 +9,7 @@
  *  - `operationLog`     : skyveil好み学習の操作ログ（id, ts, type, detail）
  *  - `referenceRecords` : Reference Picker / Compare Mode の参照レコード（id, createdAt, refThumb, extracted, applied, batchId）
  *  - `croppedImages`    : トリミング結果（id, createdAt, dataUrl(フルサイズ), thumb, favorite?）。上限50・favorite保護。
+ *  - `myPresets`        : マイプリセット（id, name, createdAt, updatedAt, snapshot）。上限20・手動保存のみ（自動間引きなし）。
  *
  * migration 方針（v7〜）：onupgradeneeded で **objectStoreNames.contains() による「無ければ作成」の冪等 migration**。
  * createObjectStore は追加のみ＝既存ストア・既存データは破壊しない（clear/deleteDatabase は使わない）。
@@ -18,7 +19,7 @@
  */
 
 const DB_NAME = "image-prompt-maker";
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 export const STORE_HISTORY   = "history";
 export const STORE_RECENT    = "recentImages";
@@ -27,6 +28,7 @@ export const STORE_IMAGE_FEATURES = "imageFeatures";
 export const STORE_OPERATION_LOG = "operationLog";
 export const STORE_REFERENCE_RECORDS = "referenceRecords";
 export const STORE_CROPPED = "croppedImages";
+export const STORE_MY_PRESETS = "myPresets";
 
 type StoreName =
   | typeof STORE_HISTORY
@@ -35,7 +37,8 @@ type StoreName =
   | typeof STORE_IMAGE_FEATURES
   | typeof STORE_OPERATION_LOG
   | typeof STORE_REFERENCE_RECORDS
-  | typeof STORE_CROPPED;
+  | typeof STORE_CROPPED
+  | typeof STORE_MY_PRESETS;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -43,7 +46,7 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 const EXPECTED_STORES: readonly string[] = [
   STORE_HISTORY, STORE_RECENT, STORE_SELECTION,
   STORE_IMAGE_FEATURES, STORE_OPERATION_LOG, STORE_REFERENCE_RECORDS,
-  STORE_CROPPED,
+  STORE_CROPPED, STORE_MY_PRESETS,
 ];
 
 /**
@@ -85,6 +88,11 @@ function ensureStores(db: IDBDatabase): void {
   if (!db.objectStoreNames.contains(STORE_CROPPED)) {
     // トリミング結果（フルサイズ保存・上限50・favorite保護）
     const s = db.createObjectStore(STORE_CROPPED, { keyPath: "id" });
+    s.createIndex("createdAt", "createdAt", { unique: false });
+  }
+  if (!db.objectStoreNames.contains(STORE_MY_PRESETS)) {
+    // マイプリセット（名前付き設定スナップショット・上限20・手動保存のみ＝自動間引きなし）
+    const s = db.createObjectStore(STORE_MY_PRESETS, { keyPath: "id" });
     s.createIndex("createdAt", "createdAt", { unique: false });
   }
 }

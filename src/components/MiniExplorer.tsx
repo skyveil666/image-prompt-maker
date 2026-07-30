@@ -18,6 +18,7 @@ import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useEscapeKey } from "../lib/useEscapeKey";
 import { croppedImagesChanged, listCroppedImages, removeCroppedImage, toggleCroppedFavorite, type CroppedImageRecord } from "../lib/croppedImages";
+import { myPresetsChanged, listMyPresets, removeMyPreset, type MyPresetRecord } from "../lib/myPresets";
 import type { ExplorerFavorite, ExplorerImage, ExplorerSubfolder } from "../lib/miniExplorer";
 import {
   addExplorerFavorite,
@@ -89,6 +90,9 @@ interface Props {
   onOpen: () => void;
   width: number;
   onResize: (w: number) => void;
+  /** 💾 マイ保存：保存済み設定を適用する（設定画面は直近10件のみ・ここが全件の置き場）。
+   *  上書きは「今の設定」が要るので設定画面側だけに置き、ここは適用と削除のみ。 */
+  onApplyMyPreset?: (preset: MyPresetRecord) => void;
 }
 
 interface TreeCtx {
@@ -523,7 +527,7 @@ function TreeItem({
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onResize }: Props) {
+export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onResize, onApplyMyPreset }: Props) {
   // ── Core navigation state ────────────────────────────────────────────
   const [rootHandle,  setRootHandle]  = useState<FileSystemDirectoryHandle | null>(null);
   const [navHistory,  setNavHistory]  = useState<NavEntry[]>([]);
@@ -561,6 +565,7 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
   const [query,        setQuery]        = useState("");      // ファイル名検索
   const [favOnly,      setFavOnly]      = useState(false);   // お気に入りのみ
   const [croppedList,  setCroppedList]  = useState<CroppedImageRecord[]>([]); // ✂ トリミング画像（クイックアクセス直下）
+  const [presetList,   setPresetList]   = useState<MyPresetRecord[]>([]);     // 💾 マイ保存（全件・設定画面は直近10件のみ）
 
   const sortRef     = useRef<HTMLDivElement>(null);
   const showTimer   = useRef<ReturnType<typeof setTimeout> | null>(null); // delay before showing hover
@@ -670,6 +675,15 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
     refresh();
     croppedImagesChanged.addEventListener("change", refresh);
     return () => { cancelled = true; croppedImagesChanged.removeEventListener("change", refresh); };
+  }, []);
+
+  // 💾 マイ保存の全件一覧：同上（設定画面側で保存/上書き/削除しても即座にここへ反映）
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = () => { void listMyPresets().then((list) => { if (!cancelled) setPresetList(list); }); };
+    refresh();
+    myPresetsChanged.addEventListener("change", refresh);
+    return () => { cancelled = true; myPresetsChanged.removeEventListener("change", refresh); };
   }, []);
 
   // ── Load images ──────────────────────────────────────────────────────
@@ -806,6 +820,11 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
   const handleToggleCroppedFavorite = useCallback(async (id: string) => {
     await toggleCroppedFavorite(id);
     setCroppedList((prev) => prev.map((r) => (r.id === id ? { ...r, favorite: !r.favorite } : r)));
+  }, []);
+
+  /** 💾 マイ保存を1件削除（myPresetsChanged 経由で設定画面側の一覧にも反映される） */
+  const handleRemovePreset = useCallback(async (id: string) => {
+    await removeMyPreset(id);
   }, []);
 
   /** Double-click → pin the large preview (does NOT auto-select) */
@@ -1041,6 +1060,43 @@ export function MiniExplorer({ onSelectImage, onClose, open, onOpen, width, onRe
                         onClick={(e) => { e.stopPropagation(); void handleRemoveCropped(r.id); }}
                         title="削除"
                         className="absolute top-0.5 right-0.5 w-4 h-4 rounded-sm flex items-center justify-center text-[10px] bg-black/60 text-white/80 opacity-0 group-hover:opacity-100 hover:bg-rose-500/80 hover:text-white transition backdrop-blur-sm"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 最下段：💾マイ保存の全件（設定画面は直近10件のみ・ここが全部の置き場） */}
+            {onApplyMyPreset && presetList.length > 0 && (
+              <div className="flex-1 min-h-0 flex flex-col border-t-2 border-bg-border bg-black/15">
+                <div
+                  className="shrink-0 px-3 py-1.5 text-[12px] uppercase tracking-widest text-text-muted/90 font-bold select-none"
+                  title="保存した設定（変更対象・詳細・世界観/斬新背景/画法世界・配色主従）。クリックで適用します"
+                >
+                  💾 マイ保存（{presetList.length}）
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-1 px-2 pb-2 mx-thin-scroll">
+                  {presetList.map((p) => (
+                    <div
+                      key={p.id}
+                      className="group flex items-center gap-1 rounded-md ring-1 ring-white/10 hover:ring-accent/50 bg-bg-panel/50 transition min-w-0"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => onApplyMyPreset(p)}
+                        title={`クリックでこの設定を適用（保存日：${new Date(p.createdAt).toLocaleDateString("ja-JP")}）`}
+                        className="flex-1 min-w-0 text-left px-2 py-1.5 text-[12px] text-text-muted/90 hover:text-text-base truncate"
+                      >
+                        📂 {p.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleRemovePreset(p.id)}
+                        title="この保存を削除"
+                        className="shrink-0 w-5 h-5 mr-1 rounded-sm flex items-center justify-center text-[11px] bg-black/40 text-white/70 opacity-0 group-hover:opacity-100 hover:bg-rose-500/80 hover:text-white transition"
                       >
                         ×
                       </button>

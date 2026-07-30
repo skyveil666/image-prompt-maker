@@ -15,6 +15,9 @@ import { useState } from "react";
 import type { ReactNode, MouseEvent as ReactMouseEvent } from "react";
 import type { WorldPreset, BgPreset, ArtPreset } from "../lib/quickActions";
 import type { ColorDominance } from "../lib/colorDominanceNote";
+import { MyPresetsSection } from "./MyPresetsSection";
+import { MY_PRESET_MAX } from "../lib/myPresets";
+import type { MyPresetRecord } from "../lib/myPresets";
 
 export type { WorldPreset, BgPreset, ArtPreset };
 
@@ -36,6 +39,14 @@ interface QuickActionsProps {
   /** 🎨 配色の主従（衣装/背景どちらを主役にするか・単一選択・null=設定なし） */
   colorDominance?:        ColorDominance | null;
   onColorDominanceChange?: (v: ColorDominance | null) => void;
+  /** 💾 マイプリセット（現在の全設定を名前付きで保存・再適用） */
+  myPresets?:           MyPresetRecord[];
+  /** 保存欄を開いた瞬間に入力欄へ流し込む自動生成名（「YYYY/MM/DD 設定ラベル」）。 */
+  myPresetDefaultName?: string;
+  onSaveMyPreset?:      (name: string) => void;
+  onApplyMyPreset?:     (preset: MyPresetRecord) => void;
+  onOverwriteMyPreset?: (id: string) => void;
+  onDeleteMyPreset?:    (id: string) => void;
   /** 量産回避（avoidCliche・サーバ側 cliche 回避ブロック。既定ON） */
   avoidCliche?:        boolean;
   onAvoidClicheChange?: (v: boolean) => void;
@@ -145,6 +156,7 @@ export function QuickActions({
   activeArtPresets    = [],
   onArtPresetToggle,
   colorDominance = null, onColorDominanceChange,
+  myPresets = [], myPresetDefaultName = "", onSaveMyPreset, onApplyMyPreset, onOverwriteMyPreset, onDeleteMyPreset,
   avoidCliche = true, onAvoidClicheChange,
   avoidRealBackground = true, onAvoidRealBackgroundChange,
 }: QuickActionsProps) {
@@ -257,6 +269,20 @@ export function QuickActions({
           <TagBtn label="🖼 背景主役" title="衣装の配色はモノトーン〜控えめに抑え、背景の方が色で主張するようにする" onClick={() => onColorDominanceChange(colorDominance === "background" ? null : "background")} active={colorDominance === "background"} variant="sky" disabled={disabled} />
           <TagBtn label="⚡ 対比" title="衣装と背景を反対方向の配色に振り分け、コントラストを強める" onClick={() => onColorDominanceChange(colorDominance === "contrast" ? null : "contrast")} active={colorDominance === "contrast"} variant="gold" disabled={disabled} />
         </CategoryRow>
+      )}
+
+      {/* ══════ マイプリセット（現在の全設定を名前付きで保存・再適用） ══════ */}
+      {onSaveMyPreset && onApplyMyPreset && onOverwriteMyPreset && onDeleteMyPreset && (
+        <MyPresetsSection
+          presets={myPresets}
+          disabled={disabled}
+          atCap={myPresets.length >= MY_PRESET_MAX}
+          defaultName={myPresetDefaultName}
+          onSave={onSaveMyPreset}
+          onApply={onApplyMyPreset}
+          onOverwrite={onOverwriteMyPreset}
+          onDelete={onDeleteMyPreset}
+        />
       )}
 
     </div>

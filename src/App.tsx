@@ -37,6 +37,11 @@ import {
 } from "./lib/quickActions";
 import { buildOutfitColorfulNote, buildOutfitColorVarietyNote } from "./lib/outfitColorNotes";
 import { buildColorDominanceNote } from "./lib/colorDominanceNote";
+import {
+  listMyPresets, saveMyPreset, overwriteMyPreset, removeMyPreset, MY_PRESET_MAX,
+  buildMyPresetDefaultName, myPresetsChanged,
+  type MyPresetRecord, type MyPresetSnapshot,
+} from "./lib/myPresets";
 import { buildCustomInstructionNote, type MemoBadge } from "./lib/axisMemoNote";
 import { joinAppliedItemsText } from "./lib/customInstructionItems";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
@@ -203,6 +208,16 @@ export default function App() {
   /** 画法世界プリセット由来の指示文（bgPresetNote の兄弟・extraInstructions と分離して管理） */
   const [artPresetNote, setArtPresetNote] = useState("");
   const [artScopes, setArtScopes] = useState<Scope[]>([]);
+  // 💾 マイプリセット：IndexedDB(STORE_MY_PRESETS)の一覧をミラーしたローカルstate（起動時に1回読み込み）。
+  const [myPresets, setMyPresets] = useState<MyPresetRecord[]>([]);
+  const refreshMyPresets = useCallback(() => { void listMyPresets().then(setMyPresets); }, []);
+  // 初回取得＋以後は保存/上書き/削除のたびにイベントで再取得（Explorer側の一覧から操作された分も拾う）。
+  useEffect(() => {
+    refreshMyPresets();
+    const onChange = () => refreshMyPresets();
+    myPresetsChanged.addEventListener("change", onChange);
+    return () => myPresetsChanged.removeEventListener("change", onChange);
+  }, [refreshMyPresets]);
   /** 参照画像から「適用」した軸タグ付き自由文（catKey → text）。生成時に extraInstructions へ統合。
    *  ※ 詳細 enum には自動反映しない（docs/23）。worldCombinedNote と同じ追加マージ方式。 */
   const [referenceNote, setReferenceNote] = useState<Record<string, string>>({});
@@ -1497,6 +1512,65 @@ export default function App() {
     showPresetToast(msg, hint);
   }, [activeArtPresets, activeBgPresets, buildInputs, variationMemory, showPresetToast, worldScopes, bgScopes, artScopes]);
 
+  // ─── 💾 マイプリセット：現在の全設定（スコープ・詳細・世界観/斬新背景/画法世界・配色主従）
+  //     を名前付きで保存し、ワンクリックで再適用する。handleRestoreFromHistory と同じ
+  //     「生の state を直接 setter で戻す」方式（プリセットのビルダー関数は再実行しない）。
+  const buildMyPresetSnapshot = useCallback((): MyPresetSnapshot => ({
+    scopes, details,
+    activeWorldPresets, worldCombinedNote, worldScopes,
+    activeBgPresets, bgPresetNote, bgScopes,
+    activeArtPresets, artPresetNote, artScopes,
+    colorDominance,
+  }), [scopes, details, activeWorldPresets, worldCombinedNote, worldScopes,
+      activeBgPresets, bgPresetNote, bgScopes,
+      activeArtPresets, artPresetNote, artScopes, colorDominance]);
+
+  // 保存欄を開く瞬間に入力欄へ流し込む自動生成名（Gemini/APIは呼ばない・機械組み立て）。
+  const myPresetDefaultName = useMemo(
+    () => buildMyPresetDefaultName({ activeWorldPresets, activeBgPresets, activeArtPresets, colorDominance, zozoApplied }),
+    [activeWorldPresets, activeBgPresets, activeArtPresets, colorDominance, zozoApplied],
+  );
+
+  const handleSaveMyPreset = useCallback(async (name: string) => {
+    const result = await saveMyPreset(name, buildMyPresetSnapshot());
+    if (result.ok) {
+      refreshMyPresets();
+      showPresetToast("💾 マイプリセットに保存しました", `「${result.record.name}」として保存しました。`);
+    } else if (result.reason === "at_cap") {
+      showPresetToast("保存できませんでした", `マイプリセットの上限（${MY_PRESET_MAX}件）に達しています。不要なプリセットを削除してから保存してください。`);
+    }
+  }, [buildMyPresetSnapshot, refreshMyPresets, showPresetToast]);
+
+  const handleApplyMyPreset = useCallback((preset: MyPresetRecord) => {
+    const s = preset.snapshot;
+    setScopes(s.scopes);
+    setDetails(s.details);
+    setActiveWorldPresets(s.activeWorldPresets);
+    setWorldCombinedNote(s.worldCombinedNote);
+    setWorldScopes(s.worldScopes);
+    setActiveBgPresets(s.activeBgPresets);
+    setBgPresetNote(s.bgPresetNote);
+    setBgScopes(s.bgScopes);
+    setActiveArtPresets(s.activeArtPresets);
+    setArtPresetNote(s.artPresetNote);
+    setArtScopes(s.artScopes);
+    setColorDominance(s.colorDominance);
+    showPresetToast("📂 マイプリセットを適用しました", `「${preset.name}」を反映しました。`);
+  }, [showPresetToast]);
+
+  const handleOverwriteMyPreset = useCallback(async (id: string) => {
+    const updated = await overwriteMyPreset(id, buildMyPresetSnapshot());
+    if (updated) {
+      refreshMyPresets();
+      showPresetToast("💾 上書き保存しました", `「${updated.name}」を今の設定で更新しました。`);
+    }
+  }, [buildMyPresetSnapshot, refreshMyPresets, showPresetToast]);
+
+  const handleDeleteMyPreset = useCallback(async (id: string) => {
+    await removeMyPreset(id);
+    refreshMyPresets();
+  }, [refreshMyPresets]);
+
   // ─── 多様性ツール（生成補助）：ギャップ化のトグル選択（単一） ─
   // handleAssistToggle（🎭雰囲気を逆に）の UI トグルは撤去。
   // assist の state（activeAssistModes）は生成送信・復元のため温存。
@@ -2033,6 +2107,7 @@ export default function App() {
               onClose={() => setExplorerOpen(false)}
               width={explorerWidth}
               onResize={handleExplorerResize}
+              onApplyMyPreset={handleApplyMyPreset}
             />
             <ImageSidebar
               imageDataUrl={imageDataUrl}
@@ -2117,6 +2192,12 @@ export default function App() {
                 onArtPresetToggle={handleArtPresetToggle}
                 colorDominance={colorDominance}
                 onColorDominanceChange={setColorDominance}
+                myPresets={myPresets}
+                myPresetDefaultName={myPresetDefaultName}
+                onSaveMyPreset={handleSaveMyPreset}
+                onApplyMyPreset={handleApplyMyPreset}
+                onOverwriteMyPreset={handleOverwriteMyPreset}
+                onDeleteMyPreset={handleDeleteMyPreset}
                 avoidCliche={avoidCliche}
                 onAvoidClicheChange={setAvoidCliche}
                 avoidRealBackground={avoidRealBackground}
