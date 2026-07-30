@@ -33,7 +33,11 @@ Thumbs.db
 desktop.ini
 
 # ── Claude / ローカル開発支援 ────────────────────────
-.claude/
+# launch.json 等ローカル専用設定は無視。ただし agents/skills（プロジェクト共通の
+# 開発ツール定義）はコミット対象として明示的に追跡する。
+.claude/*
+!.claude/agents/
+!.claude/skills/
 
 # ── 個人用起動スクリプト（必要なら remove） ───────
 # 起動.bat
