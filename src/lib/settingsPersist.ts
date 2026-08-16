@@ -21,6 +21,7 @@ import { DEFAULT_DETAILS } from "../types";
 import type { ZozoTrend } from "./zozoTrend";
 import { stripViralImageNote } from "./viralNote";
 import type { CustomInstructionItem } from "./customInstructionItems";
+import { stripCustomInstructionBlock } from "./axisMemoNote";
 import type { ColorDominance } from "./colorDominanceNote";
 
 // ─── 定数 ─────────────────────────────────────────────────────────────────────
@@ -234,6 +235,25 @@ export function loadSettings(): PersistedSettings {
           saveSettings(loaded);
         }
         localStorage.setItem(ITEMS_MIGRATE_KEY, "1");
+      }
+    } catch {
+      // localStorage 不可環境では移行をスキップ
+    }
+
+    // ✏指示ブロックの焼き付き掃除（1回だけ・実機報告バグの後始末）。
+    // アレンジ／同じ構成で再生成 が組み立て済み extraInstructions を state へ書き戻していたため、
+    // ✏指示が「追加指示」欄の一部として残り、チップを保留・削除しても消えない状態になっていた。
+    // 書き戻し側は修正済み（App.tsx の stripCustomInstructionBlock）だが、既に焼き付いた保存データは
+    // そのままでは消えないため、ここで一度だけ取り除く。ユーザーが自分で打った文は保持する。
+    try {
+      const STRIP_KEY = "ipm_extra_strip_ci_v1";
+      if (!localStorage.getItem(STRIP_KEY)) {
+        const cleaned = stripCustomInstructionBlock(loaded.extraInstructions ?? "");
+        if (cleaned !== (loaded.extraInstructions ?? "")) {
+          loaded.extraInstructions = cleaned;
+          saveSettings(loaded);
+        }
+        localStorage.setItem(STRIP_KEY, "1");
       }
     } catch {
       // localStorage 不可環境では移行をスキップ

@@ -42,7 +42,7 @@ import {
   buildMyPresetDefaultName, myPresetsChanged,
   type MyPresetRecord, type MyPresetSnapshot,
 } from "./lib/myPresets";
-import { buildCustomInstructionNote, type MemoBadge } from "./lib/axisMemoNote";
+import { buildCustomInstructionNote, stripCustomInstructionBlock, type MemoBadge } from "./lib/axisMemoNote";
 import { joinAppliedItemsText } from "./lib/customInstructionItems";
 import { analyzeBias, type BiasAnalysisResult, type HistoryEntry } from "./lib/biasAnalyzer";
 import { analyzeFullHistory, filterRecentWindow, type FullHistoryAnalysis } from "./lib/historyAnalyzer";
@@ -1676,7 +1676,11 @@ export default function App() {
       setMoods(arrangeInputs.moods);
       setAutoMoodCategories(arrangeInputs.autoMoodCategories ?? []);
       setDetails(arrangeInputs.details);
-      setExtraInstructions(arrangeInputs.extraInstructions); // アレンジ指示を UI にも反映
+      // アレンジ指示を UI にも反映。★✏指示ブロックは取り除いてから書き戻す：
+      //   arrangeInputs.extraInstructions は buildInputs() が組み立てた「自由入力＋自動生成ブロック」の
+      //   連結で、ここには applied な✏指示も含まれる。そのまま state へ入れると「追加指示」欄に焼き付き、
+      //   以後チップを保留・削除しても消えなくなる（実機報告のバグ）。✏指示の供給源は items 側のみに保つ。
+      setExtraInstructions(stripCustomInstructionBlock(arrangeInputs.extraInstructions));
       setViralMode(false);
       setArrangeSource(sourceItem);
       pendingRunRef.current = arrangeInputs;
@@ -1703,7 +1707,9 @@ export default function App() {
       setFaceLock(item.faceLock ?? false);
       setNgList(item.ngList ?? "");
       setViralMode(item.viralMode ?? false);
-      setExtraInstructions(item.extraInstructions ?? "");
+      // ★履歴に保存されている extraInstructions は生成時の組み立て済み文字列＝✏指示ブロックを含む。
+      //   そのまま復元すると「追加指示」欄に焼き付き、チップを保留・削除しても消えなくなる（同上）。
+      setExtraInstructions(stripCustomInstructionBlock(item.extraInstructions ?? ""));
 
       // ロックの各フィールドを展開
       const lk = item.locks ?? {};
