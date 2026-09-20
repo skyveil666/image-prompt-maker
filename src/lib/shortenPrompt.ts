@@ -2,14 +2,14 @@
  * shortenPrompt — ChatGPT(Image2)向け 出力プロンプトの軽量化（§4外・純関数・後処理のみ）。
  *
  * 目的：生成済みプロンプト本文（chatgpt_safe 出力）の「品質・解剖補正の重複/冗長」だけを削り、
- *       1案あたりの文字数を約450〜600字に軽量化する。生成ロジック（§4 promptSystem）は不触。
+ *       削れる冗長文だけを軽量化する（文字数の上限は保証しない）。生成ロジック（§4 promptSystem）は不触。
  *
  * 削る対象（品質冗長のみ）:
  *   1. 【人体補正】行を短い定型1行へ圧縮（同行末尾に付く英語補足ごと置換＝最大の削り代）。
  *   2. 単独行の純英語 解剖補足（"Anatomically correct…" / "Legs: exactly two legs…" 等）を除去。
  *
  * ★絶対に削らない/変えない（安全方向・意味のある内容）:
- *   - 【NG】行は verbatim 温存（一字一句変えない）。
+ *   - 【NG】/《NG》セクションは継続行も verbatim 温存（一字一句変えない）。
  *   - 【変更】【雰囲気】【光】【前提】【固定】【品質】等 本文（非性的・露出抑制・上品描写を含む）はそのまま通す。
  *
  * fail-safe：【見出し】が見つからない／何も削れない 等の想定外入力は原文をそのまま返す（壊さない）。
@@ -44,17 +44,26 @@ function shortenOne(body: string): string {
   const lines = body.split("\n");
   const out: string[] = [];
   let touched = false;
+  let inNgSection = false;
 
   for (const line of lines) {
-    // ★[NG] は安全方向ゆえ verbatim 温存（絶対に変えない）
-    if (line.startsWith("【NG】")) {
+    // NG の見出し行だけでなく、次のセクションまでの英語・空行もそのまま残す。
+    const heading = line.trimStart().match(/^(?:【([^】]+)】|《([^》]+)》)/);
+    if (heading) inNgSection = (heading[1] ?? heading[2]) === "NG";
+    if (inNgSection) {
       out.push(line);
       continue;
     }
     // 【人体補正】行 → 定型1行へ圧縮（同行に付く英語補足も同時に消える）
     if (line.startsWith("【人体補正】")) {
-      out.push(SHORT_BODY_FIX);
-      touched = true;
+      const replacement = SHORT_BODY_FIX + (line.endsWith("\r") ? "\r" : "");
+      // 元から短い行は維持。同じ行に別セクションがある想定外形式も壊さない。
+      if (replacement.length < line.length && !/[【《]/.test(line.slice("【人体補正】".length))) {
+        out.push(replacement);
+        touched = true;
+      } else {
+        out.push(line);
+      }
       continue;
     }
     // 単独行の純英語 解剖補足（日本語を含まない場合のみ）を除去
@@ -70,8 +79,8 @@ function shortenOne(body: string): string {
   // 何も削れなかった＝想定外 → 原文を返す（fail-safe）
   if (!touched) return body;
 
-  // 余分な空行（3連以上）を2行に整理。内容は変えない。
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  // NG の空行・末尾空白も含め、短縮対象外のレイアウトは保持する。
+  return out.join("\n");
 }
 
 /**

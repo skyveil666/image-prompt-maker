@@ -24,7 +24,7 @@ const OPTIONS: Option[] = [
     value: "chatgpt_safe",
     label: "ChatGPT",
     icon: "✦",
-    description: "ChatGPT / DALL-E 向け\n詳細・長めのプロンプト",
+    description: "ChatGPT画像編集向け\n詳細・長めのプロンプト",
     activeCls: "border-emerald-400/50 bg-emerald-400/10 text-emerald-300",
   },
   {

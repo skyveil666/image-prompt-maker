@@ -186,7 +186,7 @@ interface Props {
   // ── per-tag NG（タグ個別NG）──
   /** 永続 tagNg："category.field:value"。タグのダブルクリックでトグルして増減。 */
   tagNg: string[];
-  /** tagNg のトグル（fieldKey, value）。送信ゲートで en 語へ解決し【NG】へ合流する。 */
+  /** tagNg のトグル（fieldKey, value）。背景の場所・スタイルは候補除外、それ以外は【NG】へ合流する。 */
   onToggleTagNg: (fieldKey: string, value: string) => void;
 }
 
@@ -1723,8 +1723,8 @@ function NgTabContent({
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-rose-200/85 bg-rose-500/8 border border-rose-400/25 rounded-lg px-2.5 py-1.5 leading-snug">
-        🚫 <b>NGはこの欄に入力します</b>（「NG指定（任意）」テキスト欄／下の「禁止モチーフ」）。
-        詳細設定のグリッドではNG指定できません（グリッドは候補の選択のみ）。
+        🚫 <b>自由文のNGはこの欄に入力します</b>（「NG指定（任意）」テキスト欄／下の「禁止モチーフ」）。
+        詳細設定のタグもダブルクリックでNG指定できます。背景の場所・スタイルは候補から除外し、それ以外のタグNGはプロンプトのNG欄に反映されます。
       </p>
       <div className="grid sm:grid-cols-2 gap-2">
         <div>
@@ -2016,7 +2016,7 @@ export function DetailsCard({
                   {isScopeTab(t) && (
                     <p className="mb-2 flex items-center gap-1.5 rounded-md border border-rose-400/35 bg-rose-500/10 px-2 py-1 text-[11.5px] font-semibold text-rose-200 leading-snug">
                       <span className="text-[13px] leading-none">🚫</span>
-                      タグを<span className="underline decoration-rose-300 underline-offset-2">ダブルクリック</span>でNG指定（もう一度で解除）。シングルクリックは通常の選択。※NG適用は準備中（現在は生成に未反映）。
+                      タグを<span className="underline decoration-rose-300 underline-offset-2">ダブルクリック</span>でNG指定（もう一度で解除）。シングルクリックは通常の選択。背景の場所・スタイルは候補から除外し、それ以外はプロンプトのNG欄に反映します。
                     </p>
                   )}
                   {renderTabContent(t)}

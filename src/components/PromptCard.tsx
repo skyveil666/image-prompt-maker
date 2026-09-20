@@ -279,7 +279,7 @@ function GeneratedResultSlot({
             )}
           </div>
           {/* 右列：ラベル＋操作＋画像ごとの評価バー（広めに使う） */}
-          <div className="flex-1 min-w-0 flex flex-col gap-1.5">
+          <div className="basis-full sm:basis-64 grow min-w-0 flex flex-col gap-1.5">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-[13px] text-emerald-300/90 font-medium leading-none">
                 ✅ 生成結果 <span className="text-[11px] text-emerald-300/60">（{resultImages.length}/{MAX_RESULT_IMAGES}）</span>
@@ -319,7 +319,7 @@ function GeneratedResultSlot({
                 : rating === 1 ? "border-rose-400/65    bg-rose-500/15    text-rose-100"
                 : "border-white/15 bg-white/4 text-text-muted/60";
                 return (
-                  <div key={resultImages[i]} className="space-y-1">
+                  <div key={`${i}-${resultImages[i]}`} className="space-y-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className={[
                         "inline-flex items-center justify-center w-6 h-6 rounded border text-[11px] font-bold leading-none shrink-0",
@@ -386,7 +386,7 @@ function GeneratedResultSlot({
             </div>
 
             <p className="text-[10px] text-text-muted/45 leading-snug">
-              画像クリックで差し替え・×で個別削除・最大{MAX_RESULT_IMAGES}枚 ／ 評価は次回プロンプト生成に反映
+              画像クリックで差し替え・×で個別削除・最大{MAX_RESULT_IMAGES}枚 ／ 評価は画像ごとに履歴へ保存
             </p>
           </div>
         </div>
