@@ -103,9 +103,10 @@ interface SlotProps {
   onSetMemo: (index: number, memo: string) => void;
 }
 
-// 評価値 → 枠の Tailwind クラス（緑=良い / 青=普通 / 黄=微妙 / 赤=失敗）
+// 評価値 → 枠の Tailwind クラス（金=神 / 緑=良い / 青=普通 / 黄=微妙 / 赤=失敗）
 function ratingFrameClass(rating: number | null): string {
   switch (rating) {
+    case 6: return "border-yellow-300/85 shadow-[0_0_10px_-2px_rgba(253,224,71,0.55)]";
     case 5: return "border-emerald-400/85 shadow-[0_0_10px_-2px_rgba(52,211,153,0.55)]";
     case 3: return "border-sky-400/80 shadow-[0_0_8px_-2px_rgba(56,189,248,0.45)]";
     case 2: return "border-amber-400/80 shadow-[0_0_8px_-2px_rgba(251,191,36,0.45)]";
@@ -403,6 +404,12 @@ function GeneratedResultSlot({
       role="button"
       aria-label="生成結果画像を登録（D&D / Ctrl+V / クリック・最大3枚）"
       onClick={openAppendPicker}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          openAppendPicker();
+        }
+      }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -564,7 +571,7 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <header
         className={[
-          "px-5 py-3.5 flex items-center justify-between gap-4",
+          "px-5 py-3.5 flex flex-wrap items-center justify-between gap-4",
           isLocked ? "border-b border-amber-400/25 bg-amber-500/6" : pal.header,
         ].join(" ")}
       >
@@ -593,7 +600,7 @@ export function PromptCard({ item, onUpdate, onArrange, lock }: Props) {
         </div>
 
         {/* アクションボタン群 */}
-        <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+        <div className="flex items-center gap-1.5 min-w-0 max-w-full flex-wrap justify-end">
           {/* 🔒 固定 */}
           <button
             type="button"
